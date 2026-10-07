@@ -80,7 +80,10 @@ export const de = {
     'Dieses Konto hat Transaktionen und kann nicht gelöscht werden. Archiviere es stattdessen.',
   'settings.title': 'Fühl dich wie zu Hause',
   'settings.description':
-    'Änderungen an Sprache und Darstellung werden sofort übernommen. Diese vorläufigen Einstellungen werden beim Neustart zurückgesetzt; Profileinstellungen folgen später.',
+    'Sprache, Darstellung und Basiswährung werden für dieses Profil gespeichert und sofort übernommen.',
+  'settings.baseCurrency': 'Basiswährung',
+  'settings.error':
+    'Die Einstellungen konnten nicht gespeichert werden. Bitte versuche es erneut.',
   'settings.language': 'Sprache',
   'settings.theme': 'Darstellung',
   'language.hu': 'Ungarisch',

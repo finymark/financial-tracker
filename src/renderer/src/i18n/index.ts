@@ -2,10 +2,10 @@ import type { Currency } from '../../../shared/accounts'
 import { en, type MessageKey } from './en'
 import { hu } from './hu'
 import { de } from './de'
+import type { Language } from '../../../shared/settings'
+export { languages, type Language } from '../../../shared/settings'
 
 export const catalogs = { hu, en, de }
-export const languages = ['hu', 'en', 'de'] as const
-export type Language = (typeof languages)[number]
 export type { MessageKey }
 
 const locales: Record<Language, string> = {

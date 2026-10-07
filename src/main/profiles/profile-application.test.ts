@@ -105,6 +105,11 @@ describe('profile application API', () => {
           currentVersion + 1,
         )
         expect(upgraded.queries.listAccounts()).toEqual([])
+        expect(upgraded.queries.getSettings()).toEqual({
+          language: 'en',
+          theme: 'system',
+          baseCurrency: 'HUF',
+        })
       } finally {
         upgraded.close()
       }
@@ -121,6 +126,11 @@ describe('profile application API', () => {
       currency: 'HUF',
       openingBalance: 12345,
       openingDate: '2026-01-01',
+    })
+    initial.commands.updateSettings({
+      language: 'hu',
+      theme: 'dark',
+      baseCurrency: 'CHF',
     })
     initial.close()
     const failingMigration = defineSqlMigration(
@@ -144,6 +154,11 @@ describe('profile application API', () => {
         currentVersion,
       )
       expect(reopened.queries.listAccounts()).toEqual([account])
+      expect(reopened.queries.getSettings()).toEqual({
+        language: 'hu',
+        theme: 'dark',
+        baseCurrency: 'CHF',
+      })
     } finally {
       reopened.close()
     }
@@ -167,6 +182,11 @@ describe('profile application API', () => {
         currentVersion,
       )
       expect(backupApplication.queries.listAccounts()).toEqual([account])
+      expect(backupApplication.queries.getSettings()).toEqual({
+        language: 'hu',
+        theme: 'dark',
+        baseCurrency: 'CHF',
+      })
     } finally {
       backupApplication.close()
     }

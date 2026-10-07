@@ -9,6 +9,10 @@ import type {
   ChangeAccountCurrencyInput,
 } from '../../shared/accounts'
 import type { ProfileInfo, ProfileSummary } from '../../shared/profiles'
+import type {
+  ProfileSettings,
+  ProfileSettingsChanges,
+} from '../../shared/settings'
 import { openDatabase } from '../db'
 import {
   validateAccountId,
@@ -18,6 +22,7 @@ import {
   validateOpeningDate,
 } from './account-validation'
 import type { ProfilePaths } from './profile-registry'
+import { parseSettingsChanges } from './profile-settings'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -85,6 +90,7 @@ export interface ProfileQueries {
   listAccountOptions(): Account[]
   getAccountBalance(id: string): number
   hasAccountTransactions(id: string): boolean
+  getSettings(): ProfileSettings
 }
 
 export interface ProfileCommands {
@@ -94,6 +100,7 @@ export interface ProfileCommands {
   changeAccountCurrency(input: ChangeAccountCurrencyInput): Account
   archiveAccount(id: string): void
   deleteAccount(id: string): void
+  updateSettings(changes: ProfileSettingsChanges): ProfileSettings
 }
 
 export interface ProfileApplication {
@@ -145,7 +152,21 @@ export function defineSqlMigration(
 
 export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
   defineSqlMigration(1, 'initial profile schema', INITIAL_SCHEMA_SQL),
-  defineSqlMigration(2, 'accounts', ACCOUNTS_SCHEMA_SQL),
+  defineSqlMigration(
+    2,
+    'profile settings',
+    `
+    CREATE TABLE profile_settings (
+      id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),
+      language TEXT NOT NULL CHECK (language IN ('hu', 'en', 'de')),
+      theme TEXT NOT NULL CHECK (theme IN ('light', 'dark', 'system')),
+      base_currency TEXT NOT NULL CHECK (base_currency IN ('HUF', 'CHF'))
+    );
+    INSERT INTO profile_settings (id, language, theme, base_currency)
+    VALUES (1, 'en', 'system', 'HUF');
+  `,
+  ),
+  defineSqlMigration(3, 'accounts', ACCOUNTS_SCHEMA_SQL),
 ]
 
 function validateMigrations(
@@ -293,9 +314,11 @@ class OpenProfileApplication implements ProfileApplication {
       changeAccountCurrency: (input) => this.#changeAccountCurrency(input),
       archiveAccount: (id) => this.#archiveAccount(id),
       deleteAccount: (id) => this.#deleteAccount(id),
+      updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
       getProfileInfo: () => this.#getProfileInfo(),
+      getSettings: () => this.#getSettings(),
       listAccounts: () => this.#listAccounts(),
       listAccountOptions: () => this.#listAccounts(true),
       getAccountBalance: (id) => this.#getAccountBalance(id),
@@ -442,6 +465,29 @@ class OpenProfileApplication implements ProfileApplication {
 
   #executeCommand<Result>(command: () => Result): Result {
     return this.#database.transaction(command)()
+  }
+
+  #updateSettings(changes: ProfileSettingsChanges): ProfileSettings {
+    return this.#executeCommand(() => {
+      const settings = {
+        ...this.#getSettings(),
+        ...parseSettingsChanges(changes),
+      }
+      this.#database
+        .prepare(
+          'UPDATE profile_settings SET language = ?, theme = ?, base_currency = ? WHERE id = 1',
+        )
+        .run(settings.language, settings.theme, settings.baseCurrency)
+      return this.#getSettings()
+    })
+  }
+
+  #getSettings(): ProfileSettings {
+    return this.#database
+      .prepare(
+        'SELECT language, theme, base_currency AS baseCurrency FROM profile_settings WHERE id = 1',
+      )
+      .get() as ProfileSettings
   }
 
   #getProfileInfo(): ProfileInfo {

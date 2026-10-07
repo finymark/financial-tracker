@@ -10,7 +10,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import type {
-  ProfileInfo,
+  ActiveProfileInfo,
   ProfileRegistrySnapshot,
 } from '../../shared/profiles'
 import { AccountsPage } from './AccountsPage'
@@ -24,14 +24,13 @@ import {
 } from './components/ui/card'
 import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
+import { createFormatters, languages, translate, type MessageKey } from './i18n'
+import { themeModes, useTheme } from './lib/theme'
 import {
-  createFormatters,
-  languages,
-  translate,
-  type Language,
-  type MessageKey,
-} from './i18n'
-import { themeModes, useTheme, type ThemeMode } from './lib/theme'
+  baseCurrencies,
+  DEFAULT_PROFILE_SETTINGS,
+  type ProfileSettingsChanges,
+} from '../../shared/settings'
 import { cn } from './lib/utils'
 
 const pages = [
@@ -50,11 +49,11 @@ const emptySnapshot: ProfileRegistrySnapshot = {
 
 interface ProfilePickerProps {
   snapshot: ProfileRegistrySnapshot
-  active: ProfileInfo | null
+  active: ActiveProfileInfo | null
   t: Translate
   onSnapshotChange(snapshot: ProfileRegistrySnapshot): void
-  onActiveChange(profile: ProfileInfo | null): void
-  onOpen(profile: ProfileInfo): void
+  onActiveChange(profile: ActiveProfileInfo | null): void
+  onOpen(profile: ActiveProfileInfo): void
   onCancel(): void
 }
 
@@ -319,27 +318,31 @@ function ProfilePicker({
 }
 
 interface ShellProps {
-  active: ProfileInfo
-  language: Language
-  theme: ThemeMode
+  active: ActiveProfileInfo
   t: Translate
-  onLanguageChange(language: Language): void
-  onThemeChange(theme: ThemeMode): void
+  onSettingsChange(changes: ProfileSettingsChanges): Promise<void>
   onSwitchProfile(): void
 }
 
-function Shell({
-  active,
-  language,
-  theme,
-  t,
-  onLanguageChange,
-  onThemeChange,
-  onSwitchProfile,
-}: ShellProps) {
+function Shell({ active, t, onSettingsChange, onSwitchProfile }: ShellProps) {
   const [page, setPage] = useState<Page>('overview')
   const [collapsed, setCollapsed] = useState(false)
+  const { language, theme, baseCurrency } = active.settings
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [settingsError, setSettingsError] = useState(false)
   const format = createFormatters(language)
+
+  async function saveSettings(changes: ProfileSettingsChanges) {
+    setSavingSettings(true)
+    setSettingsError(false)
+    try {
+      await onSettingsChange(changes)
+    } catch {
+      setSettingsError(true)
+    } finally {
+      setSavingSettings(false)
+    }
+  }
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -458,11 +461,12 @@ function Shell({
                     <NativeSelect
                       id="language"
                       value={language}
+                      disabled={savingSettings}
                       onChange={(event) => {
                         const value = languages.find(
                           (item) => item === event.target.value,
                         )
-                        if (value) onLanguageChange(value)
+                        if (value) void saveSettings({ language: value })
                       }}
                     >
                       {languages.map((value) => (
@@ -479,11 +483,12 @@ function Shell({
                     <NativeSelect
                       id="theme"
                       value={theme}
+                      disabled={savingSettings}
                       onChange={(event) => {
                         const value = themeModes.find(
                           (item) => item === event.target.value,
                         )
-                        if (value) onThemeChange(value)
+                        if (value) void saveSettings({ theme: value })
                       }}
                     >
                       {themeModes.map((value) => (
@@ -493,7 +498,37 @@ function Shell({
                       ))}
                     </NativeSelect>
                   </div>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="base-currency"
+                      className="text-sm font-medium"
+                    >
+                      {t('settings.baseCurrency')}
+                    </label>
+                    <NativeSelect
+                      id="base-currency"
+                      value={baseCurrency}
+                      disabled={savingSettings}
+                      onChange={(event) => {
+                        const value = baseCurrencies.find(
+                          (item) => item === event.target.value,
+                        )
+                        if (value) void saveSettings({ baseCurrency: value })
+                      }}
+                    >
+                      {baseCurrencies.map((value) => (
+                        <option key={value} value={value}>
+                          {value}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </div>
                 </div>
+                {settingsError && (
+                  <p role="alert" className="text-sm font-medium text-error">
+                    {t('settings.error')}
+                  </p>
+                )}
                 <section
                   className="rounded-lg bg-muted p-4"
                   aria-labelledby="formatting-preview"
@@ -533,12 +568,11 @@ function Shell({
 }
 
 export default function App() {
-  const [language, setLanguage] = useState<Language>('en')
-  const [theme, setTheme] = useState<ThemeMode>('system')
   const [snapshot, setSnapshot] = useState(emptySnapshot)
-  const [active, setActive] = useState<ProfileInfo | null>(null)
+  const [active, setActive] = useState<ActiveProfileInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [showPicker, setShowPicker] = useState(true)
+  const { language, theme } = active?.settings ?? DEFAULT_PROFILE_SETTINGS
   const t: Translate = (key) => translate(language, key)
   useTheme(theme)
 
@@ -584,12 +618,18 @@ export default function App() {
   }
   return (
     <Shell
+      key={active.id}
       active={active}
-      language={language}
-      theme={theme}
       t={t}
-      onLanguageChange={setLanguage}
-      onThemeChange={setTheme}
+      onSettingsChange={async (settings) => {
+        const saved = await window.app.profiles.updateSettings({
+          id: active.id,
+          settings,
+        })
+        setActive((current) =>
+          current?.id === active.id ? { ...current, settings: saved } : current,
+        )
+      }}
       onSwitchProfile={() => setShowPicker(true)}
     />
   )
