@@ -1,5 +1,12 @@
 import Database from 'better-sqlite3'
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
+import {
+  copyFileSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
@@ -30,6 +37,404 @@ afterEach(() => {
 })
 
 describe('profile application API', () => {
+  test('opening a profile creates a startup backup separate from migration backups', async () => {
+    const { registry } = setup()
+    const profile = registry.createProfile('Startup backup')
+    const paths = registry.getProfilePaths(profile.id)
+    const application = await openProfileApplication({ profile, paths, clock })
+    try {
+      expect(application.queries.listBackups()).toEqual([
+        { id: expect.any(String), createdAt: '2026-01-15T10:00:00.000Z' },
+      ])
+      expect(readdirSync(paths.preMigrationBackupDirectory)).toEqual([])
+    } finally {
+      application.close()
+    }
+  })
+
+  test('keeps the last ten startup backups, including repeated opens at the same time', async () => {
+    const { registry } = setup()
+    const profile = registry.createProfile('Retention')
+    const paths = registry.getProfilePaths(profile.id)
+    const ids: string[] = []
+    for (let index = 0; index < 12; index += 1) {
+      const application = await openProfileApplication({
+        profile,
+        paths,
+        clock,
+      })
+      try {
+        const backups = application.queries.listBackups()
+        ids.push(backups[0].id)
+        expect(backups.map((backup) => backup.id)).toEqual(
+          ids.slice(-10).reverse(),
+        )
+      } finally {
+        application.close()
+      }
+    }
+  })
+
+  test('restores a chosen snapshot after confirmation and can use the reopened database', async () => {
+    const { registry } = setup()
+    const profile = registry.createProfile('Restore')
+    const paths = registry.getProfilePaths(profile.id)
+    const application = await openProfileApplication({ profile, paths, clock })
+    const backup = application.queries.listBackups()[0]
+    // Arrange later data through a fixture connection: the foundation has no financial writes yet.
+    const writer = new Database(paths.databasePath)
+    writer
+      .prepare('UPDATE profile_identity SET created_at = ?')
+      .run('2026-01-16T10:00:00.000Z')
+    writer.close()
+    try {
+      await expect(
+        application.commands.restoreBackup({
+          backupId: backup.id,
+          confirmed: false,
+        }),
+      ).rejects.toThrow('confirmation')
+      expect(application.queries.getProfileInfo().createdAt).toBe(
+        '2026-01-16T10:00:00.000Z',
+      )
+      await application.commands.restoreBackup({
+        backupId: backup.id,
+        confirmed: true,
+      })
+      expect(application.queries.getProfileInfo()).toMatchObject({
+        id: profile.id,
+        createdAt: profile.createdAt,
+      })
+      application.commands.ensureProfileIdentity()
+    } finally {
+      application.close()
+    }
+    const reopened = await openProfileApplication({ profile, paths, clock })
+    try {
+      expect(reopened.queries.getProfileInfo().createdAt).toBe(
+        profile.createdAt,
+      )
+    } finally {
+      reopened.close()
+    }
+  })
+
+  test('startup backup is consistent while another connection has an uncommitted write', async () => {
+    const { registry } = setup()
+    const profile = registry.createProfile('Writing')
+    const paths = registry.getProfilePaths(profile.id)
+    const initial = await openProfileApplication({ profile, paths, clock })
+    initial.close()
+    const writer = new Database(paths.databasePath)
+    writer.pragma('journal_mode = WAL')
+    writer.exec('BEGIN IMMEDIATE')
+    writer
+      .prepare('UPDATE profile_identity SET created_at = ?')
+      .run('2026-01-16T10:00:00.000Z')
+    let application:
+      Awaited<ReturnType<typeof openProfileApplication>> | undefined
+    try {
+      application = await openProfileApplication({ profile, paths, clock })
+      const backup = application.queries.listBackups()[0]
+      writer.exec('COMMIT')
+      writer.close()
+      expect(application.queries.getProfileInfo().createdAt).toBe(
+        '2026-01-16T10:00:00.000Z',
+      )
+      await application.commands.restoreBackup({
+        backupId: backup.id,
+        confirmed: true,
+      })
+      expect(application.queries.getProfileInfo().createdAt).toBe(
+        profile.createdAt,
+      )
+      application.commands.ensureProfileIdentity()
+    } finally {
+      if (writer.open) writer.close()
+      application?.close()
+    }
+  })
+
+  test('rejects unknown and cross-profile backup identifiers without changing the open profile', async () => {
+    const { registry } = setup()
+    const first = registry.createProfile('First backup')
+    const second = registry.createProfile('Second backup')
+    const firstApplication = await openProfileApplication({
+      profile: first,
+      paths: registry.getProfilePaths(first.id),
+      clock,
+    })
+    const secondApplication = await openProfileApplication({
+      profile: second,
+      paths: registry.getProfilePaths(second.id),
+      clock,
+    })
+    try {
+      for (const backupId of [
+        '../../profile.sqlite',
+        secondApplication.queries.listBackups()[0].id,
+      ]) {
+        await expect(
+          firstApplication.commands.restoreBackup({
+            backupId,
+            confirmed: true,
+          }),
+        ).rejects.toThrow('Backup not found')
+        expect(firstApplication.queries.getProfileInfo().id).toBe(first.id)
+      }
+    } finally {
+      firstApplication.close()
+      secondApplication.close()
+    }
+  })
+
+  test('reopens the previous database when upgrading a restored older snapshot fails', async () => {
+    const { registry } = setup()
+    const profile = registry.createProfile('Restore upgrade failure')
+    const paths = registry.getProfilePaths(profile.id)
+    const initial = await openProfileApplication({ profile, paths, clock })
+    const olderBackup = initial.queries.listBackups()[0]
+    initial.close()
+    let failUpgrade = false
+    const nextMigration = defineSqlMigration(
+      2,
+      'restored schema upgrade',
+      'CREATE TABLE restored_upgrade (value TEXT)',
+    )
+    const application = await openProfileApplication({
+      profile,
+      paths,
+      clock,
+      migrations: [
+        ...CURRENT_MIGRATIONS,
+        {
+          ...nextMigration,
+          apply(database) {
+            nextMigration.apply(database)
+            if (failUpgrade) throw new Error('Upgrade unavailable')
+          },
+        },
+      ],
+    })
+    try {
+      failUpgrade = true
+      await expect(
+        application.commands.restoreBackup({
+          backupId: olderBackup.id,
+          confirmed: true,
+        }),
+      ).rejects.toThrow('previous database was reopened')
+      expect(application.queries.getProfileInfo().schemaVersion).toBe(2)
+      application.commands.ensureProfileIdentity()
+    } finally {
+      application.close()
+    }
+  })
+
+  test('recovers the previous database if a restored migration leaves the profile identity invalid', async () => {
+    const { registry } = setup()
+    const profile = registry.createProfile('Restore identity validation')
+    const paths = registry.getProfilePaths(profile.id)
+    const initial = await openProfileApplication({ profile, paths, clock })
+    const olderBackup = initial.queries.listBackups()[0]
+    initial.close()
+    let invalidateIdentity = false
+    const nextMigration = defineSqlMigration(
+      2,
+      'identity validation upgrade',
+      'CREATE TABLE identity_upgrade (value TEXT)',
+    )
+    const application = await openProfileApplication({
+      profile,
+      paths,
+      clock,
+      migrations: [
+        ...CURRENT_MIGRATIONS,
+        {
+          ...nextMigration,
+          apply(database) {
+            nextMigration.apply(database)
+            if (invalidateIdentity)
+              database.exec(
+                "UPDATE profile_identity SET created_at = '2026-01-16T10:00:00.000Z'",
+              )
+          },
+        },
+      ],
+    })
+    try {
+      invalidateIdentity = true
+      await expect(
+        application.commands.restoreBackup({
+          backupId: olderBackup.id,
+          confirmed: true,
+        }),
+      ).rejects.toThrow('previous database was reopened')
+      expect(application.queries.getProfileInfo()).toMatchObject({
+        createdAt: profile.createdAt,
+        schemaVersion: 2,
+      })
+      application.commands.ensureProfileIdentity()
+    } finally {
+      application.close()
+    }
+  })
+
+  test('rejects a corrupt snapshot without closing or changing the live database', async () => {
+    const { registry } = setup()
+    const profile = registry.createProfile('Corrupt backup')
+    const paths = registry.getProfilePaths(profile.id)
+    const application = await openProfileApplication({ profile, paths, clock })
+    try {
+      const backup = application.queries.listBackups()[0]
+      const filename = readdirSync(paths.backupDirectory).find((name) =>
+        name.endsWith(`${backup.id}.sqlite`),
+      )!
+      writeFileSync(
+        join(paths.backupDirectory, filename),
+        'not a SQLite database',
+      )
+      await expect(
+        application.commands.restoreBackup({
+          backupId: backup.id,
+          confirmed: true,
+        }),
+      ).rejects.toThrow()
+      expect(application.queries.getProfileInfo().id).toBe(profile.id)
+      application.commands.ensureProfileIdentity()
+    } finally {
+      application.close()
+    }
+  })
+
+  test('rejects a snapshot with a newer schema without changing the live database', async () => {
+    const { registry } = setup()
+    const profile = registry.createProfile('Newer backup')
+    const paths = registry.getProfilePaths(profile.id)
+    const application = await openProfileApplication({ profile, paths, clock })
+    try {
+      const backup = application.queries.listBackups()[0]
+      const filename = readdirSync(paths.backupDirectory).find((name) =>
+        name.endsWith(`${backup.id}.sqlite`),
+      )!
+      const futureFixture = new Database(join(paths.backupDirectory, filename))
+      futureFixture
+        .prepare(
+          'INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (?, ?, ?, ?)',
+        )
+        .run(2, 'future schema', '0'.repeat(64), clock().toISOString())
+      futureFixture.close()
+      await expect(
+        application.commands.restoreBackup({
+          backupId: backup.id,
+          confirmed: true,
+        }),
+      ).rejects.toBeInstanceOf(NewerSchemaError)
+      expect(application.queries.getProfileInfo().schemaVersion).toBe(1)
+      application.commands.ensureProfileIdentity()
+    } finally {
+      application.close()
+    }
+  })
+
+  test('rejects another profile database even when its file replaces a listed backup', async () => {
+    const { registry } = setup()
+    const first = registry.createProfile('Original backup')
+    const other = registry.createProfile('Foreign backup')
+    const paths = registry.getProfilePaths(first.id)
+    const application = await openProfileApplication({
+      profile: first,
+      paths,
+      clock,
+    })
+    const foreignPaths = registry.getProfilePaths(other.id)
+    const foreign = await openProfileApplication({
+      profile: other,
+      paths: foreignPaths,
+      clock,
+    })
+    foreign.close()
+    try {
+      const backup = application.queries.listBackups()[0]
+      const filename = readdirSync(paths.backupDirectory).find((name) =>
+        name.endsWith(`${backup.id}.sqlite`),
+      )!
+      copyFileSync(
+        foreignPaths.databasePath,
+        join(paths.backupDirectory, filename),
+      )
+      await expect(
+        application.commands.restoreBackup({
+          backupId: backup.id,
+          confirmed: true,
+        }),
+      ).rejects.toThrow('does not belong to this profile')
+      expect(application.queries.getProfileInfo().id).toBe(first.id)
+    } finally {
+      application.close()
+    }
+  })
+
+  test('blocks overlapping writes and close until restore has safely reopened the profile', async () => {
+    const { registry } = setup()
+    const profile = registry.createProfile('Restore lifecycle')
+    const paths = registry.getProfilePaths(profile.id)
+    const application = await openProfileApplication({ profile, paths, clock })
+    try {
+      const backup = application.queries.listBackups()[0]
+      const restoring = application.commands.restoreBackup({
+        backupId: backup.id,
+        confirmed: true,
+      })
+      expect(() => application.commands.ensureProfileIdentity()).toThrow(
+        'restore is in progress',
+      )
+      expect(() => application.close()).toThrow('restore is in progress')
+      await expect(
+        application.commands.restoreBackup({
+          backupId: backup.id,
+          confirmed: true,
+        }),
+      ).rejects.toThrow('restore is in progress')
+      await restoring
+      application.commands.ensureProfileIdentity()
+      expect(application.queries.getProfileInfo().id).toBe(profile.id)
+    } finally {
+      application.close()
+    }
+  })
+
+  test('startup pruning never removes pre-migration backups', async () => {
+    const { registry } = setup()
+    const profile = registry.createProfile('Migration retention')
+    const paths = registry.getProfilePaths(profile.id)
+    const initial = await openProfileApplication({ profile, paths, clock })
+    initial.close()
+    const migrations = [
+      ...CURRENT_MIGRATIONS,
+      defineSqlMigration(
+        2,
+        'retention upgrade',
+        'CREATE TABLE retention_upgrade (value TEXT)',
+      ),
+    ]
+    for (let index = 0; index < 12; index += 1) {
+      const application = await openProfileApplication({
+        profile,
+        paths,
+        migrations,
+        clock,
+      })
+      try {
+        if (index === 11)
+          expect(application.queries.listBackups()).toHaveLength(10)
+      } finally {
+        application.close()
+      }
+    }
+    expect(readdirSync(paths.preMigrationBackupDirectory)).toHaveLength(1)
+  })
+
   test('two profiles can only query their own profile data', async () => {
     const { registry } = setup()
     const first = registry.createProfile('First')

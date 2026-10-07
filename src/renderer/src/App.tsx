@@ -13,6 +13,7 @@ import type {
   ProfileInfo,
   ProfileRegistrySnapshot,
 } from '../../shared/profiles'
+import { BackupSettings } from './components/backup-settings'
 import { Button } from './components/ui/button'
 import {
   Card,
@@ -324,6 +325,7 @@ interface ShellProps {
   t: Translate
   onLanguageChange(language: Language): void
   onThemeChange(theme: ThemeMode): void
+  onRestored(profile: ProfileInfo): void
   onSwitchProfile(): void
 }
 
@@ -335,9 +337,11 @@ function Shell({
   onLanguageChange,
   onThemeChange,
   onSwitchProfile,
+  onRestored,
 }: ShellProps) {
   const [page, setPage] = useState<Page>('overview')
   const [collapsed, setCollapsed] = useState(false)
+  const [backupBusy, setBackupBusy] = useState(false)
   const format = createFormatters(language)
 
   return (
@@ -391,6 +395,7 @@ function Shell({
               aria-label={t(`navigation.${id}`)}
               aria-current={page === id ? 'page' : undefined}
               title={collapsed ? t(`navigation.${id}`) : undefined}
+              disabled={backupBusy}
               onClick={() => setPage(id)}
             >
               <Icon aria-hidden="true" />
@@ -409,6 +414,7 @@ function Shell({
           title={
             collapsed ? `${active.name} — ${t('profile.switch')}` : undefined
           }
+          disabled={backupBusy}
           onClick={onSwitchProfile}
         >
           <UsersRound className="size-5 shrink-0" aria-hidden="true" />
@@ -522,6 +528,15 @@ function Shell({
               </CardContent>
             )}
           </Card>
+          {page === 'settings' && (
+            <BackupSettings
+              key={active.id}
+              language={language}
+              t={t}
+              onRestored={onRestored}
+              onBusyChange={setBackupBusy}
+            />
+          )}
         </div>
       </main>
     </div>
@@ -586,6 +601,7 @@ export default function App() {
       t={t}
       onLanguageChange={setLanguage}
       onThemeChange={setTheme}
+      onRestored={setActive}
       onSwitchProfile={() => setShowPicker(true)}
     />
   )

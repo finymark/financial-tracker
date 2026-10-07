@@ -48,9 +48,18 @@ void app.whenReady().then(() => {
   )
   registerProfileIpc(ipcMain, profiles)
 
-  app.on('will-quit', () => {
-    profiles.close()
-    database.close()
+  let shutdownStarted = false
+  let shutdownComplete = false
+  app.on('before-quit', (event) => {
+    if (shutdownComplete) return
+    event.preventDefault()
+    if (shutdownStarted) return
+    shutdownStarted = true
+    void profiles.shutdown().then(() => {
+      database.close()
+      shutdownComplete = true
+      app.quit()
+    })
   })
   createWindow()
 })

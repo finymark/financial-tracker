@@ -45,6 +45,21 @@ export const hu = {
   'settings.title': 'Érezd magad otthon',
   'settings.description':
     'A nyelv és a megjelenés módosítása azonnal érvényesül. Ezek az ideiglenes beállítások az alkalmazás újraindításakor visszaállnak; a profilbeállítások később érkeznek.',
+  'backups.title': 'Biztonsági mentések',
+  'backups.description':
+    'A profil minden megnyitásakor adatbázismentés készül. Az utolsó 10 indítási mentés marad meg; a migráció előtti mentések külön tárolódnak.',
+  'backups.loading': 'Mentések betöltése…',
+  'backups.empty': 'Nincs elérhető indítási mentés.',
+  'backups.choose': 'A mentés dátuma és időpontja',
+  'backups.restore': 'Mentés visszaállítása',
+  'backups.confirmDescription':
+    'Visszaállítja ezt a mentést? Ez lecseréli a profil jelenlegi adatbázisát, és elveti a mentés óta végzett módosításokat.',
+  'backups.confirmRestore': 'Visszaállítás megerősítése',
+  'backups.cancel': 'Mégse',
+  'backups.error':
+    'A mentési művelet nem sikerült. Ha a helyreállítás is sikertelen volt, folytatás előtt indítsa újra az alkalmazást.',
+  'backups.restored':
+    'A mentés visszaállítva. A profil adatbázisa újra megnyílt.',
   'settings.language': 'Nyelv',
   'settings.theme': 'Megjelenés',
   'language.hu': 'Magyar',

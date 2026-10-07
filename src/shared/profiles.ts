@@ -28,3 +28,13 @@ export interface RenameProfileInput extends ProfileIdInput {
 export interface DeleteProfileInput extends ProfileIdInput {
   confirmation: string
 }
+
+export interface ProfileBackup {
+  id: string
+  createdAt: string
+}
+
+export interface RestoreBackupInput {
+  backupId: string
+  confirmed: boolean
+}

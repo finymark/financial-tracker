@@ -5,6 +5,7 @@ import type {
   DeleteProfileInput,
   ProfileIdInput,
   RenameProfileInput,
+  RestoreBackupInput,
 } from '../../shared/profiles'
 import type { ProfileController } from './profile-controller'
 
@@ -52,10 +53,32 @@ function parseDeleteProfileInput(value: unknown): DeleteProfileInput {
   }
 }
 
+function parseRestoreBackupInput(value: unknown): RestoreBackupInput {
+  const input = inputRecord(value)
+  const confirmed = input['confirmed']
+  if (typeof confirmed !== 'boolean') {
+    throw new TypeError('IPC property confirmed must be a boolean')
+  }
+  return { backupId: stringProperty(input, 'backupId'), confirmed }
+}
+
 export function registerProfileIpc(
   ipcMain: IpcMain,
   controller: ProfileController,
 ): void {
+  ipcMain.handle(
+    IPC_CHANNELS.backupsList,
+    (): Awaited<ReturnType<AppBridge['backups']['list']>> =>
+      controller.listBackups(),
+  )
+  ipcMain.handle(
+    IPC_CHANNELS.backupsRestore,
+    async (
+      _event,
+      value: unknown,
+    ): Promise<Awaited<ReturnType<AppBridge['backups']['restore']>>> =>
+      controller.restoreBackup(parseRestoreBackupInput(value)),
+  )
   ipcMain.handle(
     IPC_CHANNELS.profilesList,
     (): Awaited<ReturnType<AppBridge['profiles']['list']>> => controller.list(),

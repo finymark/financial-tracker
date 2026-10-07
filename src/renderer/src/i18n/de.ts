@@ -46,6 +46,21 @@ export const de = {
   'settings.title': 'Fühl dich wie zu Hause',
   'settings.description':
     'Änderungen an Sprache und Darstellung werden sofort übernommen. Diese vorläufigen Einstellungen werden beim Neustart zurückgesetzt; Profileinstellungen folgen später.',
+  'backups.title': 'Sicherungen',
+  'backups.description':
+    'Bei jedem Öffnen dieses Profils wird die Datenbank gesichert. Die letzten 10 Startsicherungen bleiben erhalten; Sicherungen vor Migrationen werden getrennt gespeichert.',
+  'backups.loading': 'Sicherungen werden geladen…',
+  'backups.empty': 'Keine Startsicherungen verfügbar.',
+  'backups.choose': 'Datum und Uhrzeit der Sicherung',
+  'backups.restore': 'Sicherung wiederherstellen',
+  'backups.confirmDescription':
+    'Diese Sicherung wiederherstellen? Die aktuelle Profildatenbank wird ersetzt. Änderungen seit der Sicherung gehen verloren.',
+  'backups.confirmRestore': 'Wiederherstellung bestätigen',
+  'backups.cancel': 'Abbrechen',
+  'backups.error':
+    'Der Sicherungsvorgang ist fehlgeschlagen. Falls auch die Wiederherstellung fehlgeschlagen ist, starten Sie die App vor dem Fortfahren neu.',
+  'backups.restored':
+    'Sicherung wiederhergestellt. Die Profildatenbank wurde erneut geöffnet.',
   'settings.language': 'Sprache',
   'settings.theme': 'Darstellung',
   'language.hu': 'Ungarisch',

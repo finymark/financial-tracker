@@ -1,9 +1,25 @@
-import { createHash } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  renameSync,
+  rmSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
-import type { ProfileInfo, ProfileSummary } from '../../shared/profiles'
+import type {
+  ProfileBackup,
+  ProfileInfo,
+  ProfileSummary,
+  RestoreBackupInput,
+} from '../../shared/profiles'
 import { openDatabase } from '../db'
+import {
+  createStartupBackup,
+  listBackupFiles,
+  verifySqliteBackup,
+} from './profile-backups'
 import type { ProfilePaths } from './profile-registry'
 
 const MIGRATION_TABLE_SQL = `
@@ -43,10 +59,12 @@ export interface OpenProfileApplicationOptions {
 }
 
 export interface ProfileQueries {
+  listBackups(): ProfileBackup[]
   getProfileInfo(): ProfileInfo
 }
 
 export interface ProfileCommands {
+  restoreBackup(input: RestoreBackupInput): Promise<void>
   ensureProfileIdentity(): void
 }
 
@@ -227,16 +245,29 @@ function removeDatabaseFiles(databasePath: string): void {
 class OpenProfileApplication implements ProfileApplication {
   readonly commands: ProfileCommands
   readonly queries: ProfileQueries
-  readonly #database: Database.Database
+  #database: Database.Database
+  readonly #options: OpenProfileApplicationOptions
+  #restoring = false
   readonly #profile: ProfileSummary
 
-  constructor(database: Database.Database, profile: ProfileSummary) {
+  constructor(
+    database: Database.Database,
+    options: OpenProfileApplicationOptions,
+  ) {
     this.#database = database
-    this.#profile = { ...profile }
+    this.#profile = { ...options.profile }
+    this.#options = options
     this.commands = {
+      restoreBackup: (input) => this.#restoreBackup(input),
       ensureProfileIdentity: () => this.#ensureProfileIdentity(),
     }
     this.queries = {
+      listBackups: () => {
+        this.#assertAvailable()
+        return listBackupFiles(options.paths.backupDirectory).map(
+          ({ id, createdAt }) => ({ id, createdAt }),
+        )
+      },
       getProfileInfo: () => this.#getProfileInfo(),
     }
   }
@@ -263,15 +294,103 @@ class OpenProfileApplication implements ProfileApplication {
     })
   }
 
+  #validateIdentity(database: Database.Database): void {
+    const identity = database
+      .prepare('SELECT id, created_at AS createdAt FROM profile_identity')
+      .get() as { id: string; createdAt: string } | undefined
+    if (
+      identity?.id !== this.#profile.id ||
+      identity.createdAt !== this.#profile.createdAt
+    ) {
+      throw new Error('Backup does not belong to this profile')
+    }
+  }
+
+  #assertAvailable(): void {
+    if (this.#restoring) throw new Error('Profile restore is in progress')
+    if (!this.#database.open) throw new Error('Profile is closed')
+  }
+
+  async #restoreBackup(input: RestoreBackupInput): Promise<void> {
+    this.#assertAvailable()
+    if (input.confirmed !== true)
+      throw new Error('Backup restore requires confirmation')
+    const { paths } = this.#options
+    const backup = listBackupFiles(paths.backupDirectory).find(
+      (candidate) => candidate.id === input.backupId,
+    )
+    if (!backup) throw new Error('Backup not found in this profile')
+    const migrations = validateMigrations(
+      this.#options.migrations ?? CURRENT_MIGRATIONS,
+    )
+    const stagedPath = join(
+      paths.profileDirectory,
+      `.restore-${randomUUID()}.sqlite`,
+    )
+    const recoveryPath = join(
+      paths.profileDirectory,
+      `.restore-recovery-${randomUUID()}.sqlite`,
+    )
+    this.#restoring = true
+    let recoveryNeeded = false
+    try {
+      copyFileSync(join(paths.backupDirectory, backup.filename), stagedPath)
+      verifySqliteBackup(stagedPath, (database) => {
+        validateAppliedMigrations(readAppliedMigrations(database), migrations)
+        this.#validateIdentity(database)
+      })
+      // Restore is a file lifecycle operation, not an in-database write transaction.
+      // Keep an online recovery snapshot until the replacement has reopened successfully.
+      await this.#database.backup(recoveryPath)
+      verifySqliteBackup(recoveryPath, () => {})
+      this.#database.close()
+      recoveryNeeded = true
+      try {
+        rmSync(`${paths.databasePath}-wal`, { force: true })
+        rmSync(`${paths.databasePath}-shm`, { force: true })
+        renameSync(stagedPath, paths.databasePath)
+        this.#database = await openProfileDatabase(this.#options)
+        this.#validateIdentity(this.#database)
+        recoveryNeeded = false
+      } catch (error) {
+        try {
+          if (this.#database.open) this.#database.close()
+          rmSync(`${paths.databasePath}-wal`, { force: true })
+          rmSync(`${paths.databasePath}-shm`, { force: true })
+          copyFileSync(recoveryPath, stagedPath)
+          renameSync(stagedPath, paths.databasePath)
+          this.#database = openDatabase(paths.databasePath)
+          recoveryNeeded = false
+        } catch (recoveryError) {
+          throw new AggregateError(
+            [error, recoveryError],
+            `Restore recovery failed; the previous database is preserved at ${recoveryPath}`,
+          )
+        }
+        throw new Error(
+          'Could not restore backup; the previous database was reopened',
+          { cause: error },
+        )
+      }
+    } finally {
+      this.#restoring = false
+      rmSync(stagedPath, { force: true })
+      if (!recoveryNeeded) rmSync(recoveryPath, { force: true })
+    }
+  }
+
   close(): void {
+    if (this.#restoring) throw new Error('Profile restore is in progress')
     if (this.#database.open) this.#database.close()
   }
 
   #executeCommand<Result>(command: () => Result): Result {
+    this.#assertAvailable()
     return this.#database.transaction(command)()
   }
 
   #getProfileInfo(): ProfileInfo {
+    this.#assertAvailable()
     const identity = this.#database
       .prepare('SELECT id, created_at AS createdAt FROM profile_identity')
       .get() as { id: string; createdAt: string }
@@ -286,9 +405,9 @@ class OpenProfileApplication implements ProfileApplication {
   }
 }
 
-export async function openProfileApplication(
+async function openProfileDatabase(
   options: OpenProfileApplicationOptions,
-): Promise<ProfileApplication> {
+): Promise<Database.Database> {
   const migrations = validateMigrations(
     options.migrations ?? CURRENT_MIGRATIONS,
   )
@@ -340,11 +459,28 @@ export async function openProfileApplication(
       }
     }
 
-    const application = new OpenProfileApplication(database, options.profile)
-    application.commands.ensureProfileIdentity()
-    return application
+    return database
   } catch (error) {
     if (database.open) database.close()
+    throw error
+  }
+}
+
+export async function openProfileApplication(
+  options: OpenProfileApplicationOptions,
+): Promise<ProfileApplication> {
+  const database = await openProfileDatabase(options)
+  const application = new OpenProfileApplication(database, options)
+  try {
+    application.commands.ensureProfileIdentity()
+    await createStartupBackup(
+      database,
+      options.paths.backupDirectory,
+      options.clock ?? (() => new Date()),
+    )
+    return application
+  } catch (error) {
+    application.close()
     throw error
   }
 }

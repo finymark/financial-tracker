@@ -4,6 +4,10 @@ import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 const bridge: AppBridge = {
   getVersion: () => ipcRenderer.invoke(IPC_CHANNELS.getVersion),
   dbPing: () => ipcRenderer.invoke(IPC_CHANNELS.dbPing),
+  backups: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.backupsList),
+    restore: (input) => ipcRenderer.invoke(IPC_CHANNELS.backupsRestore, input),
+  },
   profiles: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.profilesList),
     create: (input) => ipcRenderer.invoke(IPC_CHANNELS.profilesCreate, input),

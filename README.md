@@ -34,22 +34,39 @@ when adding dependencies that require lifecycle scripts.
 
 ## Scripts
 
-| Command                | Purpose                                                                           |
-| ---------------------- | --------------------------------------------------------------------------------- |
-| `npm run dev`          | Start the desktop app with renderer hot reload.                                   |
-| `npm run build`        | Typecheck and build main, preload, and renderer into `out/`.                      |
-| `npm test`             | Run SQLite, translation completeness, and formatting tests under Electron's Node. |
-| `npm run lint`         | Run ESLint.                                                                       |
-| `npm run format`       | Format project files with Prettier.                                               |
-| `npm run format:check` | Check formatting without modifying files.                                         |
-| `npm run typecheck`    | Check strict Node and renderer TypeScript configurations.                         |
+| Command                | Purpose                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| `npm run dev`          | Start the desktop app with renderer hot reload.                                            |
+| `npm run build`        | Typecheck and build main, preload, and renderer into `out/`.                               |
+| `npm test`             | Run profile, SQLite, translation completeness, and formatting tests under Electron's Node. |
+| `npm run lint`         | Run ESLint.                                                                                |
+| `npm run format`       | Format project files with Prettier.                                                        |
+| `npm run format:check` | Check formatting without modifying files.                                                  |
+| `npm run typecheck`    | Check strict Node and renderer TypeScript configurations.                                  |
 
 The renderer has no Node access; a sandboxed, isolated preload exposes only the
-typed `app:getVersion` and `db:ping` calls. SQLite is used only in the main process.
+typed app, profile, and backup calls. SQLite is used only in the main process.
 Profiles are listed in `profiles.json` under the app's user-data folder; each
-profile lives in `profiles/<id>/` (database, data folder, pre-migration
-backups). Migrations are forward-only and run after a verified backup; a
+profile lives in `profiles/<id>/` (database, data folder, and backups). Migrations are forward-only and run after a verified backup; a
 database with a newer schema is refused. Installer packaging is not included yet.
+
+## Backup and restore
+
+Opening a profile takes a consistent SQLite online backup in that profile's
+`backups/` folder. The last 10 startup backups are kept, including multiple
+opens at the same time. Verified pre-migration backups stay separately in
+`backups/pre-migration/` and are not pruned by startup backup retention.
+
+In **Settings → Backups**, choose a backup by date and time, select **Restore
+backup**, then confirm. Restoring replaces the current profile database and
+loses changes made after that snapshot. Cancel leaves the database unchanged.
+The app verifies the selected snapshot, closes the live database, replaces it,
+and safely reopens it, applying supported migrations if necessary. A temporary
+online recovery snapshot protects the previous database if reopening fails.
+Corrupt, foreign-profile, or newer-schema snapshots are refused without changing
+the live database. Profile switching is disabled during restore, and quitting
+waits for the database operation to finish. These are local database backups,
+not off-device copies or backups of the separate data folder.
 
 ## App shell
 
@@ -82,3 +99,15 @@ Windows' app color mode and verify the shell follows it. Explicit Light/Dark
 must stay unchanged when Windows changes. Check keyboard navigation and focus
 indicators with both sidebar sizes. UI behavior is checked manually, not by the
 automated test suite.
+
+### Manual backup check
+
+Open a profile, go to Settings → Backups, and check that its startup snapshot
+appears with a locale-formatted date and time in all three languages. Select a
+snapshot, start restore, then cancel; verify no success message appears. Repeat
+and confirm; verify the success message and that the profile remains usable,
+including after closing and reopening the app. Open the profile repeatedly to
+check only 10 startup backups are offered; `backups/pre-migration/` must remain
+untouched. Automated application-API tests cover retention, concurrent SQLite
+writing, confirmed restore, isolation, invalid snapshots, and migration-failure
+recovery; UI behavior is checked manually.

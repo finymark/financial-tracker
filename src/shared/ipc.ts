@@ -1,7 +1,9 @@
 import type {
   CreateProfileInput,
   DeleteProfileInput,
+  ProfileBackup,
   ProfileIdInput,
+  RestoreBackupInput,
   ProfileInfo,
   ProfileRegistrySnapshot,
   ProfileSummary,
@@ -18,6 +20,8 @@ export const IPC_CHANNELS = {
   profilesOpen: 'profiles:open',
   profilesGetActive: 'profiles:get-active',
   profilesClose: 'profiles:close',
+  backupsList: 'backups:list',
+  backupsRestore: 'backups:restore',
 } as const
 
 export type DatabasePing = 'ok'
@@ -25,6 +29,10 @@ export type DatabasePing = 'ok'
 export interface AppBridge {
   getVersion(): Promise<string>
   dbPing(): Promise<DatabasePing>
+  backups: {
+    list(): Promise<ProfileBackup[]>
+    restore(input: RestoreBackupInput): Promise<ProfileInfo>
+  }
   profiles: {
     list(): Promise<ProfileRegistrySnapshot>
     create(input: CreateProfileInput): Promise<ProfileSummary>

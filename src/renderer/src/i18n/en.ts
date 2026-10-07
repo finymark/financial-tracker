@@ -43,6 +43,21 @@ export const en = {
   'settings.title': 'Make yourself at home',
   'settings.description':
     'Language and appearance changes apply immediately. These temporary choices reset when the app restarts; profile settings will come later.',
+  'backups.title': 'Backups',
+  'backups.description':
+    'A database backup is taken whenever you open this profile. The last 10 startup backups are kept; pre-migration backups are stored separately.',
+  'backups.loading': 'Loading backups…',
+  'backups.empty': 'No startup backups are available.',
+  'backups.choose': 'Backup date and time',
+  'backups.restore': 'Restore backup',
+  'backups.confirmDescription':
+    'Restore this backup? This replaces the current profile database and discards changes made since the backup.',
+  'backups.confirmRestore': 'Confirm restore',
+  'backups.cancel': 'Cancel',
+  'backups.error':
+    'The backup operation failed. If recovery also failed, restart the app before continuing.',
+  'backups.restored':
+    'Backup restored. The profile database has been reopened.',
   'settings.language': 'Language',
   'settings.theme': 'Appearance',
   'language.hu': 'Hungarian',
