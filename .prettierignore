@@ -1,0 +1,11 @@
+node_modules/
+out/
+dist/
+release/
+coverage/
+fixtures-private/
+.env*
+package-lock.json
+AGENTS.md
+GLOSSARY.md
+docs/
