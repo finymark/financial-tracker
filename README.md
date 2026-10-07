@@ -2,8 +2,9 @@
 
 A local-first personal expense tracker for Windows, built with Electron, React,
 TypeScript, and SQLite. The app opens to a collapsible sidebar with Overview,
-Transactions, Accounts, and Settings pages. Financial data and profile storage
-are not implemented yet.
+Transactions, Accounts, and Settings pages. On start you pick or create a
+profile; each profile has its own SQLite database and data folder. Financial
+data is not implemented yet.
 
 ## Requirements
 
@@ -45,8 +46,10 @@ when adding dependencies that require lifecycle scripts.
 
 The renderer has no Node access; a sandboxed, isolated preload exposes only the
 typed `app:getVersion` and `db:ping` calls. SQLite is used only in the main process.
-The app's scaffold database is in memory; the database module also accepts a file
-path, as exercised by the test. Installer packaging is not included yet.
+Profiles are listed in `profiles.json` under the app's user-data folder; each
+profile lives in `profiles/<id>/` (database, data folder, pre-migration
+backups). Migrations are forward-only and run after a verified backup; a
+database with a newer schema is refused. Installer packaging is not included yet.
 
 ## App shell
 
@@ -67,8 +70,8 @@ path, as exercised by the test. Installer packaging is not included yet.
   `Intl` with `hu-HU`, `en-GB`, and `de-DE` for dates and numbers. The
   completeness test checks the union of catalog keys, so a missing key in any
   language fails; TypeScript also checks Hungarian and German against English.
-- The profile area at the bottom of the sidebar reserves space only; it does
-  not switch or create profiles yet. The other financial pages are placeholders.
+- The profile area at the bottom of the sidebar shows the active profile and
+  switches profiles. The other financial pages are placeholders.
 
 ### Manual shell check
 
