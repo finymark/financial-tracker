@@ -42,7 +42,9 @@ export const en = {
     'Your accounts and their balances will be available here later.',
   'settings.title': 'Make yourself at home',
   'settings.description':
-    'Language and appearance changes apply immediately. These temporary choices reset when the app restarts; profile settings will come later.',
+    'Language, appearance and base currency are saved for this profile and apply immediately.',
+  'settings.baseCurrency': 'Base currency',
+  'settings.error': 'The settings could not be saved. Please try again.',
   'settings.language': 'Language',
   'settings.theme': 'Appearance',
   'language.hu': 'Hungarian',

@@ -45,7 +45,8 @@ when adding dependencies that require lifecycle scripts.
 | `npm run typecheck`    | Check strict Node and renderer TypeScript configurations.                         |
 
 The renderer has no Node access; a sandboxed, isolated preload exposes only the
-typed `app:getVersion` and `db:ping` calls. SQLite is used only in the main process.
+typed app diagnostics and profile operations (including settings). SQLite is
+used only in the main process.
 Profiles are listed in `profiles.json` under the app's user-data folder; each
 profile lives in `profiles/<id>/` (database, data folder, pre-migration
 backups). Migrations are forward-only and run after a verified backup; a
@@ -59,9 +60,13 @@ database with a newer schema is refused. Installer packaging is not included yet
   components in `src/renderer/src/components/ui/LICENSE`.
 - Visual tokens live in `src/renderer/src/tokens.css`: calm green/teal accent,
   light and dark surfaces, radius, and density (the Tailwind spacing unit).
-- Settings has temporary, in-memory language and appearance selectors. English
-  and the system theme are the initial defaults. Choices apply immediately but
-  reset on restart; profile settings belong to a later ticket.
+- Settings saves language (HU/EN/DE), appearance (light/dark/system), and base
+  currency (HUF/CHF) in each profile's SQLite database. English, the system theme,
+  and HUF are the initial defaults, including for existing profiles upgraded from
+  the identity-only schema. Saved choices apply immediately and return when the
+  profile is opened again; switching profiles switches its language and theme.
+  Failed saves show a translated error and leave the previous choices applied.
+  Base currency is stored for later reports; currency conversion is not included.
 - The system theme follows Windows through `prefers-color-scheme`, using
   Electron's default system `nativeTheme`. Explicit light/dark modes override
   that preference in the renderer, including native form controls.
@@ -77,6 +82,9 @@ database with a newer schema is refused. Installer packaging is not included yet
 
 Run `npm run dev`, navigate all four pages, and collapse/expand the sidebar.
 In Settings, select each language and verify labels and formatting change live.
+Select HUF and CHF as the base currency. Create a second profile with a different
+language, theme, and base currency; switch between the profiles and restart the
+app to verify that each profile restores its own choices.
 Select Light and Dark, then Follow Windows; while following Windows, change
 Windows' app color mode and verify the shell follows it. Explicit Light/Dark
 must stay unchanged when Windows changes. Check keyboard navigation and focus

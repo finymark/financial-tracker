@@ -2,11 +2,13 @@ import type {
   CreateProfileInput,
   DeleteProfileInput,
   ProfileIdInput,
-  ProfileInfo,
+  ActiveProfileInfo,
+  UpdateProfileSettingsInput,
   ProfileRegistrySnapshot,
   ProfileSummary,
   RenameProfileInput,
 } from './profiles'
+import type { ProfileSettings } from './settings'
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
@@ -18,6 +20,7 @@ export const IPC_CHANNELS = {
   profilesOpen: 'profiles:open',
   profilesGetActive: 'profiles:get-active',
   profilesClose: 'profiles:close',
+  profilesUpdateSettings: 'profiles:update-settings',
 } as const
 
 export type DatabasePing = 'ok'
@@ -30,8 +33,9 @@ export interface AppBridge {
     create(input: CreateProfileInput): Promise<ProfileSummary>
     rename(input: RenameProfileInput): Promise<ProfileSummary>
     delete(input: DeleteProfileInput): Promise<void>
-    open(input: ProfileIdInput): Promise<ProfileInfo>
-    getActive(): Promise<ProfileInfo | null>
+    open(input: ProfileIdInput): Promise<ActiveProfileInfo>
+    getActive(): Promise<ActiveProfileInfo | null>
     close(): Promise<void>
+    updateSettings(input: UpdateProfileSettingsInput): Promise<ProfileSettings>
   }
 }

@@ -1,3 +1,5 @@
+import type { ProfileSettings, ProfileSettingsChanges } from './settings'
+
 export interface ProfileSummary {
   id: string
   name: string
@@ -11,6 +13,14 @@ export interface ProfileRegistrySnapshot {
 
 export interface ProfileInfo extends ProfileSummary {
   schemaVersion: number
+}
+
+export interface ActiveProfileInfo extends ProfileInfo {
+  settings: ProfileSettings
+}
+
+export interface UpdateProfileSettingsInput extends ProfileIdInput {
+  settings: ProfileSettingsChanges
 }
 
 export interface CreateProfileInput {
