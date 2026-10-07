@@ -4,7 +4,8 @@ A local-first personal expense tracker for Windows, built with Electron, React,
 TypeScript, and SQLite. The app opens to a collapsible sidebar with Overview,
 Transactions, Accounts, and Settings pages. On start you pick or create a
 profile; each profile has its own SQLite database and data folder. Financial
-data is not implemented yet.
+data stays local. Accounts now track opening balances; transactions are not
+implemented yet.
 
 ## Requirements
 
@@ -45,8 +46,10 @@ when adding dependencies that require lifecycle scripts.
 | `npm run typecheck`    | Check strict Node and renderer TypeScript configurations.                         |
 
 The renderer has no Node access; a sandboxed, isolated preload exposes only the
-typed `app:getVersion` and `db:ping` calls. SQLite is used only in the main process.
-Profiles are listed in `profiles.json` under the app's user-data folder; each
+typed app, profile, and account commands/queries. Every IPC input is validated
+in the main process. Account writes use the profile application API, with each
+command executed in one SQLite transaction. SQLite is used only in the main
+process. Profiles are listed in `profiles.json` under the app's user-data folder; each
 profile lives in `profiles/<id>/` (database, data folder, pre-migration
 backups). Migrations are forward-only and run after a verified backup; a
 database with a newer schema is refused. Installer packaging is not included yet.
@@ -71,7 +74,28 @@ database with a newer schema is refused. Installer packaging is not included yet
   completeness test checks the union of catalog keys, so a missing key in any
   language fails; TypeScript also checks Hungarian and German against English.
 - The profile area at the bottom of the sidebar shows the active profile and
-  switches profiles. The other financial pages are placeholders.
+  switches profiles. Accounts lists active and archived accounts with balances in
+  their own currency; Overview and Transactions are still placeholders.
+
+## Accounts
+
+- Create an account with a name, HUF or CHF currency, an opening balance, and a
+  valid calendar opening date. Amount entry accepts a dot or comma with up to two
+  decimal places, no thousands separators, and allows negative opening balances.
+- Money is stored as exact integer hundredths for both currencies. CHF displays
+  two decimal places; HUF displays no decimals (rounded for display only).
+- Rename accounts or change their currency while they have no transactions.
+  Changing currency changes the denomination, not the amount; it is not a
+  currency conversion.
+- Archive an account to hide it from account pickers without deleting it. Archived
+  accounts remain visible on Accounts with their balance and opening date.
+- Delete an account after confirming in the page. An opening balance alone does
+  not prevent deletion: "empty" means no transactions.
+- Balances currently equal opening balances. The profile application's
+  `getAccountBalance` and `hasAccountTransactions` queries are the integration
+  points for #56, which will add signed transaction totals and transaction
+  existence checks. Deletion and currency-change guards already use the same
+  existence check; its positive cases will be tested when transactions arrive.
 
 ### Manual shell check
 
@@ -82,3 +106,14 @@ Windows' app color mode and verify the shell follows it. Explicit Light/Dark
 must stay unchanged when Windows changes. Check keyboard navigation and focus
 indicators with both sidebar sizes. UI behavior is checked manually, not by the
 automated test suite.
+
+### Manual Accounts check
+
+Run `npm run dev`, open a profile, and navigate to Accounts. Create HUF and CHF
+accounts with positive, zero, and negative opening balances; confirm HUF has no
+decimals and CHF has two. Enter a comma decimal separator and verify the amount
+round-trips after restarting. Rename an account, change its currency while empty,
+archive it, and confirm it remains listed as archived. Try deleting an account,
+cancel, then confirm deletion. Switch profiles and check that accounts remain
+separate. Repeat with Hungarian/German and light/dark themes; check keyboard
+navigation, focus indicators, and validation errors. UI checks are manual.

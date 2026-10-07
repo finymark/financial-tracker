@@ -42,7 +42,42 @@ export const de = {
     'Ausgaben und Einnahmen kannst du später hier erfassen und ansehen.',
   'accounts.title': 'Ein Platz für jedes Konto',
   'accounts.description':
-    'Deine Konten und ihre Salden werden später hier verfügbar sein.',
+    'Jeder Saldo wird in der Kontowährung angezeigt. Die Salden entsprechen derzeit den Eröffnungssalden.',
+  'accounts.create': 'Konto erstellen',
+  'accounts.name': 'Kontoname',
+  'accounts.currency': 'Währung',
+  'accounts.openingBalance': 'Eröffnungssaldo',
+  'accounts.openingDate': 'Eröffnungsdatum',
+  'accounts.balance': 'Saldo',
+  'accounts.balanceHint':
+    'Punkt oder Komma und höchstens zwei Nachkommastellen verwenden, ohne Tausendertrennzeichen. Negative Salden sind erlaubt.',
+  'accounts.empty': 'Erstelle ein Konto, um seinen Saldo zu verfolgen.',
+  'accounts.loading': 'Konten werden geladen…',
+  'accounts.rename': 'Umbenennen',
+  'accounts.changeCurrency': 'Währung ändern',
+  'accounts.archive': 'Archivieren',
+  'accounts.archived': 'Archiviert — in der Kontoauswahl ausgeblendet',
+  'accounts.delete': 'Löschen',
+  'accounts.deleteConfirmation': 'Dieses Konto endgültig löschen?',
+  'accounts.confirmDelete': 'Konto endgültig löschen',
+  'accounts.save': 'Speichern',
+  'accounts.cancel': 'Abbrechen',
+  'accounts.refresh': 'Aktualisieren',
+  'accounts.locked':
+    'Konten mit Transaktionen können weder gelöscht werden noch ihre Währung ändern.',
+  'accounts.error':
+    'Der Kontovorgang konnte nicht abgeschlossen werden. Aktualisiere die Liste und versuche es erneut.',
+  'accounts.error.name': 'Gib einen Kontonamen mit 1 bis 100 Zeichen ein.',
+  'accounts.error.currency': 'Wähle HUF oder CHF.',
+  'accounts.error.balance':
+    'Gib einen gültigen Saldo mit höchstens zwei Nachkommastellen ohne Gruppierung und innerhalb von ±90.071.992.547.409,91 ein.',
+  'accounts.error.date': 'Gib ein gültiges Eröffnungsdatum ein.',
+  'accounts.error.notFound':
+    'Das Konto wurde nicht gefunden. Aktualisiere die Liste.',
+  'accounts.error.currencyLocked':
+    'Die Währung kann bei Konten mit Transaktionen nicht geändert werden.',
+  'accounts.error.notEmpty':
+    'Dieses Konto hat Transaktionen und kann nicht gelöscht werden. Archiviere es stattdessen.',
   'settings.title': 'Fühl dich wie zu Hause',
   'settings.description':
     'Änderungen an Sprache und Darstellung werden sofort übernommen. Diese vorläufigen Einstellungen werden beim Neustart zurückgesetzt; Profileinstellungen folgen später.',

@@ -13,6 +13,7 @@ import type {
   ProfileInfo,
   ProfileRegistrySnapshot,
 } from '../../shared/profiles'
+import { AccountsPage } from './AccountsPage'
 import { Button } from './components/ui/button'
 import {
   Card,
@@ -444,6 +445,9 @@ function Shell({
               <CardTitle>{t(`${page}.title`)}</CardTitle>
               <CardDescription>{t(`${page}.description`)}</CardDescription>
             </CardHeader>
+            {page === 'accounts' && (
+              <AccountsPage key={active.id} language={language} t={t} />
+            )}
             {page === 'settings' && (
               <CardContent className="space-y-6">
                 <div className="grid gap-6 sm:grid-cols-2">

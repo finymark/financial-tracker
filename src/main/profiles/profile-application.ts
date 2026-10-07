@@ -1,9 +1,22 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
+import type {
+  Account,
+  CreateAccountInput,
+  RenameAccountInput,
+  ChangeAccountCurrencyInput,
+} from '../../shared/accounts'
 import type { ProfileInfo, ProfileSummary } from '../../shared/profiles'
 import { openDatabase } from '../db'
+import {
+  validateAccountId,
+  validateAccountName,
+  validateAccountCurrency,
+  validateOpeningBalance,
+  validateOpeningDate,
+} from './account-validation'
 import type { ProfilePaths } from './profile-registry'
 
 const MIGRATION_TABLE_SQL = `
@@ -21,6 +34,30 @@ const INITIAL_SCHEMA_SQL = `
     created_at TEXT NOT NULL
   )
 `
+
+const ACCOUNTS_SCHEMA_SQL = `
+  CREATE TABLE accounts (
+    id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+    name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 100),
+    currency TEXT NOT NULL CHECK (currency IN ('HUF', 'CHF')),
+    opening_balance INTEGER NOT NULL CHECK (
+      typeof(opening_balance) = 'integer' AND
+      opening_balance BETWEEN -9007199254740991 AND 9007199254740991
+    ),
+    opening_date TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1))
+  )
+`
+
+interface StoredAccount extends CreateAccountInput {
+  id: string
+  createdAt: string
+  archived: number
+}
+
+const ACCOUNT_COLUMNS = `id, name, currency, opening_balance AS openingBalance,
+  opening_date AS openingDate, created_at AS createdAt, archived`
 
 export interface SchemaMigration {
   readonly version: number
@@ -44,10 +81,19 @@ export interface OpenProfileApplicationOptions {
 
 export interface ProfileQueries {
   getProfileInfo(): ProfileInfo
+  listAccounts(): Account[]
+  listAccountOptions(): Account[]
+  getAccountBalance(id: string): number
+  hasAccountTransactions(id: string): boolean
 }
 
 export interface ProfileCommands {
   ensureProfileIdentity(): void
+  createAccount(input: CreateAccountInput): Account
+  renameAccount(input: RenameAccountInput): Account
+  changeAccountCurrency(input: ChangeAccountCurrencyInput): Account
+  archiveAccount(id: string): void
+  deleteAccount(id: string): void
 }
 
 export interface ProfileApplication {
@@ -99,6 +145,7 @@ export function defineSqlMigration(
 
 export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
   defineSqlMigration(1, 'initial profile schema', INITIAL_SCHEMA_SQL),
+  defineSqlMigration(2, 'accounts', ACCOUNTS_SCHEMA_SQL),
 ]
 
 function validateMigrations(
@@ -229,16 +276,142 @@ class OpenProfileApplication implements ProfileApplication {
   readonly queries: ProfileQueries
   readonly #database: Database.Database
   readonly #profile: ProfileSummary
+  readonly #clock: () => Date
 
-  constructor(database: Database.Database, profile: ProfileSummary) {
+  constructor(
+    database: Database.Database,
+    profile: ProfileSummary,
+    clock: () => Date,
+  ) {
     this.#database = database
     this.#profile = { ...profile }
+    this.#clock = clock
     this.commands = {
       ensureProfileIdentity: () => this.#ensureProfileIdentity(),
+      createAccount: (input) => this.#createAccount(input),
+      renameAccount: (input) => this.#renameAccount(input),
+      changeAccountCurrency: (input) => this.#changeAccountCurrency(input),
+      archiveAccount: (id) => this.#archiveAccount(id),
+      deleteAccount: (id) => this.#deleteAccount(id),
     }
     this.queries = {
       getProfileInfo: () => this.#getProfileInfo(),
+      listAccounts: () => this.#listAccounts(),
+      listAccountOptions: () => this.#listAccounts(true),
+      getAccountBalance: (id) => this.#getAccountBalance(id),
+      hasAccountTransactions: (id) => this.#hasAccountTransactions(id),
     }
+  }
+
+  #createAccount(input: CreateAccountInput): Account {
+    return this.#executeCommand(() => {
+      const name = validateAccountName(input.name)
+      const currency = validateAccountCurrency(input.currency)
+      const openingBalance = validateOpeningBalance(input.openingBalance)
+      const openingDate = validateOpeningDate(input.openingDate)
+      const id = randomUUID()
+      this.#database
+        .prepare(
+          `INSERT INTO accounts
+        (id, name, currency, opening_balance, opening_date, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          id,
+          name,
+          currency,
+          openingBalance,
+          openingDate,
+          this.#clock().toISOString(),
+        )
+      return this.#accountView(this.#getAccount(id))
+    })
+  }
+
+  #renameAccount(input: RenameAccountInput): Account {
+    return this.#executeCommand(() => {
+      const account = this.#getAccount(input.id)
+      const name = validateAccountName(input.name)
+      this.#database
+        .prepare('UPDATE accounts SET name = ? WHERE id = ?')
+        .run(name, account.id)
+      return this.#accountView(this.#getAccount(account.id))
+    })
+  }
+
+  #changeAccountCurrency(input: ChangeAccountCurrencyInput): Account {
+    return this.#executeCommand(() => {
+      const account = this.#getAccount(input.id)
+      const currency = validateAccountCurrency(input.currency)
+      if (
+        currency !== account.currency &&
+        this.#hasAccountTransactions(account.id)
+      ) {
+        throw new Error('accounts.error.currencyLocked')
+      }
+      this.#database
+        .prepare('UPDATE accounts SET currency = ? WHERE id = ?')
+        .run(currency, account.id)
+      return this.#accountView(this.#getAccount(account.id))
+    })
+  }
+
+  #archiveAccount(id: string): void {
+    this.#executeCommand(() => {
+      const account = this.#getAccount(id)
+      this.#database
+        .prepare('UPDATE accounts SET archived = 1 WHERE id = ?')
+        .run(account.id)
+    })
+  }
+
+  #deleteAccount(id: string): void {
+    this.#executeCommand(() => {
+      const account = this.#getAccount(id)
+      if (this.#hasAccountTransactions(account.id)) {
+        throw new Error('accounts.error.notEmpty')
+      }
+      this.#database
+        .prepare('DELETE FROM accounts WHERE id = ?')
+        .run(account.id)
+    })
+  }
+
+  #getAccount(id: string): StoredAccount {
+    const account = this.#database
+      .prepare(`SELECT ${ACCOUNT_COLUMNS} FROM accounts WHERE id = ?`)
+      .get(validateAccountId(id)) as StoredAccount | undefined
+    if (!account) throw new Error('accounts.error.notFound')
+    return account
+  }
+
+  #listAccounts(activeOnly = false): Account[] {
+    const accounts = this.#database
+      .prepare(
+        `SELECT ${ACCOUNT_COLUMNS} FROM accounts ${activeOnly ? 'WHERE archived = 0' : ''} ORDER BY created_at, rowid`,
+      )
+      .all() as StoredAccount[]
+    return accounts.map((account) => this.#accountView(account))
+  }
+
+  #accountView(account: StoredAccount): Account {
+    return {
+      ...account,
+      archived: Boolean(account.archived),
+      balance: this.#getAccountBalance(account.id),
+      hasTransactions: this.#hasAccountTransactions(account.id),
+    }
+  }
+
+  #getAccountBalance(id: string): number {
+    // #56 extends this query with signed transaction totals in the account currency.
+    return this.#getAccount(id).openingBalance
+  }
+
+  #hasAccountTransactions(id: string): boolean {
+    this.#getAccount(id)
+    // Transactions are introduced in #56; all accounts are empty until then.
+    return false
   }
 
   #ensureProfileIdentity(): void {
@@ -340,7 +513,11 @@ export async function openProfileApplication(
       }
     }
 
-    const application = new OpenProfileApplication(database, options.profile)
+    const application = new OpenProfileApplication(
+      database,
+      options.profile,
+      clock,
+    )
     application.commands.ensureProfileIdentity()
     return application
   } catch (error) {

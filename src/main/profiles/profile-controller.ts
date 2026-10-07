@@ -78,6 +78,11 @@ export class ProfileController {
     return { ...info, name: currentProfile.name }
   }
 
+  getActiveApplication(): ProfileApplication {
+    if (!this.#active) throw new Error('No profile is open')
+    return this.#active.application
+  }
+
   close(): void {
     this.#active?.application.close()
     this.#active = null
