@@ -1,0 +1,38 @@
+import type { MessageCatalog } from './en'
+
+export const de = {
+  'app.name': 'Financial Tracker',
+  'app.tagline': 'Deine Finanzen auf deinem PC.',
+  'navigation.label': 'Hauptnavigation',
+  'navigation.overview': 'Übersicht',
+  'navigation.transactions': 'Transaktionen',
+  'navigation.accounts': 'Konten',
+  'navigation.settings': 'Einstellungen',
+  'sidebar.collapse': 'Seitenleiste einklappen',
+  'sidebar.expand': 'Seitenleiste ausklappen',
+  'sidebar.profile': 'Profile',
+  'sidebar.profileHint': 'Der Profilwechsel wird später hier verfügbar sein.',
+  'overview.title': 'Deine Finanzen im Überblick',
+  'overview.description':
+    'Deine Finanzübersicht erscheint hier, sobald Konten und Transaktionen verfügbar sind.',
+  'transactions.title': 'Deine Transaktionen an einem Ort',
+  'transactions.description':
+    'Ausgaben und Einnahmen kannst du später hier erfassen und ansehen.',
+  'accounts.title': 'Ein Platz für jedes Konto',
+  'accounts.description':
+    'Deine Konten und ihre Salden werden später hier verfügbar sein.',
+  'settings.title': 'Fühl dich wie zu Hause',
+  'settings.description':
+    'Änderungen an Sprache und Darstellung werden sofort übernommen. Diese vorläufigen Einstellungen werden beim Neustart zurückgesetzt; Profileinstellungen folgen später.',
+  'settings.language': 'Sprache',
+  'settings.theme': 'Darstellung',
+  'language.hu': 'Ungarisch',
+  'language.en': 'Englisch',
+  'language.de': 'Deutsch',
+  'theme.light': 'Hell',
+  'theme.dark': 'Dunkel',
+  'theme.system': 'Windows folgen',
+  'settings.preview': 'Formatierungsvorschau',
+  'settings.date': 'Datum',
+  'settings.number': 'Zahl',
+} satisfies MessageCatalog
