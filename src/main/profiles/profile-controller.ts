@@ -1,8 +1,10 @@
 import type {
-  ProfileInfo,
+  ActiveProfileInfo,
+  UpdateProfileSettingsInput,
   ProfileRegistrySnapshot,
   ProfileSummary,
 } from '../../shared/profiles'
+import type { ProfileSettings } from '../../shared/settings'
 import {
   openProfileApplication,
   type ProfileApplication,
@@ -54,7 +56,7 @@ export class ProfileController {
     this.#registry.deleteProfile(id, confirmation)
   }
 
-  async open(id: string): Promise<ProfileInfo> {
+  async open(id: string): Promise<ActiveProfileInfo> {
     const profile = this.#registry.getProfile(id)
     const application = await openProfileApplication({
       profile,
@@ -68,14 +70,25 @@ export class ProfileController {
     }
     this.close()
     this.#active = { id, application }
-    return this.getActive() as ProfileInfo
+    return this.getActive() as ActiveProfileInfo
   }
 
-  getActive(): ProfileInfo | null {
+  getActive(): ActiveProfileInfo | null {
     if (!this.#active) return null
     const info = this.#active.application.queries.getProfileInfo()
     const currentProfile = this.#registry.getProfile(this.#active.id)
-    return { ...info, name: currentProfile.name }
+    return {
+      ...info,
+      name: currentProfile.name,
+      settings: this.#active.application.queries.getSettings(),
+    }
+  }
+
+  updateSettings(input: UpdateProfileSettingsInput): ProfileSettings {
+    if (!this.#active || this.#active.id !== input.id) {
+      throw new Error('Settings can only be changed for the active profile')
+    }
+    return this.#active.application.commands.updateSettings(input.settings)
   }
 
   close(): void {

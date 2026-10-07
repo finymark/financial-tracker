@@ -5,8 +5,10 @@ import type {
   DeleteProfileInput,
   ProfileIdInput,
   RenameProfileInput,
+  UpdateProfileSettingsInput,
 } from '../../shared/profiles'
 import type { ProfileController } from './profile-controller'
+import { parseSettingsChanges } from './profile-settings'
 
 function inputRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -49,6 +51,14 @@ function parseDeleteProfileInput(value: unknown): DeleteProfileInput {
   return {
     id: stringProperty(input, 'id'),
     confirmation: stringProperty(input, 'confirmation'),
+  }
+}
+
+function parseUpdateSettingsInput(value: unknown): UpdateProfileSettingsInput {
+  const input = inputRecord(value)
+  return {
+    id: stringProperty(input, 'id'),
+    settings: parseSettingsChanges(input.settings),
   }
 }
 
@@ -104,6 +114,14 @@ export function registerProfileIpc(
     IPC_CHANNELS.profilesGetActive,
     (): Awaited<ReturnType<AppBridge['profiles']['getActive']>> =>
       controller.getActive(),
+  )
+  ipcMain.handle(
+    IPC_CHANNELS.profilesUpdateSettings,
+    (
+      _event,
+      value: unknown,
+    ): Awaited<ReturnType<AppBridge['profiles']['updateSettings']>> =>
+      controller.updateSettings(parseUpdateSettingsInput(value)),
   )
   ipcMain.handle(
     IPC_CHANNELS.profilesClose,

@@ -12,6 +12,8 @@ const bridge: AppBridge = {
     open: (input) => ipcRenderer.invoke(IPC_CHANNELS.profilesOpen, input),
     getActive: () => ipcRenderer.invoke(IPC_CHANNELS.profilesGetActive),
     close: () => ipcRenderer.invoke(IPC_CHANNELS.profilesClose),
+    updateSettings: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.profilesUpdateSettings, input),
   },
 }
 

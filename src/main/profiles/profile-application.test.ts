@@ -65,13 +65,17 @@ describe('profile application API', () => {
 
   test('upgrades from every earlier schema version', async () => {
     const secondMigration = defineSqlMigration(
-      2,
+      CURRENT_MIGRATIONS.length + 1,
       'migration mechanism proof',
       'CREATE TABLE migration_proof (value TEXT NOT NULL)',
     )
     const migrations = [...CURRENT_MIGRATIONS, secondMigration]
 
-    for (const startingVersion of [0, 1]) {
+    for (
+      let startingVersion = 0;
+      startingVersion <= CURRENT_MIGRATIONS.length;
+      startingVersion += 1
+    ) {
       const { registry } = setup()
       const profile = registry.createProfile(`Version ${startingVersion}`)
       const paths = registry.getProfilePaths(profile.id)
@@ -84,7 +88,7 @@ describe('profile application API', () => {
         const application = await openProfileApplication({
           profile,
           paths,
-          migrations: CURRENT_MIGRATIONS,
+          migrations: CURRENT_MIGRATIONS.slice(0, startingVersion),
           clock,
         })
         application.close()
@@ -97,7 +101,9 @@ describe('profile application API', () => {
         clock,
       })
       try {
-        expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(2)
+        expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(
+          migrations.length,
+        )
       } finally {
         upgraded.close()
       }
@@ -109,9 +115,14 @@ describe('profile application API', () => {
     const profile = registry.createProfile('Migration failure')
     const paths = registry.getProfilePaths(profile.id)
     const initial = await openProfileApplication({ profile, paths, clock })
+    initial.commands.updateSettings({
+      language: 'hu',
+      theme: 'dark',
+      baseCurrency: 'CHF',
+    })
     initial.close()
     const failingMigration = defineSqlMigration(
-      2,
+      CURRENT_MIGRATIONS.length + 1,
       'fails after changing the schema',
       'CREATE TABLE should_be_rolled_back (value TEXT); INVALID SQL',
     )
@@ -127,7 +138,14 @@ describe('profile application API', () => {
 
     const reopened = await openProfileApplication({ profile, paths, clock })
     try {
-      expect(reopened.queries.getProfileInfo().schemaVersion).toBe(1)
+      expect(reopened.queries.getProfileInfo().schemaVersion).toBe(
+        CURRENT_MIGRATIONS.length,
+      )
+      expect(reopened.queries.getSettings()).toEqual({
+        language: 'hu',
+        theme: 'dark',
+        baseCurrency: 'CHF',
+      })
     } finally {
       reopened.close()
     }
@@ -147,7 +165,14 @@ describe('profile application API', () => {
       clock,
     })
     try {
-      expect(backupApplication.queries.getProfileInfo().schemaVersion).toBe(1)
+      expect(backupApplication.queries.getProfileInfo().schemaVersion).toBe(
+        CURRENT_MIGRATIONS.length,
+      )
+      expect(backupApplication.queries.getSettings()).toEqual({
+        language: 'hu',
+        theme: 'dark',
+        baseCurrency: 'CHF',
+      })
     } finally {
       backupApplication.close()
     }
@@ -169,7 +194,7 @@ describe('profile application API', () => {
       openProfileApplication({
         profile,
         paths,
-        migrations: [changedFirstMigration],
+        migrations: [changedFirstMigration, ...CURRENT_MIGRATIONS.slice(1)],
         clock,
       }),
     ).rejects.toThrow('migration record 1 is invalid')
@@ -180,7 +205,7 @@ describe('profile application API', () => {
     const profile = registry.createProfile('Newer schema')
     const paths = registry.getProfilePaths(profile.id)
     const secondMigration = defineSqlMigration(
-      2,
+      CURRENT_MIGRATIONS.length + 1,
       'future schema',
       'CREATE TABLE future_data (value TEXT NOT NULL)',
     )

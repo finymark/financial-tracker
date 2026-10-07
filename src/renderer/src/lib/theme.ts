@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 
-export const themeModes = ['light', 'dark', 'system'] as const
-export type ThemeMode = (typeof themeModes)[number]
+import type { ThemeMode } from '../../../shared/settings'
+export { themeModes, type ThemeMode } from '../../../shared/settings'
 
 // Electron's default nativeTheme source is system, so this query follows Windows.
 export function useTheme(mode: ThemeMode): void {

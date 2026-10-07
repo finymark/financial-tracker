@@ -44,7 +44,9 @@ export const hu = {
     'A számláid és egyenlegeik később itt lesznek elérhetők.',
   'settings.title': 'Érezd magad otthon',
   'settings.description':
-    'A nyelv és a megjelenés módosítása azonnal érvényesül. Ezek az ideiglenes beállítások az alkalmazás újraindításakor visszaállnak; a profilbeállítások később érkeznek.',
+    'A nyelv, a megjelenés és az alap pénznem a profilhoz mentődik, és azonnal érvényesül.',
+  'settings.baseCurrency': 'Alap pénznem',
+  'settings.error': 'A beállításokat nem sikerült menteni. Próbáld újra.',
   'settings.language': 'Nyelv',
   'settings.theme': 'Megjelenés',
   'language.hu': 'Magyar',
