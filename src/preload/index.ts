@@ -4,6 +4,15 @@ import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 const bridge: AppBridge = {
   getVersion: () => ipcRenderer.invoke(IPC_CHANNELS.getVersion),
   dbPing: () => ipcRenderer.invoke(IPC_CHANNELS.dbPing),
+  profiles: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.profilesList),
+    create: (input) => ipcRenderer.invoke(IPC_CHANNELS.profilesCreate, input),
+    rename: (input) => ipcRenderer.invoke(IPC_CHANNELS.profilesRename, input),
+    delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.profilesDelete, input),
+    open: (input) => ipcRenderer.invoke(IPC_CHANNELS.profilesOpen, input),
+    getActive: () => ipcRenderer.invoke(IPC_CHANNELS.profilesGetActive),
+    close: () => ipcRenderer.invoke(IPC_CHANNELS.profilesClose),
+  },
 }
 
 contextBridge.exposeInMainWorld('app', bridge)

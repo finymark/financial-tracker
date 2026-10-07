@@ -12,6 +12,28 @@ export const de = {
   'sidebar.expand': 'Seitenleiste ausklappen',
   'sidebar.profile': 'Profile',
   'sidebar.profileHint': 'Der Profilwechsel wird später hier verfügbar sein.',
+  'profilePicker.title': 'Profil auswählen',
+  'profilePicker.description':
+    'Jedes Profil speichert seine Finanzen in einer eigenen lokalen Datenbank.',
+  'profilePicker.choose': 'Profile',
+  'profilePicker.empty': 'Erstelle zuerst ein Profil.',
+  'profile.loading': 'Profile werden geladen…',
+  'profile.open': 'Profil öffnen',
+  'profile.create': 'Profil erstellen',
+  'profile.createDescription':
+    'Gib diesem getrennten Finanzprofil einen Namen.',
+  'profile.name': 'Profilname',
+  'profile.rename': 'Umbenennen',
+  'profile.renameLabel': 'Neuer Profilname',
+  'profile.save': 'Namen speichern',
+  'profile.delete': 'Löschen',
+  'profile.deleteDescription':
+    'Dadurch werden die Profildatenbank und alle lokalen Daten endgültig gelöscht.',
+  'profile.typeName': 'Gib zur Bestätigung den Profilnamen ein:',
+  'profile.confirmDelete': 'Profil endgültig löschen',
+  'profile.cancel': 'Zurück zum Profil',
+  'profile.switch': 'Profil wechseln',
+  'profile.error': 'Der Profilvorgang konnte nicht abgeschlossen werden.',
   'overview.title': 'Deine Finanzen im Überblick',
   'overview.description':
     'Deine Finanzübersicht erscheint hier, sobald Konten und Transaktionen verfügbar sind.',

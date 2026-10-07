@@ -15,6 +15,7 @@
   --border: oklch(0.88 0.012 170);
   --input: var(--border);
   --ring: var(--primary);
+  --error: oklch(0.5 0.18 28);
 
   --radius: 0.75rem;
   --density: 0.25rem;
@@ -38,6 +39,7 @@
   --border: oklch(0.35 0.02 170);
   --input: var(--border);
   --ring: var(--primary);
+  --error: oklch(0.75 0.14 28);
 }
 
 @theme inline {
@@ -55,6 +57,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-error: var(--error);
   --radius-sm: calc(var(--radius) - 0.375rem);
   --radius-md: calc(var(--radius) - 0.25rem);
   --radius-lg: var(--radius);

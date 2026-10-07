@@ -1,13 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import {
   ArrowLeftRight,
   LayoutDashboard,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
+  UserRound,
   UsersRound,
   Wallet,
 } from 'lucide-react'
+import type {
+  ProfileInfo,
+  ProfileRegistrySnapshot,
+} from '../../shared/profiles'
 import { Button } from './components/ui/button'
 import {
   Card,
@@ -16,8 +21,15 @@ import {
   CardHeader,
   CardTitle,
 } from './components/ui/card'
+import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
-import { createFormatters, languages, translate, type Language } from './i18n'
+import {
+  createFormatters,
+  languages,
+  translate,
+  type Language,
+  type MessageKey,
+} from './i18n'
 import { themeModes, useTheme, type ThemeMode } from './lib/theme'
 import { cn } from './lib/utils'
 
@@ -28,20 +40,305 @@ const pages = [
   { id: 'settings', icon: Settings },
 ] as const
 type Page = (typeof pages)[number]['id']
+type Translate = (key: MessageKey) => string
 
-export default function App() {
+const emptySnapshot: ProfileRegistrySnapshot = {
+  profiles: [],
+  lastUsedProfileId: null,
+}
+
+interface ProfilePickerProps {
+  snapshot: ProfileRegistrySnapshot
+  active: ProfileInfo | null
+  t: Translate
+  onSnapshotChange(snapshot: ProfileRegistrySnapshot): void
+  onActiveChange(profile: ProfileInfo | null): void
+  onOpen(profile: ProfileInfo): void
+  onCancel(): void
+}
+
+function ProfilePicker({
+  snapshot,
+  active,
+  t,
+  onSnapshotChange,
+  onActiveChange,
+  onOpen,
+  onCancel,
+}: ProfilePickerProps) {
+  const initialId =
+    snapshot.lastUsedProfileId ?? snapshot.profiles[0]?.id ?? null
+  const [selectedId, setSelectedId] = useState<string | null>(initialId)
+  const [newName, setNewName] = useState('')
+  const [renameName, setRenameName] = useState('')
+  const [confirmation, setConfirmation] = useState('')
+  const [mode, setMode] = useState<'none' | 'rename' | 'delete'>('none')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(false)
+  const selected = snapshot.profiles.find((item) => item.id === selectedId)
+
+  async function refresh(preferredId?: string) {
+    const [next, current] = await Promise.all([
+      window.app.profiles.list(),
+      window.app.profiles.getActive(),
+    ])
+    onSnapshotChange(next)
+    onActiveChange(current)
+    setSelectedId(
+      preferredId ?? next.lastUsedProfileId ?? next.profiles[0]?.id ?? null,
+    )
+  }
+
+  async function run(action: () => Promise<void>) {
+    setBusy(true)
+    setError(false)
+    try {
+      await action()
+    } catch {
+      setError(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function submitCreate(event: FormEvent) {
+    event.preventDefault()
+    void run(async () => {
+      const created = await window.app.profiles.create({ name: newName })
+      const opened = await window.app.profiles.open({ id: created.id })
+      await refresh(created.id)
+      onOpen(opened)
+    })
+  }
+
+  function submitRename(event: FormEvent) {
+    event.preventDefault()
+    if (!selected) return
+    void run(async () => {
+      await window.app.profiles.rename({ id: selected.id, name: renameName })
+      await refresh(selected.id)
+      setMode('none')
+      setRenameName('')
+    })
+  }
+
+  function submitDelete(event: FormEvent) {
+    event.preventDefault()
+    if (!selected) return
+    void run(async () => {
+      await window.app.profiles.delete({
+        id: selected.id,
+        confirmation,
+      })
+      await refresh()
+      setMode('none')
+      setConfirmation('')
+    })
+  }
+
+  function openSelected() {
+    if (!selected) return
+    void run(async () => {
+      const opened = await window.app.profiles.open({ id: selected.id })
+      await refresh(selected.id)
+      onOpen(opened)
+    })
+  }
+
+  return (
+    <main className="min-h-dvh bg-muted p-6 sm:p-10">
+      <div className="mx-auto max-w-2xl space-y-6">
+        <header className="text-center">
+          <UsersRound
+            className="mx-auto mb-3 size-9 text-primary"
+            aria-hidden="true"
+          />
+          <h1 className="text-2xl font-semibold">{t('profilePicker.title')}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {t('profilePicker.description')}
+          </p>
+        </header>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('profilePicker.choose')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {snapshot.profiles.length === 0 ? (
+              <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
+                {t('profilePicker.empty')}
+              </p>
+            ) : (
+              <div
+                className="grid gap-2"
+                role="radiogroup"
+                aria-label={t('profilePicker.choose')}
+              >
+                {snapshot.profiles.map((profile) => (
+                  <button
+                    key={profile.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selectedId === profile.id}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg border p-3 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                      selectedId === profile.id && 'border-primary bg-accent',
+                    )}
+                    onClick={() => {
+                      setSelectedId(profile.id)
+                      setMode('none')
+                    }}
+                  >
+                    <UserRound
+                      className="size-5 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                    <span className="font-medium">{profile.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {error && (
+              <p role="alert" className="text-sm font-medium text-error">
+                {t('profile.error')}
+              </p>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={!selected || busy} onClick={openSelected}>
+                {t('profile.open')}
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={!selected || busy}
+                onClick={() => {
+                  setRenameName(selected?.name ?? '')
+                  setMode('rename')
+                }}
+              >
+                {t('profile.rename')}
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={!selected || busy}
+                onClick={() => setMode('delete')}
+              >
+                {t('profile.delete')}
+              </Button>
+              {active && (
+                <Button variant="ghost" disabled={busy} onClick={onCancel}>
+                  {t('profile.cancel')}
+                </Button>
+              )}
+            </div>
+
+            {mode === 'rename' && selected && (
+              <form
+                className="space-y-3 rounded-lg border p-4"
+                onSubmit={submitRename}
+              >
+                <label htmlFor="rename-profile" className="text-sm font-medium">
+                  {t('profile.renameLabel')}
+                </label>
+                <Input
+                  id="rename-profile"
+                  value={renameName}
+                  maxLength={100}
+                  required
+                  autoFocus
+                  onChange={(event) => setRenameName(event.target.value)}
+                />
+                <Button type="submit" disabled={busy}>
+                  {t('profile.save')}
+                </Button>
+              </form>
+            )}
+
+            {mode === 'delete' && selected && (
+              <form
+                className="space-y-3 rounded-lg border p-4"
+                onSubmit={submitDelete}
+              >
+                <p className="text-sm text-muted-foreground">
+                  {t('profile.deleteDescription')}
+                </p>
+                <label htmlFor="delete-profile" className="text-sm font-medium">
+                  {t('profile.typeName')} <strong>{selected.name}</strong>
+                </label>
+                <Input
+                  id="delete-profile"
+                  value={confirmation}
+                  autoComplete="off"
+                  required
+                  autoFocus
+                  onChange={(event) => setConfirmation(event.target.value)}
+                />
+                <Button
+                  type="submit"
+                  disabled={busy || confirmation !== selected.name}
+                >
+                  {t('profile.confirmDelete')}
+                </Button>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('profile.create')}</CardTitle>
+            <CardDescription>{t('profile.createDescription')}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="flex gap-2" onSubmit={submitCreate}>
+              <label htmlFor="new-profile" className="sr-only">
+                {t('profile.name')}
+              </label>
+              <Input
+                id="new-profile"
+                value={newName}
+                placeholder={t('profile.name')}
+                maxLength={100}
+                required
+                onChange={(event) => setNewName(event.target.value)}
+              />
+              <Button
+                type="submit"
+                disabled={busy || newName.trim().length === 0}
+              >
+                {t('profile.create')}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </main>
+  )
+}
+
+interface ShellProps {
+  active: ProfileInfo
+  language: Language
+  theme: ThemeMode
+  t: Translate
+  onLanguageChange(language: Language): void
+  onThemeChange(theme: ThemeMode): void
+  onSwitchProfile(): void
+}
+
+function Shell({
+  active,
+  language,
+  theme,
+  t,
+  onLanguageChange,
+  onThemeChange,
+  onSwitchProfile,
+}: ShellProps) {
   const [page, setPage] = useState<Page>('overview')
   const [collapsed, setCollapsed] = useState(false)
-  const [language, setLanguage] = useState<Language>('en')
-  const [theme, setTheme] = useState<ThemeMode>('system')
-  const t = (key: Parameters<typeof translate>[1]) => translate(language, key)
   const format = createFormatters(language)
-  useTheme(theme)
-
-  useEffect(() => {
-    document.documentElement.lang = language
-    document.title = translate(language, 'app.name')
-  }, [language])
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -101,24 +398,29 @@ export default function App() {
             </Button>
           ))}
         </nav>
-        <div className="mt-auto border-t pt-4" title={t('sidebar.profileHint')}>
-          <div
-            className={cn(
-              'flex items-center gap-3 text-muted-foreground',
-              collapsed && 'justify-center',
-            )}
-          >
-            <UsersRound className="size-5 shrink-0" aria-hidden="true" />
-            <span className={cn('text-sm font-medium', collapsed && 'sr-only')}>
-              {t('sidebar.profile')}
-            </span>
-          </div>
-          {!collapsed && (
-            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              {t('sidebar.profileHint')}
-            </p>
+        <Button
+          variant="ghost"
+          size={collapsed ? 'icon' : 'default'}
+          className={cn(
+            'mt-auto border-t pt-4',
+            !collapsed && 'h-auto justify-start',
           )}
-        </div>
+          aria-label={t('profile.switch')}
+          title={
+            collapsed ? `${active.name} — ${t('profile.switch')}` : undefined
+          }
+          onClick={onSwitchProfile}
+        >
+          <UsersRound className="size-5 shrink-0" aria-hidden="true" />
+          {!collapsed && (
+            <span className="min-w-0 text-left">
+              <span className="block truncate font-medium">{active.name}</span>
+              <span className="block text-xs text-muted-foreground">
+                {t('profile.switch')}
+              </span>
+            </span>
+          )}
+        </Button>
       </aside>
 
       <main
@@ -156,7 +458,7 @@ export default function App() {
                         const value = languages.find(
                           (item) => item === event.target.value,
                         )
-                        if (value) setLanguage(value)
+                        if (value) onLanguageChange(value)
                       }}
                     >
                       {languages.map((value) => (
@@ -177,7 +479,7 @@ export default function App() {
                         const value = themeModes.find(
                           (item) => item === event.target.value,
                         )
-                        if (value) setTheme(value)
+                        if (value) onThemeChange(value)
                       }}
                     >
                       {themeModes.map((value) => (
@@ -223,5 +525,68 @@ export default function App() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function App() {
+  const [language, setLanguage] = useState<Language>('en')
+  const [theme, setTheme] = useState<ThemeMode>('system')
+  const [snapshot, setSnapshot] = useState(emptySnapshot)
+  const [active, setActive] = useState<ProfileInfo | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [showPicker, setShowPicker] = useState(true)
+  const t: Translate = (key) => translate(language, key)
+  useTheme(theme)
+
+  useEffect(() => {
+    document.documentElement.lang = language
+    document.title = translate(language, 'app.name')
+  }, [language])
+
+  useEffect(() => {
+    void Promise.all([
+      window.app.profiles.list(),
+      window.app.profiles.getActive(),
+    ])
+      .then(([registry, current]) => {
+        setSnapshot(registry)
+        setActive(current)
+      })
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <main className="grid min-h-dvh place-items-center text-sm text-muted-foreground">
+        {t('profile.loading')}
+      </main>
+    )
+  }
+  if (showPicker || !active) {
+    return (
+      <ProfilePicker
+        snapshot={snapshot}
+        active={active}
+        t={t}
+        onSnapshotChange={setSnapshot}
+        onActiveChange={setActive}
+        onOpen={(profile) => {
+          setActive(profile)
+          setShowPicker(false)
+        }}
+        onCancel={() => setShowPicker(false)}
+      />
+    )
+  }
+  return (
+    <Shell
+      active={active}
+      language={language}
+      theme={theme}
+      t={t}
+      onLanguageChange={setLanguage}
+      onThemeChange={setTheme}
+      onSwitchProfile={() => setShowPicker(true)}
+    />
   )
 }
