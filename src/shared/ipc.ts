@@ -30,6 +30,8 @@ import type { ProfileSettings } from './settings'
 import type {
   CreateTransactionInput,
   Payee,
+  TransactionListInput,
+  TransactionPage,
   Transaction,
   TransactionIdInput,
   UpdateTransactionInput,
@@ -83,7 +85,7 @@ export interface AppBridge {
   getVersion(): Promise<string>
   dbPing(): Promise<DatabasePing>
   transactions: {
-    list(): Promise<Transaction[]>
+    list(input?: TransactionListInput): Promise<TransactionPage>
     create(input: CreateTransactionInput): Promise<Transaction>
     update(input: UpdateTransactionInput): Promise<Transaction>
     delete(input: TransactionIdInput): Promise<void>

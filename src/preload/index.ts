@@ -15,7 +15,7 @@ const bridge: AppBridge = {
   getVersion: () => ipcRenderer.invoke(IPC_CHANNELS.getVersion),
   dbPing: () => ipcRenderer.invoke(IPC_CHANNELS.dbPing),
   transactions: {
-    list: () => ipcRenderer.invoke(IPC_CHANNELS.transactionsList),
+    list: (input) => ipcRenderer.invoke(IPC_CHANNELS.transactionsList, input),
     create: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.transactionsCreate, input),
     update: (input) =>

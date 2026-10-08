@@ -1,4 +1,5 @@
 import type { CategoryKind } from './categories'
+import type { Currency } from './accounts'
 
 export type TransactionKind = CategoryKind
 
@@ -44,4 +45,40 @@ export interface UpdateTransactionInput extends CreateTransactionInput {
 
 export interface TransactionIdInput {
   id: string
+}
+
+export type TransactionPeriod =
+  'all' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'custom'
+
+// Dates are inclusive and valid only with the custom period. Defaults: all
+// dates, offset 0, limit 100 (maximum 500). All supplied filters combine with AND.
+export interface TransactionListInput {
+  period?: TransactionPeriod
+  from?: string
+  to?: string
+  accountId?: string
+  categoryId?: string
+  payeeId?: string
+  search?: string
+  offset?: number
+  limit?: number
+}
+
+export interface TransactionTotals {
+  currency: Currency
+  expenseMinor: number
+  incomeMinor: number
+}
+
+export interface TransactionDayTotals {
+  date: string
+  totals: TransactionTotals[]
+}
+
+export interface TransactionPage {
+  rows: Transaction[]
+  totalCount: number
+  // Aggregates cover the entire filtered set, independent of offset/limit.
+  totals: TransactionTotals[]
+  days: TransactionDayTotals[]
 }

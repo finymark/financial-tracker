@@ -61,6 +61,8 @@ import { parseSettingsChanges } from './profile-settings'
 import type {
   CreateTransactionInput,
   Payee,
+  TransactionListInput,
+  TransactionPage,
   Transaction,
   UpdateTransactionInput,
 } from '../../shared/transactions'
@@ -133,7 +135,7 @@ export interface OpenProfileApplicationOptions {
 }
 
 export interface ProfileQueries {
-  listTransactions(): Transaction[]
+  listTransactions(input?: TransactionListInput): TransactionPage
   listPayees(): Payee[]
   hasCategoryTransactions(id: string): boolean
   listCategories(): Category[]
@@ -269,6 +271,16 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
     );
     CREATE INDEX transaction_lines_transaction_id ON transaction_lines(transaction_id);
     CREATE INDEX transaction_lines_category_id ON transaction_lines(category_id);
+  `,
+  ),
+  defineSqlMigration(
+    6,
+    'transaction list filter indexes',
+    `
+    CREATE INDEX transactions_newest ON transactions(date DESC, created_at DESC, id DESC);
+    CREATE INDEX transactions_account_newest ON transactions(account_id, date DESC, created_at DESC, id DESC);
+    CREATE INDEX transactions_payee_newest ON transactions(payee_id, date DESC, created_at DESC, id DESC);
+    CREATE INDEX categories_parent_id ON categories(parent_id);
   `,
   ),
 ]
@@ -454,9 +466,9 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
-      listTransactions: () => {
+      listTransactions: (input) => {
         this.#assertAvailable()
-        return listTransactions(this.#database)
+        return listTransactions(this.#database, input, this.#clock)
       },
       listPayees: () => {
         this.#assertAvailable()

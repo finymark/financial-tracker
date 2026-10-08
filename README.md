@@ -277,7 +277,7 @@ not off-device copies or backups of the separate data folder.
   language fails; TypeScript also checks Hungarian and German against English.
 - The profile area at the bottom of the sidebar shows the active profile and
   switches profiles. Accounts lists active and archived accounts with balances in
-  their own currency. Transactions provides a minimal ledger list and a
+  their own currency. Transactions provides a filterable, virtualised table and a
   right-side create/edit drawer; Overview remains a placeholder.
 
 ## Accounts
@@ -341,8 +341,30 @@ not off-device copies or backups of the separate data folder.
 - Edit any listed transaction from the same drawer, or delete it after
   confirmation. Create, edit, delete, category reassignment, and balance updates
   run through the profile application command boundary in one SQLite transaction.
-- The page intentionally shows only a small transaction list. Search, filters,
-  and the full transaction list experience are not included yet.
+- The dense table is newest first (date, creation timestamp, then UUID), grouped
+  by day, with income/expense signs and icons. Each day shows totals for that
+  whole filtered day, even when it continues onto another page. Only the visible
+  rows plus a small overscan are mounted in the fixed-height scrolling viewport.
+- Combine period (all dates, this month, last month, this year, or an inclusive
+  custom range), account, category, payee, and free-text filters with **Apply
+  filters**. Presets use the application's injected clock. A main category
+  includes its subcategories; archived accounts/categories remain filterable.
+  Free text matches payee name or note, ignoring case and diacritics, and treats
+  punctuation literally. Different filters combine with AND.
+- Filtered-set and daily expense/income totals stay separate by currency (HUF
+  and CHF), without conversion, and include all matching transactions, not only
+  the current page. Queries return bounded pages (default 100, maximum 500);
+  the UI uses 200-row pages. Row and aggregate queries share one read snapshot.
+- Offset paging fits the numbered previous/next windows and known filtered
+  count. The appended migration 6 indexes newest order, account, payee, and
+  category parent lookup; existing transaction-line indexes serve category
+  matching. Keyset paging would improve deep sequential scans and stability
+  during external writes, but requires cursor state and cannot directly address
+  arbitrary windows. At the v0.1 20 000-transaction scale, offset is sufficient;
+  local writes reset to the first page to avoid stale offsets. The performance
+  test times a filtered first page plus all aggregates with a generous 500 ms
+  bound, arranging the 20 000 transactions through application commands in one
+  fixture transaction (outside the measured query).
 
 ### Manual Transactions check
 
@@ -355,6 +377,15 @@ kinds, then edit the date, account, kind, amount, payee, category, and note. Del
 after first cancelling the confirmation. Archive an account and category and
 confirm neither appears in its drawer picker. Repeat in Hungarian, English, and
 German and check translated validation, keyboard focus, and light/dark themes.
+Combine all filters and compare whole-set totals with known amounts in both
+currencies. Check custom endpoints, year/month rollover, main-category versus
+subcategory selection, archived-history filters, and case/diacritic-insensitive
+payee/note search. With more than 200 matching transactions, scroll to the bottom
+and page forward/back; verify the day header totals still cover the whole day,
+the browser mounts only a small row window, and edit/delete refreshes the first
+page and totals. UI checks remain manual; the application-API tests cover filters,
+calendar boundaries, stable paging, exact totals, upgrade preservation, and the
+20 000-transaction query bound.
 
 ### Manual Categories check
 
