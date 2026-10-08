@@ -45,9 +45,6 @@ export const de = {
     'Diese Kategorie hat Transaktionen. Wähle einen Ersatz, um sie zu erhalten.',
   'categories.error.replacement':
     'Wähle eine andere aktive Ersatzkategorie derselben Art.',
-  'categories.error.transactionIntegration':
-    'Die Neuzuordnung von Transaktionen ist in dieser Version noch nicht verfügbar. Die Kategorie wurde nicht gelöscht.',
-
   'app.name': 'Financial Tracker',
   'app.tagline': 'Deine Finanzen auf deinem PC.',
   'navigation.label': 'Hauptnavigation',
@@ -83,13 +80,64 @@ export const de = {
   'profile.error': 'Der Profilvorgang konnte nicht abgeschlossen werden.',
   'overview.title': 'Deine Finanzen im Überblick',
   'overview.description':
-    'Deine Finanzübersicht erscheint hier, sobald Konten und Transaktionen verfügbar sind.',
+    'Eine zusammengefasste Finanzübersicht wird später hier verfügbar sein.',
   'transactions.title': 'Deine Transaktionen an einem Ort',
   'transactions.description':
-    'Ausgaben und Einnahmen kannst du später hier erfassen und ansehen.',
+    'Erfasse Ausgaben und Einnahmen, damit deine Kontosalden aktuell bleiben.',
+  'transactions.listDescription':
+    'Hier erscheinen die letzten Transaktionen. Filter und Suche folgen später.',
+  'transactions.create': 'Transaktion erfassen',
+  'transactions.edit': 'Transaktion bearbeiten',
+  'transactions.delete': 'Löschen',
+  'transactions.deleteConfirmation':
+    'Diese Transaktion endgültig löschen? Der Kontosaldo wird aktualisiert.',
+  'transactions.confirmDelete': 'Transaktion löschen',
+  'transactions.cancel': 'Abbrechen',
+  'transactions.close': 'Transaktionsleiste schließen',
+  'transactions.save': 'Transaktion speichern',
+  'transactions.loading': 'Transaktionen werden geladen…',
+  'transactions.empty': 'Noch keine Transaktionen erfasst.',
+  'transactions.noAccounts':
+    'Erstelle ein aktives Konto, bevor du eine Transaktion erfasst.',
+  'transactions.refresh': 'Aktualisieren',
+  'transactions.kind': 'Ausgabe oder Einnahme',
+  'transactions.expense': 'Ausgabe',
+  'transactions.income': 'Einnahme',
+  'transactions.date': 'Datum',
+  'transactions.amount': 'Betrag',
+  'transactions.amountHint':
+    'Gib einen positiven Betrag mit Punkt oder Komma und höchstens zwei Nachkommastellen ein.',
+  'transactions.account': 'Konto',
+  'transactions.chooseAccount': 'Aktives Konto auswählen',
+  'transactions.payee': 'Zahlungspartner',
+  'transactions.payeeHint':
+    'Wähle einen vorhandenen Namen oder gib einen neuen Zahlungspartner ein.',
+  'transactions.category': 'Kategorie',
+  'transactions.note': 'Notiz',
+  'transactions.noPayee': 'Kein Zahlungspartner',
+  'transactions.noCategory': 'Keine Kategorie',
+  'transactions.unknownAccount': 'Unbekanntes Konto',
+  'transactions.error':
+    'Der Transaktionsvorgang konnte nicht abgeschlossen werden. Aktualisiere die Liste und versuche es erneut.',
+  'transactions.error.account': 'Wähle ein aktives Konto.',
+  'transactions.error.kind': 'Wähle Ausgabe oder Einnahme.',
+  'transactions.error.date': 'Gib ein gültiges Kalenderdatum ein.',
+  'transactions.error.futureDate':
+    'Das Transaktionsdatum darf nicht in der Zukunft liegen.',
+  'transactions.error.amount':
+    'Gib einen positiven Betrag mit höchstens zwei Nachkommastellen ein.',
+  'transactions.error.payee':
+    'Gib einen Zahlungspartner mit höchstens 100 Zeichen ein.',
+  'transactions.error.category':
+    'Wähle eine aktive Kategorie, die zu Ausgabe oder Einnahme passt.',
+  'transactions.error.note': 'Gib eine Notiz mit höchstens 1.000 Zeichen ein.',
+  'transactions.error.notFound':
+    'Die Transaktion wurde nicht gefunden. Aktualisiere die Liste.',
+  'transactions.error.lines':
+    'Die Transaktionszeilen entsprechen nicht dem Gesamtbetrag.',
   'accounts.title': 'Ein Platz für jedes Konto',
   'accounts.description':
-    'Jeder Saldo wird in der Kontowährung angezeigt. Die Salden entsprechen derzeit den Eröffnungssalden.',
+    'Jeder Saldo kombiniert Eröffnungssaldo, Einnahmen und Ausgaben in der Kontowährung.',
   'accounts.create': 'Konto erstellen',
   'accounts.name': 'Kontoname',
   'accounts.currency': 'Währung',

@@ -27,6 +27,13 @@ import type {
   RenameProfileInput,
 } from './profiles'
 import type { ProfileSettings } from './settings'
+import type {
+  CreateTransactionInput,
+  Payee,
+  Transaction,
+  TransactionIdInput,
+  UpdateTransactionInput,
+} from './transactions'
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
@@ -55,6 +62,11 @@ export const IPC_CHANNELS = {
   accountsArchive: 'accounts:archive',
   accountsDelete: 'accounts:delete',
   profilesUpdateSettings: 'profiles:update-settings',
+  transactionsList: 'transactions:list',
+  transactionsCreate: 'transactions:create',
+  transactionsUpdate: 'transactions:update',
+  transactionsDelete: 'transactions:delete',
+  payeesList: 'payees:list',
 } as const
 
 export type DatabasePing = 'ok'
@@ -62,6 +74,15 @@ export type DatabasePing = 'ok'
 export interface AppBridge {
   getVersion(): Promise<string>
   dbPing(): Promise<DatabasePing>
+  transactions: {
+    list(): Promise<Transaction[]>
+    create(input: CreateTransactionInput): Promise<Transaction>
+    update(input: UpdateTransactionInput): Promise<Transaction>
+    delete(input: TransactionIdInput): Promise<void>
+  }
+  payees: {
+    list(): Promise<Payee[]>
+  }
   backups: {
     list(): Promise<ProfileBackup[]>
     restore(input: RestoreBackupInput): Promise<ActiveProfileInfo>

@@ -58,6 +58,19 @@ import {
 } from './account-validation'
 import type { ProfilePaths } from './profile-registry'
 import { parseSettingsChanges } from './profile-settings'
+import type {
+  CreateTransactionInput,
+  Payee,
+  Transaction,
+  UpdateTransactionInput,
+} from '../../shared/transactions'
+import {
+  createTransaction,
+  deleteTransaction,
+  listPayees,
+  listTransactions,
+  updateTransaction,
+} from './profile-transactions'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -120,6 +133,8 @@ export interface OpenProfileApplicationOptions {
 }
 
 export interface ProfileQueries {
+  listTransactions(): Transaction[]
+  listPayees(): Payee[]
   hasCategoryTransactions(id: string): boolean
   listCategories(): Category[]
   listCategoryOptions(kind: CategoryKind): Category[]
@@ -133,6 +148,9 @@ export interface ProfileQueries {
 }
 
 export interface ProfileCommands {
+  createTransaction(input: CreateTransactionInput): Transaction
+  updateTransaction(input: UpdateTransactionInput): Transaction
+  deleteTransaction(id: string): void
   createCategory(input: CreateCategoryInput): Category
   renameCategory(input: RenameCategoryInput): Category
   archiveCategory(id: string): void
@@ -216,6 +234,42 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
     4,
     'two-level categories with translated defaults',
     CATEGORIES_SCHEMA_SQL,
+  ),
+  defineSqlMigration(
+    5,
+    'transactions and payees',
+    `
+    CREATE TABLE payees (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      name TEXT NOT NULL COLLATE NOCASE CHECK (length(trim(name)) BETWEEN 1 AND 100),
+      created_at TEXT NOT NULL,
+      UNIQUE (name)
+    );
+    CREATE TABLE transactions (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      account_id TEXT NOT NULL REFERENCES accounts(id),
+      kind TEXT NOT NULL CHECK (kind IN ('expense', 'income')),
+      date TEXT NOT NULL CHECK (date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+      total_minor INTEGER NOT NULL CHECK (
+        typeof(total_minor) = 'integer' AND total_minor BETWEEN 1 AND 9007199254740991
+      ),
+      payee_id TEXT REFERENCES payees(id),
+      note TEXT NOT NULL CHECK (length(note) <= 1000),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX transactions_account_id ON transactions(account_id);
+    CREATE TABLE transaction_lines (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      transaction_id TEXT NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+      amount_minor INTEGER NOT NULL CHECK (
+        typeof(amount_minor) = 'integer' AND amount_minor BETWEEN 1 AND 9007199254740991
+      ),
+      category_id TEXT REFERENCES categories(id)
+    );
+    CREATE INDEX transaction_lines_transaction_id ON transaction_lines(transaction_id);
+    CREATE INDEX transaction_lines_category_id ON transaction_lines(category_id);
+  `,
   ),
 ]
 
@@ -360,6 +414,16 @@ class OpenProfileApplication implements ProfileApplication {
     this.#options = options
     this.#clock = options.clock ?? (() => new Date())
     this.commands = {
+      createTransaction: (input) =>
+        this.#executeCommand(() =>
+          createTransaction(this.#database, input, this.#clock),
+        ),
+      updateTransaction: (input) =>
+        this.#executeCommand(() =>
+          updateTransaction(this.#database, input, this.#clock),
+        ),
+      deleteTransaction: (id) =>
+        this.#executeCommand(() => deleteTransaction(this.#database, id)),
       deleteCategory: (input) =>
         this.#executeCommand(() => deleteCategory(this.#database, input)),
       reorderCategory: (input) =>
@@ -390,6 +454,14 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      listTransactions: () => {
+        this.#assertAvailable()
+        return listTransactions(this.#database)
+      },
+      listPayees: () => {
+        this.#assertAvailable()
+        return listPayees(this.#database)
+      },
       hasCategoryTransactions: (id) => {
         this.#assertAvailable()
         return hasCategoryTransactions(this.#database, id)
@@ -528,14 +600,27 @@ class OpenProfileApplication implements ProfileApplication {
   }
 
   #getAccountBalance(id: string): number {
-    // #56 extends this query with signed transaction totals in the account currency.
-    return this.#getAccount(id).openingBalance
+    const account = this.#getAccount(id)
+    const totals = this.#database
+      .prepare(
+        `SELECT COALESCE(SUM(
+          CASE kind WHEN 'income' THEN total_minor ELSE -total_minor END
+        ), 0) AS total FROM transactions WHERE account_id = ?`,
+      )
+      .get(account.id) as { total: number }
+    const balance = account.openingBalance + totals.total
+    if (!Number.isSafeInteger(balance))
+      throw new Error('accounts.error.balance')
+    return balance
   }
 
   #hasAccountTransactions(id: string): boolean {
-    this.#getAccount(id)
-    // Transactions are introduced in #56; all accounts are empty until then.
-    return false
+    const account = this.#getAccount(id)
+    return Boolean(
+      this.#database
+        .prepare('SELECT 1 FROM transactions WHERE account_id = ? LIMIT 1')
+        .get(account.id),
+    )
   }
 
   #ensureProfileIdentity(): void {

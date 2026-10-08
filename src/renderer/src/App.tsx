@@ -16,6 +16,7 @@ import type {
 import { BackupSettings } from './components/backup-settings'
 import { CategorySettings } from './components/category-settings'
 import { AccountsPage } from './AccountsPage'
+import { TransactionsPage } from './TransactionsPage'
 import { Button } from './components/ui/button'
 import {
   Card,
@@ -464,6 +465,9 @@ function Shell({
             </CardHeader>
             {page === 'accounts' && (
               <AccountsPage key={active.id} language={language} t={t} />
+            )}
+            {page === 'transactions' && (
+              <TransactionsPage key={active.id} language={language} t={t} />
             )}
             {page === 'settings' && (
               <CardContent className="space-y-6">

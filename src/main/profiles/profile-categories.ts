@@ -129,9 +129,12 @@ export function hasCategoryTransactions(
   database: Database.Database,
   id: string,
 ): boolean {
-  getCategory(database, id)
-  // Like hasAccountTransactions, #56 extends this query once its ledger exists.
-  return false
+  const category = getCategory(database, id)
+  return Boolean(
+    database
+      .prepare('SELECT 1 FROM transaction_lines WHERE category_id = ? LIMIT 1')
+      .get(category.id),
+  )
 }
 
 export function deleteCategory(
@@ -163,8 +166,12 @@ export function deleteCategory(
   ) {
     throw new Error('categories.error.children')
   }
-  // #56 must reassign transaction lines here, inside the same command transaction.
-  // Fail closed if only the existence query is extended, never orphan ledger data.
-  if (used) throw new Error('categories.error.transactionIntegration')
+  if (used) {
+    database
+      .prepare(
+        'UPDATE transaction_lines SET category_id = ? WHERE category_id = ?',
+      )
+      .run(input.replacementId, category.id)
+  }
   database.prepare('DELETE FROM categories WHERE id = ?').run(category.id)
 }
