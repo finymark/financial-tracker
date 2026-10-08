@@ -302,7 +302,8 @@ not off-device copies or backups of the separate data folder.
   switches profiles. Accounts lists active and archived accounts with balances in
   their own currency. Transactions provides a filterable, virtualised table and a
   right-side create/edit drawer. Reports provides base-currency expense totals by
-  main category and subcategory; Overview remains a placeholder.
+  main category and subcategory; Overview shows this month's expenses, income,
+  net, and top five expense categories compared with the full last month.
 
 ## Exchange rates and base-currency conversion
 
@@ -326,6 +327,58 @@ not off-device copies or backups of the separate data folder.
   last refresh date. Filtered transaction totals retain their per-currency values
   and additionally show a base-currency total, provisional state, and any
   unconverted currency bucket.
+
+## Overview dashboard
+
+- **Overview** is the start page: expenses, income, and net (income minus expenses)
+  for this month to date, alongside the full previous calendar month and the
+  absolute change. Both inclusive date ranges are displayed; last month is not
+  cut at today's day-of-month.
+- The dashboard reuses the category-breakdown query and report-line selection,
+  so expense totals and category amounts agree with **Reports** for the same
+  range. Transfers, balance adjustments, and excluded transactions never count.
+  Splits use each part's category, including the uncategorized group.
+- All totals use the profile's base currency, explicit unconverted buckets, and
+  provisional-rate indicators. Net and changes use exact signed converted lines
+  and round once, rather than subtracting rounded card amounts.
+- The top five main expense categories include uncategorized when it ranks in
+  the top five. Ranking and shares use exact converted expenses; shares use all
+  categories as the denominator, not just the top five. Missing-rate amounts
+  remain separate and do not count in ranking or shares. With no converted
+  expenses, shares are zero and the unconverted bucket remains visible.
+- Expense/income cards and category names open the matching transaction list
+  with the dashboard's date range and excluded transactions hidden. **View
+  reports** opens the full category breakdown. Rates refreshing and returning
+  focus to the app reload the dashboard.
+
+### Manual Overview and report charts check
+
+Run `npm run dev` with synthetic HUF/CHF accounts and transactions. Repeat in
+HU/EN/DE and light/dark themes, including a collapsed sidebar and a narrow
+window. Verify Overview opens first, the two explicit date ranges show this
+month to date versus the full last month, and expense/income/net cards show
+current totals, previous totals, and signed absolute changes. Test no data,
+income only, negative net, and year/month rollover.
+
+Create more than five main expense categories, subcategories, split parts, and
+uncategorized lines; check the top-five order, amounts, and shares against the
+Reports breakdown for the same inclusive dates. Verify excluded expenses and
+income, transfers, and balance adjustments never count. Check missing-rate
+buckets on current/previous/change totals and category rows, and stale-rate
+indicators while offline; after refresh the dashboard should update. Switch
+base currency and profiles, return from editing or undoing transactions, and
+verify totals and translated category names reload without another profile's
+values.
+
+Check the overview bar chart and Reports pie/bar charts use theme-token colors,
+readable labels, and locale-formatted money tooltips. Check top-five table links,
+expense/income card links, and View reports using keyboard navigation; category
+links must preserve the inclusive dates, include subcategories, handle
+uncategorized, and hide excluded transactions. Chart rendering/tooltips and
+navigation remain manual checks. Temporary SQLite application-API tests cover
+dashboard/breakdown agreement, splits, exclusions, exact net/change rounding,
+date-based conversion, missing/stale rates, top-five shares, and calendar
+rollover.
 
 ## Reports
 

@@ -175,6 +175,8 @@ import {
   resolveReportDateRange,
 } from './report-validation'
 import { getCategoryBreakdown } from './profile-reports'
+import { getOverviewDashboard } from './profile-report-overview'
+import type { OverviewDashboard } from '../../shared/report-overview'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -229,6 +231,7 @@ export interface OpenProfileApplicationOptions {
 }
 
 export interface ProfileQueries {
+  getOverviewDashboard(): OverviewDashboard
   getCategoryBreakdown(input: ReportDateRangeInput): CategoryBreakdownReport
   convertToBaseCurrency(
     lines: readonly ConversionLine[],
@@ -1141,6 +1144,12 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      getOverviewDashboard: () => {
+        this.#assertAvailable()
+        return this.#database.transaction(() =>
+          getOverviewDashboard(this.#database, this.#clock),
+        )()
+      },
       getCategoryBreakdown: (input) => {
         this.#assertAvailable()
         const range = resolveReportDateRange(

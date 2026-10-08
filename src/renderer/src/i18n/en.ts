@@ -196,7 +196,20 @@ export const en = {
     'The profile database does not match the selected profile.',
   'overview.title': 'A clear view of your finances',
   'overview.description':
-    'A summarized financial overview will be available here later.',
+    'This month to date compared with the full last month, in your base currency.',
+  'overview.error': 'The overview could not be loaded.',
+  'overview.expenses': 'Expenses',
+  'overview.incomes': 'Income',
+  'overview.net': 'Net',
+  'overview.thisMonthToDate': 'This month to date',
+  'overview.fullLastMonth': 'Full last month',
+  'overview.change': 'Change vs last month',
+  'overview.topCategories': 'Top 5 expense categories this month',
+  'overview.transactions': 'View transactions',
+  'overview.reports': 'View reports',
+  'overview.chartLabel': 'Top five expense categories this month',
+  'overview.shareHint':
+    'Shares use converted expenses across all categories, not only the top five. Unconverted amounts are shown separately and are not included in shares.',
   'reports.title': 'Expenses by category',
   'reports.description':
     'Compare category totals in your base currency and drill down to the transactions behind them.',

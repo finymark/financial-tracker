@@ -3,6 +3,8 @@ import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 
 const bridge: AppBridge = {
   reports: {
+    overviewDashboard: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.reportsOverviewDashboard),
     categoryBreakdown: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.reportsCategoryBreakdown, input),
   },

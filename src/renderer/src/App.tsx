@@ -44,6 +44,7 @@ import {
 import { cn } from './lib/utils'
 import type { RateStatus } from '../../shared/exchange-rates'
 import { ReportsPage } from './ReportsPage'
+import { OverviewPage } from './OverviewPage'
 import type { TransactionListInput } from '../../shared/transactions'
 
 const pages = [
@@ -667,6 +668,18 @@ function Shell({
                   setUndoOffered(true)
                 }}
                 initialReportFilter={reportTransactionFilter}
+              />
+            )}
+            {page === 'overview' && (
+              <OverviewPage
+                key={`${active.id}:${undoRevision}`}
+                language={language}
+                t={t}
+                onOpenReports={() => setPage('reports')}
+                onOpenTransactions={(input) => {
+                  setReportTransactionFilter(input)
+                  setPage('transactions')
+                }}
               />
             )}
             {page === 'reports' && (
