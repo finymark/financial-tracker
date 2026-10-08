@@ -108,6 +108,15 @@ export const de = {
     'Erfasse Ausgaben und Einnahmen, damit deine Kontosalden aktuell bleiben.',
   'transactions.listDescription':
     'Transaktionen nach Zeitraum, Konto, Kategorie, Zahlungspartner oder Notiz filtern.',
+  'transactions.excluded': 'Ausgeschlossen',
+  'transactions.excludedHint':
+    'Im Kontostand enthalten, aber nicht in den Ausgaben- und Einnahmensummen.',
+  'transactions.exclusion': 'Ausgeschlossene Transaktionen',
+  'transactions.exclusion.all': 'Alle Transaktionen',
+  'transactions.exclusion.onlyExcluded': 'Nur ausgeschlossene',
+  'transactions.exclusion.hideExcluded': 'Ausgeschlossene ausblenden',
+  'transactions.error.excluded':
+    'Wähle, ob die Transaktion ausgeschlossen ist.',
   'transactions.filters': 'Transaktionsfilter',
   'transactions.period': 'Zeitraum',
   'transactions.period.all': 'Alle Daten',

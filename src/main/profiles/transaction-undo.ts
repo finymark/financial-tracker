@@ -20,6 +20,8 @@ interface StoredTransactionImage {
   totalMinor: number
   payeeId: string | null
   note: string
+  // Absent in pre-exclusion migration fixtures.
+  excluded?: number
   createdAt: string
   updatedAt: string
 }
@@ -77,8 +79,8 @@ function captureAggregate(
   const transaction = transactionId
     ? ((database
         .prepare(
-          `SELECT id, account_id AS accountId, kind, date,
-            total_minor AS totalMinor, payee_id AS payeeId, note,
+          `SELECT *, account_id AS accountId,
+            total_minor AS totalMinor, payee_id AS payeeId,
             created_at AS createdAt, updated_at AS updatedAt
           FROM transactions WHERE id = ?`,
         )
@@ -163,6 +165,11 @@ function restoreAggregate(
         transaction.createdAt,
         transaction.updatedAt,
       )
+    if (transaction.excluded !== undefined) {
+      database
+        .prepare('UPDATE transactions SET excluded = ? WHERE id = ?')
+        .run(transaction.excluded, transaction.id)
+    }
     const insertLine = database.prepare(
       `INSERT INTO transaction_lines
         (id, transaction_id, amount_minor, category_id) VALUES (?, ?, ?, ?)`,

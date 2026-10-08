@@ -325,6 +325,13 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
       BEGIN SELECT RAISE(ABORT, 'Invalid normalized payee name'); END;
   `,
   ),
+  defineSqlMigration(
+    8,
+    'excluded transactions',
+    `
+    ALTER TABLE transactions ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0 CHECK (excluded IN (0, 1));
+  `,
+  ),
 ]
 
 function validateMigrations(

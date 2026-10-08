@@ -101,6 +101,14 @@ export const en = {
     'Record expenses and income, then keep account balances up to date.',
   'transactions.listDescription':
     'Filter transactions by period, account, category, payee or note.',
+  'transactions.excluded': 'Excluded',
+  'transactions.excludedHint':
+    'Included in the account balance, but left out of expense and income totals.',
+  'transactions.exclusion': 'Excluded transactions',
+  'transactions.exclusion.all': 'All transactions',
+  'transactions.exclusion.onlyExcluded': 'Only excluded',
+  'transactions.exclusion.hideExcluded': 'Hide excluded',
+  'transactions.error.excluded': 'Choose whether the transaction is excluded.',
   'transactions.filters': 'Transaction filters',
   'transactions.period': 'Period',
   'transactions.period.all': 'All dates',
