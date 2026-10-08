@@ -48,6 +48,8 @@ import { startsHidden } from '../shared/desktop'
 import { QuickAddShortcut } from './global-shortcut'
 import { registerAttachmentIpc } from './profiles/attachment-ipc'
 import sharp from 'sharp'
+import { preprocessReceiptImage } from './ocr/receipt-preprocessing'
+import { TesseractOcrEngine } from './ocr/tesseract-ocr-engine'
 
 let mainWindow: BrowserWindow | null = null
 let quickAddWindow: BrowserWindow | null = null
@@ -193,9 +195,31 @@ async function smokeTest(): Promise<void> {
     if (metadata.width !== 1 || metadata.height !== 1)
       throw new Error('Image processing failed')
     console.log('Image smoke test OK')
+    const syntheticReceipt = await sharp(
+      Buffer.from(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160">
+          <rect width="100%" height="100%" fill="white"/>
+          <text x="35" y="110" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="black">TOTAL 12.50</text>
+        </svg>`,
+      ),
+    )
+      .png()
+      .toBuffer()
+    const ocr = new TesseractOcrEngine()
+    try {
+      const result = await ocr.recognize(
+        await preprocessReceiptImage(syntheticReceipt),
+        ['eng'],
+      )
+      if (!/TOTAL\s+12[.,]50/iu.test(result.text))
+        throw new Error(`OCR returned unexpected text: ${result.text}`)
+      console.log('OCR smoke test OK')
+    } finally {
+      await ocr.dispose()
+    }
     exitCode = 0
-  } catch {
-    console.error('Smoke test FAILED')
+  } catch (error) {
+    console.error('Smoke test FAILED', error)
   } finally {
     rmSync(directory, { recursive: true, force: true })
     app.exit(exitCode)
