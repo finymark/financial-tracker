@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { ActiveProfileInfo } from '../../shared/profiles'
 import type { TransactionKind } from '../../shared/transactions'
-import { parseAmountExpression } from '../../shared/amount-expression'
-import { tagKey } from '../../shared/text-keys'
 import { DEFAULT_PROFILE_SETTINGS } from '../../shared/settings'
 import type { PayeeSuggestion } from '../../shared/payees'
 import { AmountInput } from './components/amount-input'
@@ -11,6 +9,8 @@ import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
 import {
   emptyForm,
+  addPendingTag,
+  createTransactionInput,
   transactionError,
   type TransactionForm,
 } from './components/transactions/transaction-form'
@@ -118,17 +118,14 @@ function QuickAddForm({
     queueMicrotask(() => amountRef.current?.focus())
   }
 
+  function markManual(field: 'payee' | 'category' | 'tags') {
+    autofillProtected.current[field] = true
+  }
+
   function addTag() {
-    const name = form.pendingTagName.trim()
-    if (!name) return
-    autofillProtected.current.tags = true
-    setForm({
-      ...form,
-      tagNames: form.tagNames.some((tag) => tagKey(tag) === tagKey(name))
-        ? form.tagNames
-        : [...form.tagNames, name],
-      pendingTagName: '',
-    })
+    if (!form.pendingTagName.trim()) return
+    markManual('tags')
+    setForm(addPendingTag(form))
   }
 
   async function save(keepOpen: boolean) {
@@ -142,24 +139,10 @@ function QuickAddForm({
     setError(null)
     let completed = false
     try {
-      await window.app.transactions.create({
-        accountId: form.accountId,
-        kind: form.kind,
-        date: form.date,
-        totalMinor: parseAmountExpression(
-          form.amount,
-          account.currency,
-          'transactions.error.amount',
-        ),
-        payeeName: form.payeeName,
-        categoryId: form.categoryId || null,
-        note: form.note,
-        tagNames: form.pendingTagName.trim()
-          ? [...form.tagNames, form.pendingTagName.trim()]
-          : form.tagNames,
-        excluded: false,
-      })
-      await window.app.desktop.quickAddSaved({ keepOpen })
+      await window.app.transactions.create(
+        createTransactionInput(form, account.currency),
+      )
+      await window.app.desktop.quickAddSaved()
       completed = true
       setSaved(true)
       if (keepOpen) {
@@ -311,7 +294,7 @@ function QuickAddForm({
             maxLength={100}
             disabled={busy}
             onChange={(event) => {
-              autofillProtected.current.payee = true
+              markManual('payee')
               setForm({ ...form, payeeName: event.target.value })
             }}
           />
@@ -327,7 +310,7 @@ function QuickAddForm({
             value={form.categoryId}
             disabled={busy}
             onChange={(event) => {
-              autofillProtected.current.category = true
+              markManual('category')
               setForm({ ...form, categoryId: event.target.value })
             }}
           >
@@ -353,7 +336,7 @@ function QuickAddForm({
               maxLength={100}
               disabled={busy}
               onChange={(event) => {
-                autofillProtected.current.tags = true
+                markManual('tags')
                 setForm({ ...form, pendingTagName: event.target.value })
               }}
               onKeyDown={(event) => {
@@ -379,12 +362,13 @@ function QuickAddForm({
                   key={name}
                   type="button"
                   className="rounded-md bg-muted px-2 py-1"
-                  onClick={() =>
+                  onClick={() => {
+                    markManual('tags')
                     setForm({
                       ...form,
                       tagNames: form.tagNames.filter((tag) => tag !== name),
                     })
-                  }
+                  }}
                 >
                   {name} ×
                 </button>
@@ -457,10 +441,15 @@ export default function QuickAddApp() {
   }, [settings.language])
 
   useEffect(() => {
-    void window.app.profiles
-      .getActive()
-      .then(setActive)
-      .catch(() => setActive(null))
+    const refreshActive = () => {
+      setActive(undefined)
+      void window.app.profiles
+        .getActive()
+        .then(setActive)
+        .catch(() => setActive(null))
+    }
+    refreshActive()
+    return window.app.desktop.onProfileChanged(refreshActive)
   }, [])
 
   return (
@@ -492,7 +481,7 @@ export default function QuickAddApp() {
             </Button>
           </div>
         ) : (
-          <QuickAddForm active={active} t={t} />
+          <QuickAddForm key={active.id} active={active} t={t} />
         )}
       </main>
     </PrivacyProvider>

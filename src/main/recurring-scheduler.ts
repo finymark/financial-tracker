@@ -55,7 +55,12 @@ export class RecurringScheduler {
         .commands.generateRecurringTransactions()
     } catch (error) {
       // No open profile is a normal idle state; genuine write errors are logged.
-      if (error instanceof Error && error.message === 'No profile is open')
+      if (
+        error instanceof Error &&
+        ['No profile is open', 'A profile operation is in progress'].includes(
+          error.message,
+        )
+      )
         return
       this.#logger.error('Recurring transaction generation failed', error)
     }

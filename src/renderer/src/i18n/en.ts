@@ -184,7 +184,7 @@ export const en = {
   'pending.overdue': 'Overdue',
   'pending.dueCount': 'Due pending transactions',
   'pending.error.accountArchived':
-    'This account is archived. Edit the recurring transaction and choose an active account before confirming.',
+    'This account is archived. Unarchive the account or skip this occurrence.',
   'recurring.description':
     'Create regular expense and income estimates. Due occurrences stay pending and do not affect your finances yet.',
   'recurring.create': 'Create recurring transaction',

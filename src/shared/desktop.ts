@@ -17,10 +17,6 @@ export interface SetQuickAddShortcutInput {
   accelerator: string
 }
 
-export interface QuickAddSavedInput {
-  keepOpen: boolean
-}
-
 export function startsHidden(args: readonly string[]): boolean {
   return args.includes('--hidden')
 }

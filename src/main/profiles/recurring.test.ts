@@ -154,6 +154,48 @@ test('new definitions skip occurrences before creation and reopen catches up ide
   ).toBe(false)
 })
 
+test('a due occurrence is generated immediately after create without replacing its undo entry', async () => {
+  const context = await setup()
+  const recurring = context.application.commands.createRecurringTransaction({
+    ...context.input,
+    schedule: { type: 'monthly', day: 15, intervalMonths: 1 },
+  })
+
+  expect(context.application.queries.listPendingTransactions()).toEqual([
+    expect.objectContaining({
+      recurringId: recurring.id,
+      dueDate: '2026-01-15',
+    }),
+  ])
+  expect(context.application.commands.undoLast()).toBe(true)
+  expect(context.application.queries.listRecurringTransactions()).toEqual([])
+  expect(context.application.queries.listPendingTransactions()).toEqual([])
+})
+
+test('pause generates occurrences due since the last tick and resume generates its next due occurrence immediately', async () => {
+  const context = await setup()
+  const recurring = context.application.commands.createRecurringTransaction({
+    ...context.input,
+    schedule: { type: 'weekly', weekday: 4, intervalWeeks: 1 },
+  })
+
+  context.setNow('2026-01-22T10:00:00.000Z')
+  context.application.commands.pauseRecurringTransaction(recurring.id)
+  expect(
+    context.application.queries
+      .listPendingTransactions()
+      .map((pending) => pending.dueDate),
+  ).toEqual(['2026-01-15', '2026-01-22'])
+
+  context.setNow('2026-01-29T10:00:00.000Z')
+  context.application.commands.resumeRecurringTransaction(recurring.id)
+  expect(
+    context.application.queries
+      .listPendingTransactions()
+      .map((pending) => pending.dueDate),
+  ).toEqual(['2026-01-15', '2026-01-22', '2026-01-29'])
+})
+
 test('pause, resume and end date control generation; every recurring command is undoable', async () => {
   const context = await setup()
   const recurring = context.application.commands.createRecurringTransaction({
@@ -179,9 +221,8 @@ test('pause, resume and end date control generation; every recurring command is 
     context.application.queries.listRecurringTransactions()[0],
   ).toMatchObject({
     paused: false,
-    generatedThrough: '2026-01-28',
+    generatedThrough: '2026-01-29',
   })
-  context.application.commands.generateRecurringTransactions()
   expect(
     context.application.queries
       .listPendingTransactions()
@@ -211,6 +252,7 @@ test('editing changes only not-yet-generated snapshots and delete undo restores 
   const originalPending =
     context.application.queries.listPendingTransactions()[0]
   const beforeEdit = context.application.queries.listRecurringTransactions()[0]
+  context.setNow('2026-01-22T10:00:00.000Z')
   const edited = context.application.commands.updateRecurringTransaction({
     ...context.input,
     id: recurring.id,
@@ -220,8 +262,6 @@ test('editing changes only not-yet-generated snapshots and delete undo restores 
     note: 'Updated estimate',
     schedule: { type: 'weekly', weekday: 4, intervalWeeks: 1 },
   })
-  context.setNow('2026-01-22T10:00:00.000Z')
-  context.application.commands.generateRecurringTransactions()
   expect(context.application.queries.listPendingTransactions()).toEqual([
     originalPending,
     expect.objectContaining({
@@ -413,6 +453,17 @@ test('confirm rejects an archived snapshot account without consuming the occurre
   ])
 })
 
+test('invalid pending ids report the pending not-found error', async () => {
+  const context = await setup()
+
+  expect(() =>
+    context.application.commands.confirmPendingTransaction({ id: 'invalid' }),
+  ).toThrow('pending.error.notFound')
+  expect(() =>
+    context.application.commands.skipPendingTransaction('invalid'),
+  ).toThrow('pending.error.notFound')
+})
+
 test('confirmed occurrences never regenerate across reopen', async () => {
   const context = await setup()
   context.application.commands.createRecurringTransaction({
@@ -438,6 +489,41 @@ test('confirmed occurrences never regenerate across reopen', async () => {
     expect.objectContaining({ id: confirmed.id }),
   ])
 })
+
+test.each(['confirm', 'skip'] as const)(
+  '%s then delete and both undos restore the occurrence to pending',
+  async (decision) => {
+    const context = await setup()
+    const recurring = context.application.commands.createRecurringTransaction({
+      ...context.input,
+      schedule: { type: 'monthly', day: 15, intervalMonths: 1 },
+    })
+    const pending = context.application.queries.listPendingTransactions()[0]
+    const confirmed =
+      decision === 'confirm'
+        ? context.application.commands.confirmPendingTransaction({
+            id: pending.id,
+          })
+        : null
+
+    if (decision === 'skip')
+      context.application.commands.skipPendingTransaction(pending.id)
+    context.application.commands.deleteRecurringTransaction(recurring.id)
+    expect(context.application.commands.undoLast()).toBe(true)
+    expect(context.application.queries.listPendingTransactions()).toEqual([])
+
+    expect(context.application.commands.undoLast()).toBe(true)
+    expect(context.application.queries.listPendingTransactions()).toEqual([
+      pending,
+    ])
+    if (confirmed)
+      expect(
+        context.application.queries
+          .listTransactions()
+          .rows.some((transaction) => transaction.id === confirmed.id),
+      ).toBe(false)
+  },
+)
 
 test('account deletion is guarded while category and tag deletion null/remove references with undo', async () => {
   const context = await setup()

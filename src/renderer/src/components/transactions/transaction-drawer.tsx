@@ -1,4 +1,3 @@
-import { tagKey } from '../../../../shared/text-keys'
 import {
   useEffect,
   useRef,
@@ -38,6 +37,8 @@ import {
 import {
   emptyForm,
   emptyTransferForm,
+  addPendingTag,
+  createTransactionInput,
   type DrawerForm,
   type TransactionForm,
   type TransferForm,
@@ -319,42 +320,10 @@ export function TransactionDrawer({
             ? window.app.transfers.update({ id: form.id, ...input })
             : window.app.transfers.create(input)
         }
-        const input = {
-          accountId: form.accountId,
-          kind: form.kind,
-          date: form.date,
-          totalMinor: parseAmountExpression(
-            form.amount,
-            selectedAccount?.currency ?? 'HUF',
-            'transactions.error.amount',
-          ),
-          payeeName: form.payeeName,
-          categoryId: form.categoryId || null,
-          note: form.note,
-          tagNames: form.pendingTagName.trim()
-            ? [...form.tagNames, form.pendingTagName.trim()]
-            : form.tagNames,
-          excluded: form.excluded,
-          ...(form.splitLines
-            ? {
-                categoryId: null,
-                note: '',
-                tagNames: [],
-                lines: form.splitLines.map((line) => ({
-                  amountMinor: parseAmountExpression(
-                    line.amount,
-                    selectedAccount?.currency ?? 'HUF',
-                    'transactions.error.amount',
-                  ),
-                  categoryId: line.categoryId || null,
-                  note: line.note,
-                  tagNames: line.pendingTagName.trim()
-                    ? [...line.tagNames, line.pendingTagName.trim()]
-                    : line.tagNames,
-                })),
-              }
-            : {}),
-        }
+        const input = createTransactionInput(
+          form,
+          selectedAccount?.currency ?? 'HUF',
+        )
         const saved = await (form.id
           ? window.app.transactions.update({ id: form.id, ...input })
           : window.app.transactions.create(input))
@@ -406,16 +375,9 @@ export function TransactionDrawer({
       !form.pendingTagName.trim()
     )
       return
-    const name = form.pendingTagName.trim()
     markManual('tags')
     autofillProtected.current.tags = true
-    setForm({
-      ...form,
-      tagNames: form.tagNames.some((tag) => tagKey(tag) === tagKey(name))
-        ? form.tagNames
-        : [...form.tagNames, name],
-      pendingTagName: '',
-    })
+    setForm(addPendingTag(form))
   }
 
   const savedTransaction = form?.id

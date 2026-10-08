@@ -1,6 +1,5 @@
 import type {
   AutostartStatus,
-  QuickAddSavedInput,
   SetAutostartInput,
   SetQuickAddShortcutInput,
   ShortcutStatus,
@@ -203,7 +202,7 @@ export interface AppBridge {
     setShortcut(input: SetQuickAddShortcutInput): Promise<ShortcutStatus>
     showMain(): Promise<void>
     closeQuickAdd(): Promise<void>
-    quickAddSaved(input: QuickAddSavedInput): Promise<void>
+    quickAddSaved(): Promise<void>
     onDataChanged(listener: (offerUndo: boolean) => void): () => void
     onProfileChanged(listener: () => void): () => void
   }

@@ -13,8 +13,7 @@ const bridge: AppBridge = {
       ipcRenderer.invoke(IPC_CHANNELS.desktopSetShortcut, input),
     showMain: () => ipcRenderer.invoke(IPC_CHANNELS.desktopShowMain),
     closeQuickAdd: () => ipcRenderer.invoke(IPC_CHANNELS.desktopCloseQuickAdd),
-    quickAddSaved: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.desktopQuickAddSaved, input),
+    quickAddSaved: () => ipcRenderer.invoke(IPC_CHANNELS.desktopQuickAddSaved),
     onDataChanged: (listener) => {
       const handler = (_event: Electron.IpcRendererEvent, offerUndo: boolean) =>
         listener(offerUndo)

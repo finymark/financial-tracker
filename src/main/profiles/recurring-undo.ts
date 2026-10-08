@@ -13,7 +13,7 @@ import {
   createRecurringTransaction,
   deleteRecurringTransaction,
   getPendingTransaction,
-  listPendingTransactions,
+  listRecurringTransactionOccurrences,
   listRecurringTransactions,
   setRecurringPaused,
   skipPendingTransaction,
@@ -43,9 +43,7 @@ function capture(
   )
   return {
     recurring: recurring ?? null,
-    pending: listPendingTransactions(database).filter(
-      (item) => item.recurringId === id,
-    ),
+    pending: listRecurringTransactionOccurrences(database, id),
   }
 }
 

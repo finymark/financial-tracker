@@ -7,6 +7,7 @@ type DesktopKey =
   | 'tray.quit'
   | 'tray.notice'
   | 'tray.noticeOk'
+  | 'quickAdd.openError'
   | 'settings.autostart'
   | 'settings.autostartDescription'
   | 'settings.autostartUnavailable'
@@ -28,6 +29,8 @@ export const desktopMessages = {
     'tray.notice':
       'Financial Tracker keeps running in the tray when you close the window. Use the tray icon to open it again, add a transaction, or quit.',
     'tray.noticeOk': 'OK',
+    'quickAdd.openError':
+      'Quick add could not open the last used profile. Open the main window and try again.',
     'settings.autostart': 'Start with Windows',
     'settings.autostartDescription':
       'Start hidden in the tray when you sign in. This setting applies to every profile on this Windows account; off by default.',
@@ -54,6 +57,8 @@ export const desktopMessages = {
     'tray.notice':
       'Az ablak bezárása után a Financial Tracker tovább fut a tálcán. A tálcaikonról újra megnyithatod, tranzakciót rögzíthetsz vagy kiléphetsz.',
     'tray.noticeOk': 'Rendben',
+    'quickAdd.openError':
+      'A gyors rögzítés nem tudta megnyitni a legutóbb használt profilt. Nyisd meg a főablakot, és próbáld újra.',
     'settings.autostart': 'Indítás a Windows rendszerrel',
     'settings.autostartDescription':
       'Bejelentkezéskor rejtve, a tálcán indul. Ez a beállítás a Windows-fiók minden profiljára érvényes; alapértelmezetten kikapcsolt.',
@@ -81,6 +86,8 @@ export const desktopMessages = {
     'tray.notice':
       'Financial Tracker läuft nach dem Schließen des Fensters im Infobereich weiter. Über das Symbol kannst du es wieder öffnen, eine Transaktion erfassen oder die App beenden.',
     'tray.noticeOk': 'OK',
+    'quickAdd.openError':
+      'Die Schnellerfassung konnte das zuletzt verwendete Profil nicht öffnen. Öffne das Hauptfenster und versuche es erneut.',
     'settings.autostart': 'Mit Windows starten',
     'settings.autostartDescription':
       'Bei der Anmeldung verborgen im Infobereich starten. Diese Einstellung gilt für alle Profile dieses Windows-Kontos; standardmäßig ausgeschaltet.',

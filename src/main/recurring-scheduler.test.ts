@@ -29,3 +29,22 @@ test('recurring generation follows the shared hourly scheduler lifecycle', () =>
   scheduler.stop()
   expect(clearInterval).toHaveBeenCalledWith('hourly')
 })
+
+test.each(['No profile is open', 'A profile operation is in progress'])(
+  'silently retries the normal idle state: %s',
+  (message) => {
+    const logger = { error: vi.fn() }
+    const scheduler = new RecurringScheduler(
+      {
+        getActiveApplication() {
+          throw new Error(message)
+        },
+      },
+      { logger },
+    )
+
+    scheduler.generateActive()
+
+    expect(logger.error).not.toHaveBeenCalled()
+  },
+)

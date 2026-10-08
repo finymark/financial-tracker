@@ -1077,12 +1077,8 @@ class OpenProfileApplication implements ProfileApplication {
     this.#options = options
     this.#clock = options.clock ?? (() => new Date())
     this.commands = {
-      generateRecurringTransactions: () => {
-        this.#executeBackgroundWrite(() =>
-          generateRecurringTransactions(this.#database, this.#clock),
-        )
-        this.#options.onPendingTransactionsChanged?.()
-      },
+      generateRecurringTransactions: () =>
+        this.#generateRecurringTransactions(),
       confirmPendingTransaction: (input) => {
         const transaction = this.#executeAndRefreshRates(
           confirmPendingUndoableCommand(this.#database, input, this.#clock),
@@ -1096,22 +1092,32 @@ class OpenProfileApplication implements ProfileApplication {
         )
         this.#options.onPendingTransactionsChanged?.()
       },
-      createRecurringTransaction: (input) =>
-        this.#executeUndoableCommand(
+      createRecurringTransaction: (input) => {
+        const recurring = this.#executeUndoableCommand(
           createRecurringUndoableCommand(this.#database, input, this.#clock),
-        ),
-      updateRecurringTransaction: (input) =>
-        this.#executeUndoableCommand(
+        )
+        this.#generateRecurringTransactions()
+        return recurring
+      },
+      updateRecurringTransaction: (input) => {
+        const recurring = this.#executeUndoableCommand(
           updateRecurringUndoableCommand(this.#database, input, this.#clock),
-        ),
-      pauseRecurringTransaction: (id) =>
+        )
+        this.#generateRecurringTransactions()
+        return recurring
+      },
+      pauseRecurringTransaction: (id) => {
+        this.#generateRecurringTransactions()
         this.#executeUndoableCommand(
           pauseRecurringUndoableCommand(this.#database, id, true, this.#clock),
-        ),
-      resumeRecurringTransaction: (id) =>
+        )
+      },
+      resumeRecurringTransaction: (id) => {
         this.#executeUndoableCommand(
           pauseRecurringUndoableCommand(this.#database, id, false, this.#clock),
-        ),
+        )
+        this.#generateRecurringTransactions()
+      },
       deleteRecurringTransaction: (id) =>
         this.#executeUndoableCommand(
           deleteRecurringUndoableCommand(this.#database, id),
@@ -1656,6 +1662,13 @@ class OpenProfileApplication implements ProfileApplication {
     // Cache maintenance is not a user-data command. It must neither be
     // undoable nor invalidate user-data images already in the undo history.
     this.#database.transaction(operation)()
+  }
+
+  #generateRecurringTransactions(): void {
+    this.#executeBackgroundWrite(() =>
+      generateRecurringTransactions(this.#database, this.#clock),
+    )
+    this.#options.onPendingTransactionsChanged?.()
   }
 
   #refreshExchangeRates(source: ExchangeRateSource): Promise<void> {
