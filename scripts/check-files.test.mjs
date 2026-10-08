@@ -77,6 +77,11 @@ describe('file guard', () => {
     ['client secret', ['client_secret', 'synthetic'].join(' = '), 'secret'],
     ['password assignment', ['password', 'synthetic'].join('='), 'secret'],
     ['email address', mailbox, 'email'],
+    [
+      'email address after a slash',
+      `https://example.org/u/${mailbox}`,
+      'email',
+    ],
   ])(
     'blocks %s without printing its contents',
     async (_label, content, rule) => {
@@ -125,13 +130,24 @@ describe('file guard', () => {
     expect((await run('sample.txt')).status).toBe(0)
   })
 
+  it.each(['node_modules/@tesseract.js-data/eng', "'!node_modules/@scope/**'"])(
+    'does not mistake scoped npm path %s for an email address',
+    async (value) => {
+      write('sample.txt', value)
+      expect((await run('sample.txt')).status).toBe(0)
+    },
+  )
+
   it.each([
     'png',
     'JPG',
+    'jpeg',
     'gif',
     'webp',
     'bmp',
+    'tif',
     'tiff',
+    'pdf',
     'svg',
     'ico',
     'avif',
@@ -141,6 +157,17 @@ describe('file guard', () => {
     expect((await run(`src/fixtures/sample.${extension}`)).stderr).toContain(
       'fixture-image',
     )
+  })
+
+  it.each([
+    'fixtures',
+    'receipt-fixtures',
+    'fixtures-private',
+    'nested/test-fixtures',
+  ])('blocks media under any %s folder', async (folder) => {
+    const file = `${folder}/sample.pdf`
+    write(file, '%PDF-1.7\nsynthetic\n')
+    expect((await run(file)).stderr).toContain('fixture-image')
   })
 
   it('blocks a renamed image by its signature, but permits images outside fixtures', async () => {

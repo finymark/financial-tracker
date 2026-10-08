@@ -15,11 +15,11 @@ const patterns = [
   ],
   [
     'email',
-    /\b[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,63}\b/gi,
+    /\b[A-Z0-9][A-Z0-9.!#$%&'*+=?^_`{|}~-]*@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,63}\b/gi,
   ],
 ]
 const imageExtension =
-  /\.(?:png|jpe?g|gif|webp|bmp|tiff?|svg|ico|avif|hei[cf]|dng|raw|psd)$/i
+  /\.(?:png|jpe?g|gif|webp|bmp|tiff?|pdf|svg|ico|avif|hei[cf]|dng|raw|psd)$/i
 const mergeMarker = /^(?:<{7,}|={7,}|>{7,}|\|{7,})(?:\s.*)?$/m
 const digest = (content) => createHash('sha256').update(content).digest('hex')
 
@@ -68,7 +68,8 @@ function isImage(content) {
     ) ||
     /^RIFF[\s\S]{4}WEBP/.test(header) ||
     /^[\s\S]{4}ftyp(?:avif|avis|heic|heix|hevc|hevx|mif1|msf1)/.test(header) ||
-    /<svg(?:\s|>)/i.test(header)
+    /<svg(?:\s|>)/i.test(header) ||
+    /^%PDF-/i.test(header)
   )
 }
 
@@ -103,7 +104,7 @@ async function check(file, allowlist, directory) {
     findings.push(`${name}${line ? `:${line}` : ''}: ${rule}`)
   }
   if (
-    /(?:^|\/)fixtures\//i.test(name) &&
+    /(?:^|\/)[^/]*fixtures[^/]*\//i.test(name) &&
     (imageExtension.test(name) || isImage(content))
   ) {
     report('fixture-image')

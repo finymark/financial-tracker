@@ -1,0 +1,10 @@
+PÉLDA BOLT Bt.
+2222 Mintafalu, Teszt tér 3.
+NYUGTA
+2025-02-01 09:05
+Termék A                    1 200 Ft
+Termék B                    1 147 Ft
+ÖSSZESEN                    2 347 Ft
+Kerekítés                      +3 Ft
+FIZETENDŐ                   2 350 Ft
+KÉSZPÉNZ                    2 350 Ft

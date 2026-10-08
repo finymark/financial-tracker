@@ -1,12 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto'
 import {
+  readFileSync,
   copyFileSync,
   existsSync,
   mkdirSync,
   renameSync,
   rmSync,
 } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import Database from 'better-sqlite3'
 import type {
   ProfileBackup,
@@ -38,6 +39,7 @@ import { openDatabase } from '../db'
 import {
   createStartupBackup,
   listBackupFiles,
+  restoreMissingAttachments,
   verifySqliteBackup,
 } from './profile-backups'
 import type {
@@ -205,6 +207,50 @@ import {
   skipPendingUndoableCommand,
   updateRecurringUndoableCommand,
 } from './recurring-undo'
+import type { Attachment, StagedAttachment } from '../../shared/attachments'
+import type { OpenAttachmentInput } from '../../shared/attachments'
+import type { DeleteTransactionInput } from '../../shared/transactions'
+import {
+  attachmentDirectory,
+  attachmentStoredPath,
+  copyAttachments,
+  copyAttachmentForOpening,
+  importAttachment,
+  importReceiptPhoto,
+  listAttachments,
+  sweepUnreferencedAttachments,
+} from './profile-attachments'
+import {
+  attachAttachmentUndoableCommand,
+  removeAttachmentUndoableCommand,
+} from './attachment-undo'
+import type {
+  ConfirmReceiptInput,
+  ConfirmedReceipt,
+  Receipt,
+  ReceiptIntake,
+  ReceiptSource,
+  ReceiptPrefill,
+} from '../../shared/receipts'
+import {
+  getReceiptInboxCount,
+  getReceiptDefaultAccountId,
+  getReceiptPrefill,
+  insertReceipt,
+  listReceipts,
+  listReceivedReceiptIds,
+  renderReceiptPreview,
+  setReceiptOcrResult,
+  validateReceiptSource,
+} from './profile-receipts'
+import {
+  confirmReceiptUndoableCommand,
+  discardReceiptUndoableCommand,
+} from './receipt-undo'
+import type { OcrEngine } from '../ocr/ocr-engine'
+import { readReceipt } from '../ocr/read-receipt'
+import { ReceiptPreprocessor } from '../ocr/receipt-preprocessing'
+import { today } from '../../shared/date'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -259,10 +305,18 @@ export interface OpenProfileApplicationOptions {
   exchangeRateSource?: ExchangeRateSource
   onRateStatusChanged?: () => void
   onPendingTransactionsChanged?: () => void
+  onReceiptInboxChanged?: () => void
+  ocrEngine?: OcrEngine
+  startBackgroundWork?: boolean
   logger?: Pick<Console, 'error'>
 }
 
 export interface ProfileQueries {
+  listReceipts(): Receipt[]
+  getReceiptPrefill(id: string): ReceiptPrefill
+  getReceiptInboxCount(): number
+  getReceiptDefaultAccountId(): string | null
+  listAttachments(transactionId: string): Attachment[]
   getDuePendingTransactionCount(): number
   listPendingTransactions(): PendingTransaction[]
   listRecurringTransactions(): RecurringTransaction[]
@@ -299,6 +353,20 @@ export interface ProfileQueries {
 }
 
 export interface ProfileCommands {
+  intakeReceipt(input: ReceiptIntake, source: ReceiptSource): Promise<Receipt>
+  confirmReceipt(input: ConfirmReceiptInput): ConfirmedReceipt
+  discardReceipt(id: string): Receipt
+  renderReceiptPreview(id: string, thumbnail?: boolean): Promise<string>
+  importAttachment(path: string): Promise<StagedAttachment>
+  attachAttachment(
+    transactionId: string,
+    attachment: StagedAttachment,
+  ): Attachment
+  removeAttachment(id: string): void
+  copyAttachmentForOpening(
+    input: OpenAttachmentInput,
+    temporaryDirectory: string,
+  ): string
   confirmPendingTransaction(input: ConfirmPendingTransactionInput): Transaction
   skipPendingTransaction(id: string): void
   generateRecurringTransactions(): void
@@ -329,7 +397,7 @@ export interface ProfileCommands {
   deleteCategorisationRule(id: string): void
   createTransaction(input: CreateTransactionInput): Transaction
   updateTransaction(input: UpdateTransactionInput): Transaction
-  deleteTransaction(id: string): void
+  deleteTransaction(input: string | DeleteTransactionInput): void
   renameTag(input: RenameTagInput): Tag
   deleteTag(id: string): void
   createTransfer(input: CreateTransferInput): Transfer
@@ -366,6 +434,8 @@ export interface ProfileCommands {
 export interface ProfileApplication {
   readonly commands: ProfileCommands
   readonly queries: ProfileQueries
+  startBackgroundWork(): void
+  stopBackgroundWork(): Promise<void>
   close(): void
 }
 
@@ -935,6 +1005,114 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
       ON pending_transactions(status, due_date, created_at, id);
   `,
   ),
+  defineSqlMigration(
+    21,
+    'transaction attachments',
+    `
+    CREATE TABLE attachments (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      transaction_id TEXT NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+      original_file_name TEXT NOT NULL CHECK (length(original_file_name) BETWEEN 1 AND 255),
+      stored_name TEXT NOT NULL CHECK (length(stored_name) BETWEEN 68 AND 69),
+      media_type TEXT NOT NULL CHECK (media_type IN ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')),
+      byte_size INTEGER NOT NULL CHECK (typeof(byte_size) = 'integer' AND byte_size > 0),
+      position INTEGER NOT NULL CHECK (typeof(position) = 'integer' AND position >= 0),
+      created_at TEXT NOT NULL,
+      UNIQUE (transaction_id, position)
+    );
+    CREATE INDEX attachments_transaction_id_position
+      ON attachments(transaction_id, position);
+    CREATE INDEX attachments_stored_name ON attachments(stored_name);
+  `,
+  ),
+  defineSqlMigration(
+    22,
+    'receipt inbox',
+    `
+    CREATE TABLE receipt_inbox_items (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      status TEXT NOT NULL CHECK (status IN ('received', 'read', 'confirmed', 'discarded')),
+      stored_name TEXT NOT NULL CHECK (length(stored_name) BETWEEN 68 AND 69),
+      original_file_name TEXT NOT NULL CHECK (length(original_file_name) BETWEEN 1 AND 255),
+      media_type TEXT NOT NULL CHECK (media_type IN ('image/jpeg', 'image/png', 'image/webp')),
+      byte_size INTEGER NOT NULL CHECK (typeof(byte_size) = 'integer' AND byte_size > 0),
+      source TEXT NOT NULL CHECK (source IN ('drop', 'folder', 'phone')),
+      received_at TEXT NOT NULL,
+      ocr_payee_name TEXT,
+      ocr_date TEXT,
+      ocr_total_minor INTEGER CHECK (
+        ocr_total_minor IS NULL OR
+        (typeof(ocr_total_minor) = 'integer' AND
+          ocr_total_minor BETWEEN 1 AND 9007199254740991)
+      ),
+      ocr_currency TEXT CHECK (ocr_currency IS NULL OR ocr_currency IN ('HUF', 'CHF')),
+      ocr_confidence REAL CHECK (
+        ocr_confidence IS NULL OR
+        (typeof(ocr_confidence) IN ('real', 'integer') AND
+          ocr_confidence BETWEEN 0 AND 1)
+      ),
+      created_transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL,
+      CHECK (status = 'confirmed' OR created_transaction_id IS NULL)
+    );
+    CREATE INDEX receipt_inbox_items_active_received
+      ON receipt_inbox_items(status, received_at, id);
+    CREATE INDEX receipt_inbox_items_stored_name
+      ON receipt_inbox_items(stored_name);
+  `,
+  ),
+  defineSqlMigration(
+    23,
+    'profile watched folder',
+    `
+    ALTER TABLE profile_settings ADD COLUMN watched_folder TEXT
+      CHECK (watched_folder IS NULL OR length(watched_folder) > 0);
+  `,
+  ),
+  defineSqlMigration(
+    24,
+    'receipt OCR EUR currency',
+    `
+    CREATE TABLE receipt_inbox_items_with_eur (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      status TEXT NOT NULL CHECK (status IN ('received', 'read', 'confirmed', 'discarded')),
+      stored_name TEXT NOT NULL CHECK (length(stored_name) BETWEEN 68 AND 69),
+      original_file_name TEXT NOT NULL CHECK (length(original_file_name) BETWEEN 1 AND 255),
+      media_type TEXT NOT NULL CHECK (media_type IN ('image/jpeg', 'image/png', 'image/webp')),
+      byte_size INTEGER NOT NULL CHECK (typeof(byte_size) = 'integer' AND byte_size > 0),
+      source TEXT NOT NULL CHECK (source IN ('drop', 'folder', 'phone')),
+      received_at TEXT NOT NULL,
+      ocr_payee_name TEXT,
+      ocr_date TEXT,
+      ocr_total_minor INTEGER CHECK (
+        ocr_total_minor IS NULL OR
+        (typeof(ocr_total_minor) = 'integer' AND
+          ocr_total_minor BETWEEN 1 AND 9007199254740991)
+      ),
+      ocr_currency TEXT CHECK (ocr_currency IS NULL OR ocr_currency IN ('HUF', 'CHF', 'EUR')),
+      ocr_confidence REAL CHECK (
+        ocr_confidence IS NULL OR
+        (typeof(ocr_confidence) IN ('real', 'integer') AND
+          ocr_confidence BETWEEN 0 AND 1)
+      ),
+      created_transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL,
+      CHECK (status = 'confirmed' OR created_transaction_id IS NULL)
+    );
+    INSERT INTO receipt_inbox_items_with_eur
+      (id, status, stored_name, original_file_name, media_type, byte_size,
+       source, received_at, ocr_payee_name, ocr_date, ocr_total_minor,
+       ocr_currency, ocr_confidence, created_transaction_id)
+      SELECT id, status, stored_name, original_file_name, media_type, byte_size,
+       source, received_at, ocr_payee_name, ocr_date, ocr_total_minor,
+       ocr_currency, ocr_confidence, created_transaction_id
+      FROM receipt_inbox_items ORDER BY rowid;
+    DROP TABLE receipt_inbox_items;
+    ALTER TABLE receipt_inbox_items_with_eur RENAME TO receipt_inbox_items;
+    CREATE INDEX receipt_inbox_items_active_received
+      ON receipt_inbox_items(status, received_at, id);
+    CREATE INDEX receipt_inbox_items_stored_name
+      ON receipt_inbox_items(stored_name);
+  `,
+  ),
 ]
 
 function validateMigrations(
@@ -1064,9 +1242,16 @@ class OpenProfileApplication implements ProfileApplication {
   #restoring = false
   readonly #profile: ProfileSummary
   readonly #clock: () => Date
+  readonly #attachmentsPath: string
   readonly #undoHistory = new UndoHistory()
   #pendingRateRefresh: Promise<void> | null = null
   #rateRefreshRequested = false
+  #receiptOcrEnabled = false
+  #receiptOcrGeneration = 0
+  #receiptOcrQueue: string[] = []
+  #receiptOcrQueued = new Set<string>()
+  #receiptOcrRun: Promise<void> | null = null
+  readonly #receiptPreprocessor: ReceiptPreprocessor | null
 
   constructor(
     database: Database.Database,
@@ -1076,7 +1261,86 @@ class OpenProfileApplication implements ProfileApplication {
     this.#profile = { ...options.profile }
     this.#options = options
     this.#clock = options.clock ?? (() => new Date())
+    this.#receiptPreprocessor = options.ocrEngine
+      ? new ReceiptPreprocessor()
+      : null
+    const attachmentsPath = attachmentDirectory(options.paths.dataDirectory)
+    this.#attachmentsPath = attachmentsPath
     this.commands = {
+      intakeReceipt: async (input, source) => {
+        this.#assertAvailable()
+        const validatedSource = validateReceiptSource(source)
+        const attachment = await importReceiptPhoto(input, attachmentsPath)
+        let receipt!: Receipt
+        this.#executeBackgroundWrite(() => {
+          receipt = insertReceipt(
+            this.#database,
+            attachment,
+            validatedSource,
+            this.#clock,
+          )
+        })
+        this.#options.onReceiptInboxChanged?.()
+        this.#queueReceiptOcr(receipt.id)
+        return receipt
+      },
+      confirmReceipt: (input) => {
+        const result = this.#executeAndRefreshRates(
+          confirmReceiptUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+            attachmentsPath,
+          ),
+        )
+        this.#options.onReceiptInboxChanged?.()
+        return result
+      },
+      discardReceipt: (id) => {
+        const receipt = this.#executeUndoableCommand(
+          discardReceiptUndoableCommand(this.#database, id),
+        )
+        this.#options.onReceiptInboxChanged?.()
+        return receipt
+      },
+      renderReceiptPreview: async (id, thumbnail = false) => {
+        this.#assertAvailable()
+        return renderReceiptPreview(
+          this.#database,
+          id,
+          attachmentsPath,
+          thumbnail,
+        )
+      },
+      importAttachment: async (path) => {
+        this.#assertAvailable()
+        return importAttachment(path, attachmentsPath)
+      },
+      attachAttachment: (transactionId, attachment) =>
+        this.#executeUndoableCommand(
+          attachAttachmentUndoableCommand(
+            this.#database,
+            transactionId,
+            attachment,
+            attachmentsPath,
+            this.#clock,
+          ),
+        ),
+      removeAttachment: (id) =>
+        this.#executeUndoableCommand(
+          removeAttachmentUndoableCommand(this.#database, id),
+        ),
+      copyAttachmentForOpening: (input, temporaryDirectory) => {
+        this.#assertAvailable()
+        return copyAttachmentForOpening(
+          this.#database,
+          typeof input.id === 'string'
+            ? { id: input.id }
+            : { attachment: input.attachment! },
+          attachmentsPath,
+          temporaryDirectory,
+        )
+      },
       generateRecurringTransactions: () =>
         this.#generateRecurringTransactions(),
       confirmPendingTransaction: (input) => {
@@ -1173,16 +1437,26 @@ class OpenProfileApplication implements ProfileApplication {
         ),
       createTransaction: (input) =>
         this.#executeAndRefreshRates(
-          createTransactionUndoableCommand(this.#database, input, this.#clock),
+          createTransactionUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+            attachmentsPath,
+          ),
         ),
       updateTransaction: (input) =>
         this.#executeAndRefreshRates(
           updateTransactionUndoableCommand(this.#database, input, this.#clock),
         ),
-      deleteTransaction: (id) =>
+      deleteTransaction: (value) => {
+        const input = typeof value === 'string' ? { id: value } : value
+        const attachments = listAttachments(this.#database, input.id)
+        if (input.saveAttachmentsTo !== undefined)
+          copyAttachments(attachments, attachmentsPath, input.saveAttachmentsTo)
         this.#executeAndRefreshRates(
-          deleteTransactionUndoableCommand(this.#database, id),
-        ),
+          deleteTransactionUndoableCommand(this.#database, input.id),
+        )
+      },
       deleteTag: (id) =>
         this.#executeUndoableCommand(
           deleteTagUndoableCommand(this.#database, id),
@@ -1241,6 +1515,8 @@ class OpenProfileApplication implements ProfileApplication {
         if (undone) {
           this.#maybeRefreshExchangeRates()
           this.#options.onPendingTransactionsChanged?.()
+          this.#options.onReceiptInboxChanged?.()
+          this.#startReceiptOcr()
         }
         return undone
       },
@@ -1296,7 +1572,16 @@ class OpenProfileApplication implements ProfileApplication {
             .listCategories()
             .find((category) => category.id === id)!
         })(),
-      restoreBackup: (input) => this.#restoreBackup(input),
+      restoreBackup: async (input) => {
+        const pendingOcr = this.#stopReceiptOcr()
+        if (pendingOcr) await pendingOcr
+        try {
+          await this.#restoreBackup(input)
+          this.#options.onReceiptInboxChanged?.()
+        } finally {
+          this.#startReceiptOcr()
+        }
+      },
       ensureProfileIdentity: () => this.#ensureProfileIdentity(),
       createAccount: (input) =>
         this.#executeAndRefreshRates(
@@ -1325,6 +1610,26 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      listReceipts: () => {
+        this.#assertAvailable()
+        return listReceipts(this.#database)
+      },
+      getReceiptPrefill: (id) => {
+        this.#assertAvailable()
+        return getReceiptPrefill(this.#database, id)
+      },
+      getReceiptInboxCount: () => {
+        this.#assertAvailable()
+        return getReceiptInboxCount(this.#database)
+      },
+      getReceiptDefaultAccountId: () => {
+        this.#assertAvailable()
+        return getReceiptDefaultAccountId(this.#database)
+      },
+      listAttachments: (transactionId) => {
+        this.#assertAvailable()
+        return listAttachments(this.#database, transactionId)
+      },
       getDuePendingTransactionCount: () => {
         this.#assertAvailable()
         return getDuePendingTransactionCount(this.#database, this.#clock)
@@ -1617,6 +1922,12 @@ class OpenProfileApplication implements ProfileApplication {
         renameSync(stagedPath, paths.databasePath)
         this.#database = await openProfileDatabase(this.#options)
         this.#validateIdentity(this.#database)
+        restoreMissingAttachments(
+          this.#database,
+          paths.backupDirectory,
+          attachmentDirectory(paths.dataDirectory),
+          this.#options.logger,
+        )
         recoveryNeeded = false
       } catch (error) {
         try {
@@ -1642,8 +1953,109 @@ class OpenProfileApplication implements ProfileApplication {
     }
   }
 
+  startBackgroundWork(): void {
+    this.#startReceiptOcr()
+  }
+
+  async stopBackgroundWork(): Promise<void> {
+    await this.#stopReceiptOcr()
+    await this.#receiptPreprocessor?.dispose()
+  }
+
+  #startReceiptOcr(): void {
+    if (!this.#options.ocrEngine || !this.#database.open) return
+    this.#receiptOcrEnabled = true
+    for (const id of listReceivedReceiptIds(this.#database))
+      this.#queueReceiptOcr(id)
+  }
+
+  #queueReceiptOcr(id: string): void {
+    if (
+      !this.#receiptOcrEnabled ||
+      !this.#options.ocrEngine ||
+      this.#receiptOcrQueued.has(id)
+    )
+      return
+    this.#receiptOcrQueue.push(id)
+    this.#receiptOcrQueued.add(id)
+    this.#ensureReceiptOcrRun()
+  }
+
+  #ensureReceiptOcrRun(): void {
+    if (
+      this.#receiptOcrRun ||
+      !this.#receiptOcrEnabled ||
+      this.#receiptOcrQueue.length === 0
+    )
+      return
+    const run = this.#drainReceiptOcr()
+      .catch((error: unknown) => {
+        const logger = this.#options.logger ?? console
+        logger.error('Receipt OCR background processing failed', error)
+      })
+      .finally(() => {
+        if (this.#receiptOcrRun === run) this.#receiptOcrRun = null
+        this.#ensureReceiptOcrRun()
+      })
+    this.#receiptOcrRun = run
+  }
+
+  async #drainReceiptOcr(): Promise<void> {
+    const engine = this.#options.ocrEngine
+    if (!engine) return
+    while (this.#receiptOcrEnabled && this.#receiptOcrQueue.length) {
+      const id = this.#receiptOcrQueue.shift()!
+      this.#receiptOcrQueued.delete(id)
+      const generation = this.#receiptOcrGeneration
+      let result
+      try {
+        const receipt = listReceipts(this.#database).find(
+          (candidate) => candidate.id === id && candidate.status === 'received',
+        )
+        if (!receipt) continue
+        const image = readFileSync(
+          attachmentStoredPath(this.#attachmentsPath, receipt.storedName),
+        )
+        result = await readReceipt(
+          image,
+          this.#getSettings().language,
+          engine,
+          today(this.#clock),
+          (input) => this.#receiptPreprocessor!.preprocess(input),
+        )
+      } catch {
+        result = { confidence: 'low' as const, rawText: '' }
+      }
+      if (
+        generation !== this.#receiptOcrGeneration ||
+        !this.#receiptOcrEnabled ||
+        !this.#database.open ||
+        this.#restoring
+      )
+        return
+      let updated = false
+      this.#executeBackgroundWrite(() => {
+        updated = setReceiptOcrResult(this.#database, id, result) !== null
+      })
+      if (updated) this.#options.onReceiptInboxChanged?.()
+    }
+  }
+
+  #stopReceiptOcr(): Promise<void> | null {
+    this.#receiptOcrEnabled = false
+    this.#receiptOcrGeneration += 1
+    this.#receiptOcrQueue = []
+    this.#receiptOcrQueued.clear()
+    return this.#receiptOcrRun
+  }
+
   close(): void {
     if (this.#restoring) throw new Error('Profile restore is in progress')
+    this.#receiptOcrEnabled = false
+    this.#receiptOcrGeneration += 1
+    this.#receiptOcrQueue = []
+    this.#receiptOcrQueued.clear()
+    void this.#receiptPreprocessor?.dispose()
     this.#undoHistory.clear()
     if (this.#database.open) this.#database.close()
   }
@@ -1731,24 +2143,32 @@ class OpenProfileApplication implements ProfileApplication {
 
   #updateSettings(changes: ProfileSettingsChanges): ProfileSettings {
     this.#assertAvailable()
-    const parsed = parseSettingsChanges(changes)
+    const parsed = parseSettingsChanges(
+      changes,
+      dirname(dirname(this.#options.paths.profileDirectory)),
+    )
     const update = () => {
       const settings = { ...this.#getSettings(), ...parsed }
       this.#database
         .prepare(
-          'UPDATE profile_settings SET language = ?, theme = ?, base_currency = ?, privacy_mode = ? WHERE id = 1',
+          'UPDATE profile_settings SET language = ?, theme = ?, base_currency = ?, privacy_mode = ?, watched_folder = ? WHERE id = 1',
         )
         .run(
           settings.language,
           settings.theme,
           settings.baseCurrency,
           Number(settings.privacyMode),
+          settings.watchedFolder,
         )
       return this.#getSettings()
     }
-    // Privacy is presentation-only: do not invalidate ledger undo images.
+    // Privacy and watched-folder intake do not invalidate ledger undo images.
     // Mixed writes retain the existing non-undoable settings-command boundary.
-    if (Object.keys(parsed).every((key) => key === 'privacyMode')) {
+    if (
+      Object.keys(parsed).every(
+        (key) => key === 'privacyMode' || key === 'watchedFolder',
+      )
+    ) {
       return this.#database.transaction(update)()
     }
     return this.#executeCommand(update)
@@ -1763,12 +2183,14 @@ class OpenProfileApplication implements ProfileApplication {
       theme: ProfileSettings['theme']
       base_currency: ProfileSettings['baseCurrency']
       privacy_mode?: number
+      watched_folder?: string | null
     }
     return {
       language: row.language,
       theme: row.theme,
       baseCurrency: row.base_currency,
       privacyMode: row.privacy_mode === 1,
+      watchedFolder: row.watched_folder ?? null,
     }
   }
 
@@ -1856,14 +2278,21 @@ export async function openProfileApplication(
   const application = new OpenProfileApplication(database, options)
   try {
     application.commands.ensureProfileIdentity()
+    sweepUnreferencedAttachments(
+      database,
+      attachmentDirectory(options.paths.dataDirectory),
+    )
     if (options.createStartupBackup !== false) {
       await createStartupBackup(
         database,
         options.paths.backupDirectory,
         options.clock ?? (() => new Date()),
+        attachmentDirectory(options.paths.dataDirectory),
+        options.logger,
       )
     }
     application.commands.generateRecurringTransactions()
+    if (options.startBackgroundWork !== false) application.startBackgroundWork()
     return application
   } catch (error) {
     application.close()

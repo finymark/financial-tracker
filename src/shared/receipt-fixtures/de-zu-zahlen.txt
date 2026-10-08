@@ -1,0 +1,8 @@
+TEST KAUFHAUS GmbH
+Musterplatz 4
+20095 Beispielstadt
+Quittung
+Ware A                         999,50 €
+Ware B                         235,00 €
+Zu zahlen                    1.234,50 €
+04.02.2025 19:03

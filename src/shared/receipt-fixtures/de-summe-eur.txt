@@ -1,0 +1,9 @@
+BEISPIEL HANDEL GmbH
+Teststraße 18
+10115 Musterstadt
+USt-ID: DE000000000
+KASSENZETTEL
+Artikel A                      20,00 EUR
+Artikel B                      22,90 EUR
+SUMME EUR                      42,90
+03.02.25 15:44

@@ -5,6 +5,7 @@ import {
   ArrowLeftRight,
   ChartPie,
   CalendarClock,
+  Inbox,
   LayoutDashboard,
   PanelLeftClose,
   PanelLeftOpen,
@@ -49,6 +50,7 @@ import {
   baseCurrencies,
   DEFAULT_PROFILE_SETTINGS,
   type ProfileSettingsChanges,
+  type WatchedFolderFailure,
 } from '../../shared/settings'
 import { cn } from './lib/utils'
 import type { RateStatus } from '../../shared/exchange-rates'
@@ -57,10 +59,13 @@ import { OverviewPage } from './OverviewPage'
 import type { TransactionListInput } from '../../shared/transactions'
 import { RecurringPage } from './RecurringPage'
 import type { RecurringPrefill } from './lib/recurring-prefill'
+import { WatchedFolderSettings } from './components/watched-folder-settings'
+import { ReceiptInboxPage } from './ReceiptInboxPage'
 
 const pages = [
   { id: 'overview', icon: LayoutDashboard },
   { id: 'transactions', icon: ArrowLeftRight },
+  { id: 'receipts', icon: Inbox },
   { id: 'recurring', icon: CalendarClock },
   { id: 'reports', icon: ChartPie },
   { id: 'accounts', icon: Wallet },
@@ -68,6 +73,22 @@ const pages = [
 ] as const
 type Page = (typeof pages)[number]['id']
 type Translate = (key: MessageKey) => string
+
+const receiptIntakeErrorKeys = [
+  'receipts.error.type',
+  'receipts.error.size',
+  'receipts.error.path',
+  'receipts.error.source',
+  'receipts.error',
+] as const satisfies readonly MessageKey[]
+
+function watchedFolderFailureMessage(
+  t: Translate,
+  failure: WatchedFolderFailure,
+): string {
+  const reason = receiptIntakeErrorKeys.find((key) => key === failure.reasonKey)
+  return `${t('watchedFolder.intakeFailure')}: ${failure.fileName}. ${t(reason ?? 'receipts.error')}`
+}
 
 const emptySnapshot: ProfileRegistrySnapshot = {
   profiles: [],
@@ -381,15 +402,16 @@ function Shell({
   const [recurringPrefill, setRecurringPrefill] =
     useState<RecurringPrefill | null>(null)
   const [duePendingCount, setDuePendingCount] = useState(0)
+  const [receiptCount, setReceiptCount] = useState(0)
   const [showShortcutHelp, setShowShortcutHelp] = useState(false)
   const transactionRequestHandled = useCallback(
     () => setNewTransactionRequested(false),
     [],
   )
   const [collapsed, setCollapsed] = useState(false)
-  const { language, theme, baseCurrency } = active.settings
+  const { language, theme, baseCurrency, watchedFolder } = active.settings
   const [savingSettings, setSavingSettings] = useState(false)
-  const [settingsError, setSettingsError] = useState(false)
+  const [settingsError, setSettingsError] = useState<MessageKey | null>(null)
   const [backupBusy, setBackupBusy] = useState(false)
   const [accountBusy, setAccountBusy] = useState(false)
   const [categoryBusy, setCategoryBusy] = useState(false)
@@ -401,6 +423,9 @@ function Shell({
   const [undoBusy, setUndoBusy] = useState(false)
   const [undoError, setUndoError] = useState(false)
   const [rateStatus, setRateStatus] = useState<RateStatus | null>(null)
+  const [watchedFolderFailures, setWatchedFolderFailures] = useState<
+    WatchedFolderFailure[]
+  >([])
   const format = createFormatters(language)
   const privacyShortcut = shortcuts.find(
     (item) => item.action === 'privacy',
@@ -408,11 +433,11 @@ function Shell({
   const togglePrivacy = useCallback(async () => {
     if (savingSettings || backupBusy) return
     setSavingSettings(true)
-    setSettingsError(false)
+    setSettingsError(null)
     try {
       await onSettingsChange({ privacyMode: !active.settings.privacyMode })
     } catch {
-      setSettingsError(true)
+      setSettingsError('settings.error')
     } finally {
       setSavingSettings(false)
     }
@@ -432,6 +457,14 @@ function Shell({
           setUndoError(false)
           setUndoOffered(true)
         }
+      }),
+    [],
+  )
+
+  useEffect(
+    () =>
+      window.app.profiles.onWatchedFolderFailure((failure) => {
+        setWatchedFolderFailures((current) => [...current, failure])
       }),
     [],
   )
@@ -456,6 +489,26 @@ function Shell({
     }
     load()
     const unsubscribe = window.app.rates.onStatusChanged(load)
+    return () => {
+      ignore = true
+      unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    let ignore = false
+    const load = () => {
+      void window.app.receipts
+        .count()
+        .then((count) => {
+          if (!ignore) setReceiptCount(count)
+        })
+        .catch(() => {
+          if (!ignore) setReceiptCount(0)
+        })
+    }
+    load()
+    const unsubscribe = window.app.receipts.onChanged(load)
     return () => {
       ignore = true
       unsubscribe()
@@ -564,11 +617,15 @@ function Shell({
 
   async function saveSettings(changes: ProfileSettingsChanges) {
     setSavingSettings(true)
-    setSettingsError(false)
+    setSettingsError(null)
     try {
       await onSettingsChange(changes)
-    } catch {
-      setSettingsError(true)
+    } catch (error) {
+      setSettingsError(
+        String(error).includes('watchedFolder.error.userData')
+          ? 'watchedFolder.error.userData'
+          : 'settings.error',
+      )
     } finally {
       setSavingSettings(false)
     }
@@ -651,6 +708,18 @@ function Shell({
                   {duePendingCount}
                 </span>
               )}
+              {id === 'receipts' && receiptCount > 0 && (
+                <span
+                  className={cn(
+                    'rounded-full bg-error px-2 py-0.5 text-xs text-white',
+                    !collapsed && 'ml-auto',
+                    collapsed && 'absolute -top-1 -right-1',
+                  )}
+                  aria-label={`${t('receipts.count')}: ${receiptCount}`}
+                >
+                  {receiptCount}
+                </span>
+              )}
             </Button>
           ))}
         </nav>
@@ -715,7 +784,7 @@ function Shell({
             </p>
             {settingsError && (
               <p role="alert" className="text-sm font-medium text-error">
-                {t('settings.error')}
+                {t(settingsError)}
               </p>
             )}
             {rateStatus && (
@@ -786,6 +855,18 @@ function Shell({
                   setPage('recurring')
                 }}
                 initialReportFilter={reportTransactionFilter}
+              />
+            )}
+            {page === 'receipts' && (
+              <ReceiptInboxPage
+                key={`${active.id}:${undoRevision}`}
+                language={language}
+                t={t}
+                undoRevision={undoRevision}
+                onChanged={() => {
+                  setUndoError(false)
+                  setUndoOffered(true)
+                }}
               />
             )}
             {page === 'overview' && (
@@ -918,6 +999,20 @@ function Shell({
                     </NativeSelect>
                   </div>
                 </div>
+                <WatchedFolderSettings
+                  watchedFolder={watchedFolder}
+                  disabled={
+                    savingSettings ||
+                    accountBusy ||
+                    backupBusy ||
+                    categoryBusy ||
+                    payeeBusy ||
+                    ruleBusy
+                  }
+                  t={t}
+                  onChange={saveSettings}
+                  onError={() => setSettingsError('settings.error')}
+                />
                 <AutostartSettings t={t} />
                 <ShortcutSettings t={t} />
                 <p className="text-sm text-muted-foreground">
@@ -1046,6 +1141,24 @@ function Shell({
           </Button>
         </aside>
       )}
+      {watchedFolderFailures[0] && (
+        <aside
+          role="alert"
+          className="fixed right-4 bottom-24 z-50 flex max-w-md items-center gap-3 rounded-lg border bg-card p-4 text-card-foreground shadow-lg"
+        >
+          <p className="text-sm">
+            {watchedFolderFailureMessage(t, watchedFolderFailures[0])}
+          </p>
+          <Button
+            variant="ghost"
+            onClick={() =>
+              setWatchedFolderFailures((current) => current.slice(1))
+            }
+          >
+            {t('watchedFolder.dismissFailure')}
+          </Button>
+        </aside>
+      )}
     </div>
   )
 }
@@ -1059,6 +1172,9 @@ export default function App() {
   const [startupShortcutFailure, setStartupShortcutFailure] = useState<
     string | null
   >(null)
+  const [dropActive, setDropActive] = useState(false)
+  const [dropBusy, setDropBusy] = useState(false)
+  const [dropError, setDropError] = useState<MessageKey | null>(null)
   const { language, theme } = active?.settings ?? DEFAULT_PROFILE_SETTINGS
   const t: Translate = (key) => translate(language, key)
   useTheme(theme)
@@ -1083,6 +1199,81 @@ export default function App() {
       })
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    let depth = 0
+    const canIntake = Boolean(active && !showPicker)
+    const hasFiles = (event: DragEvent) =>
+      event.dataTransfer?.types.includes('Files') === true
+    const enter = (event: DragEvent) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest('[data-transaction-attachment-drop-zone]')
+      ) {
+        depth = 0
+        setDropActive(false)
+        return
+      }
+      event.preventDefault()
+      if (!canIntake || !hasFiles(event)) return
+      depth += 1
+      setDropActive(true)
+    }
+    const over = (event: DragEvent) => {
+      event.preventDefault()
+      if (canIntake && event.dataTransfer)
+        event.dataTransfer.dropEffect = 'copy'
+    }
+    const leave = (event: DragEvent) => {
+      event.preventDefault()
+      if (!canIntake) return
+      depth = Math.max(0, depth - 1)
+      if (depth === 0) setDropActive(false)
+    }
+    const drop = (event: DragEvent) => {
+      event.preventDefault()
+      depth = 0
+      setDropActive(false)
+      if (!canIntake || dropBusy) return
+      const paths = [...(event.dataTransfer?.files ?? [])]
+        .map((file) => window.app.files.path(file))
+        .filter(Boolean)
+      if (paths.length === 0) return
+      setDropBusy(true)
+      setDropError(null)
+      void (async () => {
+        let firstError: MessageKey | null = null
+        for (const path of paths) {
+          try {
+            await window.app.receipts.intake({
+              intake: { path },
+              source: 'drop',
+            })
+          } catch (caught) {
+            const keys = [
+              'receipts.error.type',
+              'receipts.error.size',
+              'receipts.error.path',
+            ] as const satisfies readonly MessageKey[]
+            firstError ??=
+              keys.find((key) => String(caught).includes(key)) ??
+              'receipts.error'
+          }
+        }
+        setDropError(firstError)
+      })().finally(() => setDropBusy(false))
+    }
+    document.addEventListener('dragenter', enter)
+    document.addEventListener('dragover', over)
+    document.addEventListener('dragleave', leave)
+    document.addEventListener('drop', drop)
+    return () => {
+      document.removeEventListener('dragenter', enter)
+      document.removeEventListener('dragover', over)
+      document.removeEventListener('dragleave', leave)
+      document.removeEventListener('drop', drop)
+    }
+  }, [active, showPicker, dropBusy])
 
   useEffect(() => {
     const unsubscribeProfile = window.app.desktop.onProfileChanged(() => {
@@ -1163,6 +1354,24 @@ export default function App() {
             variant="ghost"
             onClick={() => setStartupShortcutFailure(null)}
           >
+            {t('tray.noticeOk')}
+          </Button>
+        </aside>
+      )}
+      {(dropActive || dropBusy) && active && !showPicker && (
+        <div className="pointer-events-none fixed inset-0 z-[100] grid place-items-center bg-foreground/25 p-8">
+          <div className="rounded-xl border-2 border-dashed bg-background p-10 text-center text-lg font-semibold shadow-xl">
+            {t(dropBusy ? 'receipts.dropProcessing' : 'receipts.dropOverlay')}
+          </div>
+        </div>
+      )}
+      {dropError && (
+        <aside
+          role="alert"
+          className="fixed right-4 bottom-4 z-[101] flex max-w-md items-center gap-3 rounded-lg border bg-card p-4 text-sm text-error shadow-lg"
+        >
+          <p>{t(dropError)}</p>
+          <Button variant="ghost" onClick={() => setDropError(null)}>
             {t('tray.noticeOk')}
           </Button>
         </aside>

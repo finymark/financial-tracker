@@ -15,8 +15,9 @@ import {
 } from './transaction-validation'
 import { inputRecord, registerIpcHandler } from '../ipc'
 import { validateTagNames } from './tag-validation'
+import { parseStagedAttachment } from './attachment-ipc'
 
-function transactionFields(value: unknown) {
+export function transactionFields(value: unknown, withAttachments = false) {
   const input = inputRecord(value)
   const lines = (() => {
     if (input.lines === undefined) return undefined
@@ -48,6 +49,18 @@ function transactionFields(value: unknown) {
         : validateTagNames(input.tagNames),
     excluded: validateTransactionExcluded(input.excluded),
     lines,
+    ...(withAttachments
+      ? {
+          stagedAttachments:
+            input.stagedAttachments === undefined
+              ? undefined
+              : Array.isArray(input.stagedAttachments)
+                ? input.stagedAttachments.map(parseStagedAttachment)
+                : (() => {
+                    throw new Error('attachments.error.staged')
+                  })(),
+        }
+      : {}),
   }
 }
 
@@ -88,7 +101,7 @@ export function registerTransactionIpc(
     ): Awaited<ReturnType<AppBridge['transactions']['create']>> =>
       controller
         .getActiveApplication()
-        .commands.createTransaction(transactionFields(value)),
+        .commands.createTransaction(transactionFields(value, true)),
   )
   registerIpcHandler(
     ipcMain,
@@ -111,11 +124,17 @@ export function registerTransactionIpc(
       _event,
       value: unknown,
     ): Awaited<ReturnType<AppBridge['transactions']['delete']>> => {
-      controller
-        .getActiveApplication()
-        .commands.deleteTransaction(
-          validateTransactionId(inputRecord(value).id),
-        )
+      const input = inputRecord(value)
+      const saveAttachmentsTo = input.saveAttachmentsTo
+      if (
+        saveAttachmentsTo !== undefined &&
+        (typeof saveAttachmentsTo !== 'string' || !saveAttachmentsTo)
+      )
+        throw new Error('attachments.error.copy')
+      controller.getActiveApplication().commands.deleteTransaction({
+        id: validateTransactionId(input.id),
+        ...(saveAttachmentsTo !== undefined ? { saveAttachmentsTo } : {}),
+      })
     },
   )
 }

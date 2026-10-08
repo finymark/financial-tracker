@@ -178,10 +178,43 @@ export const de = {
   'navigation.label': 'Hauptnavigation',
   'navigation.overview': 'Übersicht',
   'navigation.transactions': 'Transaktionen',
+  'navigation.receipts': 'Belegeingang',
   'navigation.recurring': 'Wiederkehrend',
   'navigation.reports': 'Berichte',
   'navigation.accounts': 'Konten',
   'navigation.settings': 'Einstellungen',
+  'receipts.title': 'Belege zur Bearbeitung',
+  'receipts.description':
+    'Prüfe abgelegte Belegfotos und bestätige sie als Transaktion oder verwirf sie.',
+  'receipts.count': 'Belege im Eingang',
+  'receipts.loading': 'Belegeingang wird geladen…',
+  'receipts.empty': 'Keine Belegfotos warten auf Bearbeitung.',
+  'receipts.preview': 'Vorschau des Belegfotos',
+  'receipts.back': 'Zurück zum Belegeingang',
+  'receipts.confirm': 'Transaktion bestätigen',
+  'receipts.discard': 'Verwerfen',
+  'receipts.reading':
+    'Beleg wird gelesen… Manuelle Eingabe ist weiterhin möglich.',
+  'receipts.ocrPrefilled': 'durch OCR gelesen',
+  'receipts.ocrLowConfidence':
+    'Die OCR-Sicherheit ist niedrig. Bitte alle vorausgefüllten Felder prüfen.',
+  'receipts.currencyMismatch':
+    'Kein aktives Konto entspricht der erkannten Währung:',
+  'receipts.source.drop': 'In die App gezogen',
+  'receipts.source.folder': 'Überwachter Ordner',
+  'receipts.source.phone': 'Vom Telefon hochgeladen',
+  'receipts.dropOverlay': 'Belegfotos ablegen, um sie zum Eingang hinzuzufügen',
+  'receipts.dropProcessing': 'Belegfotos werden hinzugefügt…',
+  'receipts.error':
+    'Der Belegvorgang konnte nicht abgeschlossen werden. Versuche es erneut.',
+  'receipts.error.type':
+    'Lege ein JPEG-, PNG- oder WebP-Bild ab. PDF- und andere Dateien werden im Belegeingang nicht angenommen.',
+  'receipts.error.size': 'Jedes Belegfoto darf höchstens 25 MB groß sein.',
+  'receipts.error.path': 'Das Belegfoto konnte nicht gelesen werden.',
+  'receipts.error.source': 'Wähle eine gültige Eingangsquelle.',
+  'receipts.error.notFound':
+    'Der Beleg wurde nicht gefunden. Aktualisiere den Eingang.',
+  'receipts.error.preview': 'Die Belegvorschau konnte nicht erstellt werden.',
   'recurring.title': 'Wiederkehrende Transaktionen',
   'recurring.definitions': 'Definitionen',
   'recurring.sections': 'Bereiche für wiederkehrende Transaktionen',
@@ -471,6 +504,29 @@ export const de = {
   'transactions.deleteConfirmation':
     'Diese Transaktion endgültig löschen? Der Kontosaldo wird aktualisiert.',
   'transactions.confirmDelete': 'Transaktion löschen',
+  'attachments.title': 'Anhänge',
+  'attachments.add': 'Hinzufügen',
+  'attachments.drop': 'JPEG-, PNG-, WebP- oder PDF-Dateien hier ablegen.',
+  'attachments.empty': 'Keine Anhänge.',
+  'attachments.open': 'Öffnen',
+  'attachments.remove': 'Entfernen',
+  'attachments.deleteWithTransaction': 'Transaktion und ihre Anhänge löschen',
+  'attachments.saveCopiesAndDelete':
+    'Anhangkopien in einem Ordner speichern…, dann löschen',
+  'attachments.error.type':
+    'Wähle eine JPEG-, PNG-, WebP- oder PDF-Datei. Der Dateityp wird anhand des Inhalts geprüft.',
+  'attachments.error.size': 'Jeder Anhang darf höchstens 25 MB groß sein.',
+  'attachments.error.path':
+    'Die ausgewählte Datei konnte nicht gelesen werden.',
+  'attachments.error.store':
+    'Der Anhang konnte nicht in dieses Profil kopiert werden.',
+  'attachments.error.staged':
+    'Der vorbereitete Anhang ist nicht mehr verfügbar.',
+  'attachments.error.notFound':
+    'Der Anhang wurde nicht gefunden. Aktualisiere die Transaktion.',
+  'attachments.error.copy':
+    'Die Anhangkopien konnten nicht in diesem Ordner gespeichert werden.',
+  'attachments.error.open': 'Der Anhang konnte nicht geöffnet werden.',
   'transactions.cancel': 'Abbrechen',
   'transactions.close': 'Transaktionsleiste schließen',
   'transactions.save': 'Transaktion speichern',
@@ -600,11 +656,26 @@ export const de = {
     'Dieses Konto hat Transaktionen und kann nicht gelöscht werden. Archiviere es stattdessen.',
   'settings.title': 'Fühl dich wie zu Hause',
   'settings.description':
-    'Sprache, Darstellung und Basiswährung werden für dieses Profil gespeichert und sofort übernommen.',
+    'Sprache, Darstellung, Basiswährung und Belegeingang werden für dieses Profil gespeichert und sofort übernommen.',
   'settings.baseCurrency': 'Basiswährung',
   'settings.version': 'App-Version',
   'settings.error':
     'Die Einstellungen konnten nicht gespeichert werden. Bitte versuche es erneut.',
+  'watchedFolder.title': 'Überwachter Ordner',
+  'watchedFolder.hint':
+    'Jeder lokale Ordner außerhalb der Financial-Tracker-Daten funktioniert, auch ein mit Google Drive für Desktop oder OneDrive synchronisierter Ordner. Vollständig übertragene Belegfotos werden in den Unterordner feldolgozott verschoben.',
+  'watchedFolder.error.userData':
+    'Wähle einen Ordner außerhalb des Financial-Tracker-Datenordners.',
+  'watchedFolder.current': 'Aktueller Ordner',
+  'watchedFolder.none': 'Kein Ordner ausgewählt',
+  'watchedFolder.status': 'Status',
+  'watchedFolder.status.watching': 'Wird überwacht',
+  'watchedFolder.status.unavailable': 'Ordner nicht verfügbar',
+  'watchedFolder.choose': 'Ordner auswählen',
+  'watchedFolder.clear': 'Entfernen',
+  'watchedFolder.intakeFailure':
+    'Ein überwachtes Belegfoto konnte nicht hinzugefügt werden',
+  'watchedFolder.dismissFailure': 'Schließen',
   'backups.title': 'Sicherungen',
   'backups.description':
     'Bei jedem Öffnen dieses Profils wird die Datenbank gesichert. Die letzten 10 Startsicherungen bleiben erhalten; Sicherungen vor Migrationen werden getrennt gespeichert.',
@@ -647,4 +718,20 @@ export const de = {
   'settings.preview': 'Formatierungsvorschau',
   'settings.date': 'Datum',
   'settings.number': 'Zahl',
+  'phoneUpload.title': 'Vom Handy hochladen',
+  'phoneUpload.starting': 'Privater Netzwerk-Upload wird gestartet…',
+  'phoneUpload.noPrivateNetwork':
+    'Keine Verbindung mit einem privaten Netzwerk. Verbinde diesen PC mit deinem privaten WLAN und versuche es erneut.',
+  'phoneUpload.error':
+    'Der Handy-Upload konnte nicht gestartet werden. Versuche es erneut.',
+  'phoneUpload.interface': 'Private Netzwerkverbindung',
+  'phoneUpload.qrAlt': 'QR-Code für die Handy-Upload-Adresse',
+  'phoneUpload.address': 'Oder öffne diese Adresse auf dem Handy',
+  'phoneUpload.expiresIn': 'Automatischer Stopp in {time}',
+  'phoneUpload.expired': 'Diese Upload-Sitzung wurde beendet.',
+  'phoneUpload.uploaded': '{count} hochgeladen',
+  'phoneUpload.firewallTitle': 'Windows-Firewall',
+  'phoneUpload.firewallGuidance':
+    'Windows fragt möglicherweise nach einer Freigabe für „Financial Tracker“. Erlaube sie nur in privaten Netzwerken. Wenn das Handy keine Verbindung herstellen kann, müssen beide Geräte dasselbe WLAN verwenden und das Windows-Netzwerk muss auf Privat eingestellt sein.',
+  'phoneUpload.close': 'Schließen',
 } satisfies MessageCatalog

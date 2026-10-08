@@ -1,7 +1,57 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
+import type {
+  WatchedFolderFailure,
+  WatchedFolderStatus,
+} from '../shared/settings'
 
 const bridge: AppBridge = {
+  phoneUpload: {
+    start: (input) => ipcRenderer.invoke(IPC_CHANNELS.phoneUploadStart, input),
+    stop: (input) => ipcRenderer.invoke(IPC_CHANNELS.phoneUploadStop, input),
+    onReceived: (listener) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        received: Parameters<typeof listener>[0],
+      ) => listener(received)
+      ipcRenderer.on(IPC_CHANNELS.phoneUploadReceived, handler)
+      return () =>
+        ipcRenderer.removeListener(IPC_CHANNELS.phoneUploadReceived, handler)
+    },
+  },
+  files: {
+    path: (file) => webUtils.getPathForFile(file),
+  },
+  attachments: {
+    pick: () => ipcRenderer.invoke(IPC_CHANNELS.attachmentsPick),
+    pickCopyFolder: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.attachmentsPickCopyFolder),
+    import: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.attachmentsImport, input),
+    list: (input) => ipcRenderer.invoke(IPC_CHANNELS.attachmentsList, input),
+    attach: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.attachmentsAttach, input),
+    remove: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.attachmentsRemove, input),
+    open: (input) => ipcRenderer.invoke(IPC_CHANNELS.attachmentsOpen, input),
+  },
+  receipts: {
+    intake: (input) => ipcRenderer.invoke(IPC_CHANNELS.receiptsIntake, input),
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.receiptsList),
+    count: () => ipcRenderer.invoke(IPC_CHANNELS.receiptsCount),
+    defaultAccountId: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.receiptsDefaultAccount),
+    prefill: (input) => ipcRenderer.invoke(IPC_CHANNELS.receiptsPrefill, input),
+    confirm: (input) => ipcRenderer.invoke(IPC_CHANNELS.receiptsConfirm, input),
+    discard: (input) => ipcRenderer.invoke(IPC_CHANNELS.receiptsDiscard, input),
+    preview: (input) => ipcRenderer.invoke(IPC_CHANNELS.receiptsPreview, input),
+    onChanged: (listener) => {
+      const handler = () => listener()
+      ipcRenderer.on(IPC_CHANNELS.receiptsChanged, handler)
+      return () =>
+        ipcRenderer.removeListener(IPC_CHANNELS.receiptsChanged, handler)
+    },
+  },
   desktop: {
     autostartStatus: () =>
       ipcRenderer.invoke(IPC_CHANNELS.desktopAutostartStatus),
@@ -177,6 +227,34 @@ const bridge: AppBridge = {
     open: (input) => ipcRenderer.invoke(IPC_CHANNELS.profilesOpen, input),
     getActive: () => ipcRenderer.invoke(IPC_CHANNELS.profilesGetActive),
     close: () => ipcRenderer.invoke(IPC_CHANNELS.profilesClose),
+    pickWatchedFolder: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.profilesPickWatchedFolder),
+    watchedFolderStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.profilesWatchedFolderStatus),
+    onWatchedFolderStatusChanged: (listener) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        status: WatchedFolderStatus | null,
+      ) => listener(status)
+      ipcRenderer.on(IPC_CHANNELS.profilesWatchedFolderStatusChanged, handler)
+      return () =>
+        ipcRenderer.removeListener(
+          IPC_CHANNELS.profilesWatchedFolderStatusChanged,
+          handler,
+        )
+    },
+    onWatchedFolderFailure: (listener) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        failure: WatchedFolderFailure,
+      ) => listener(failure)
+      ipcRenderer.on(IPC_CHANNELS.profilesWatchedFolderFailure, handler)
+      return () =>
+        ipcRenderer.removeListener(
+          IPC_CHANNELS.profilesWatchedFolderFailure,
+          handler,
+        )
+    },
     updateSettings: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.profilesUpdateSettings, input),
   },

@@ -2,7 +2,7 @@
 
 A local-first personal expense tracker for Windows, built with Electron, React,
 TypeScript, and SQLite. The app opens to a collapsible sidebar with Overview,
-Transactions, Recurring, Reports, Accounts, and Settings pages. On start you
+Transactions, Receipt inbox, Recurring, Reports, Accounts, and Settings pages. On start you
 pick or create a profile; each profile has its own SQLite database and data
 folder. Financial data stays local. Accounts track opening balances, signed
 expense/income transactions, both legs of transfers, and target-based balance
@@ -176,9 +176,10 @@ rename this folder or change the appId. Uninstalling keeps profile data.
 `electron-builder.yml` produces a per-user, one-click **unsigned NSIS x64**
 installer. Windows may show an unknown-publisher/SmartScreen warning; code
 signing is not configured. Executable resource editing is disabled, so the
-installer/app currently use Electron's default icon. Native SQLite binaries are
-explicitly unpacked from asar, and native dependency rebuilding is disabled:
-`better-sqlite3` 13 already ships the compatible Node-API binary.
+installer/app currently use Electron's default icon. Native SQLite and Sharp
+image-processing binaries are explicitly unpacked from asar, and native
+dependency rebuilding is disabled. `better-sqlite3` 13 already ships the
+compatible Node-API binary.
 
 ### Validate without publishing
 
@@ -209,8 +210,11 @@ Get-Content $log
 $process.ExitCode
 ```
 
-It must print `SQLite smoke test OK` and exit 0. The flag opens a temporary
-file-backed database, runs a query, closes it, deletes it, and exits without
+It must print `SQLite smoke test OK`, `Image smoke test OK`,
+`OCR smoke test OK`, then `QR smoke test OK`, and exit 0.
+The flag opens a temporary file-backed database, runs a query, and processes a
+tiny in-memory image with Sharp, preprocesses and reads a synthetic receipt in
+the OCR worker, then renders a QR code before cleaning up and exiting without
 opening a window or reading profiles. For an installed-artifact check, silently
 install `Financial Tracker Setup <version>.exe` with `/S /D=<temporary-directory>`
 (the directory argument must be last), then run the installed executable with
@@ -271,8 +275,13 @@ and safely reopens it, applying supported migrations if necessary. A temporary
 online recovery snapshot protects the previous database if reopening fails.
 Corrupt, foreign-profile, or newer-schema snapshots are refused without changing
 the live database. Profile switching is disabled during restore, and quitting
-waits for the database operation to finish. These are local database backups,
-not off-device copies or backups of the separate data folder.
+waits for the database operation to finish. Attachment content is included
+incrementally: each startup backup copies only content-addressed files not already
+present in `backups/attachments/`. Restoring a database copies every referenced
+file missing from the live attachment store back from that pool. Startup
+retention still applies only to the last 10 SQLite snapshots. The shared
+attachment pool and verified `backups/pre-migration/` snapshots are deliberately
+not pruned. These are local backups, not off-device copies.
 
 ## App shell
 
@@ -409,7 +418,8 @@ and light/dark mode where applicable:
    `release/win-unpacked/Financial Tracker.exe`, and repeat shortcut, tray,
    profile-picker, Enter/Esc, privacy, and conflict checks. Then run
    `release/win-unpacked/Financial Tracker.exe --smoke-test`; it must print
-   `SQLite smoke test OK` and exit 0.
+   `SQLite smoke test OK`, `Image smoke test OK`, `OCR smoke test OK`, then
+   `QR smoke test OK`, and exit 0.
 
 ## Exchange rates and base-currency conversion
 
@@ -715,6 +725,22 @@ missing buckets, staleness, range validation and empty data.
   only matching parts. The Excluded flag remains on the transaction header and
   therefore excludes every part from totals. Per-line notes use appended
   migration 13 after unchanged migrations 10–12.
+- Saved and new expense/income drawers accept JPEG, PNG, WebP, and PDF
+  attachments through **Add** or the drop zone. The main process detects the
+  type from file contents and rejects unsupported or larger-than-25-MB sources.
+  Images apply EXIF orientation and are downscaled only when their long side is
+  over 2,000 pixels; smaller images and PDFs retain their exact bytes.
+  Content-addressed immutable files live under
+  `profiles/<id>/data/attachments/`, so identical stored content is copied only
+  once. **Open** first copies an attachment to a per-run temporary folder; the
+  immutable store path is never exposed to another application.
+- Attach, remove, create-with-attachments, and transaction deletion are atomic
+  row commands and are undoable. Deleting a transaction with attachments offers
+  either **Delete transaction and its attachments** or **Save attachment copies
+  to a folder…, then delete**; copy names are de-duplicated in the selected
+  folder. Content no longer referenced by either SQLite or the in-memory Undo
+  history is swept on the next profile open. Transfers and balance adjustments
+  do not accept attachments. Attachments use appended migration 21.
 - Edit any listed transaction or transfer from the same drawer, or delete it after
   confirmation. Create, edit, delete, category reassignment, and balance updates
   run through the profile application command boundary in one SQLite transaction.
@@ -770,6 +796,132 @@ missing buckets, staleness, range validation and empty data.
 - Categorisation rules use migration 15 for their original schema. Appended
   migration 16 adds payee actions, currency-aware amount conditions, and the
   broader condition constraint without changing migrations 1–15.
+
+### Manual Attachments check
+
+Run `npm run dev` with synthetic files only. In a new expense/income drawer,
+add several JPEG/PNG/WebP/PDF files with the native picker and with drag and
+drop, remove one staged file, save, and reopen the transaction. Verify names,
+sizes, type icons, ordering, split support, and translated errors for an
+unsupported file and a source over 25 MB. Open each attachment and confirm the
+temporary copy launches while edits to that copy do not change the stored file.
+Attach and remove files on a saved transaction and undo each operation. Delete
+a transaction with attachments using both choices: first delete directly and
+undo; then save copies to a folder containing a same-named file, verify the
+de-duplicated names, delete, and undo. Repeat in HU/EN/DE and with keyboard
+navigation and light/dark themes. Close and reopen a profile to check referenced
+files remain and removed content is swept. Create two startup backups with a new
+attachment between them, remove a live stored file, restore the relevant backup,
+and verify the attachment opens again.
+
+Build with `npx electron-builder --win nsis --publish never`, then run
+`"release/win-unpacked/Financial Tracker.exe" --smoke-test`. It must print
+`SQLite smoke test OK`, `Image smoke test OK`, `OCR smoke test OK`, and
+`QR smoke test OK`, then exit
+successfully.
+
+## Receipt inbox
+
+- Drop JPEG, PNG, or WebP receipt photos anywhere on the main window to add
+  them to the open profile's **Receipt inbox**. PDF and other files are rejected,
+  and every photo uses the same 25 MB limit, orientation correction, and
+  2,000-pixel image bound as transaction image attachments.
+- The sidebar badge counts received and read photos. The inbox lists them oldest
+  first with a thumbnail, original name, received date, and intake source.
+- Receipt OCR runs only on this PC with bundled Hungarian, German, and English
+  Tesseract models selected from the profile language with English fallback. No
+  receipt or OCR text is sent to a network service. Before recognition, a
+  transient copy is converted to grayscale, contrast-normalised, adaptively
+  binarised, deskewed, and enlarged when small; the stored colour photo is not
+  changed.
+- Open a receipt to view its photo beside an editable transaction form. OCR can
+  prefill payee (including aliases, categorisation rules, and last-used values),
+  date, amount, and a matching active HUF/CHF account. A detected currency with
+  no matching account is shown as a hint. Confirming creates the transaction
+  with exactly that photo as its attachment; discarding hides the receipt. Both
+  decisions are undoable.
+- OCR is a convenience, not an authority: thermal paper, blur, unusual layouts,
+  and handwriting can reduce accuracy, so every field must be checked. Line-item
+  extraction and split suggestions are intentionally out of scope.
+- Inbox intake is a background write and does not replace or clear the existing
+  Undo history. Active inbox photos are retained by the attachment sweep and are
+  included in the incremental attachment backup pool and restore process.
+- Each profile can choose a watched folder in **Settings**. Any local folder
+  outside the app's user-data directory, including one synced by Google Drive
+  for Desktop or OneDrive, can feed JPEG,
+  PNG, and WebP photos into that profile's inbox. The app checks only top-level
+  files, ignores hidden and temporary sync files, and retries unavailable folders
+  every 30 seconds.
+- A photo is accepted only after its size and modification time remain unchanged
+  for at least two seconds and Windows allows it to be moved. Accepted files move
+  into a `feldolgozott` subfolder and are never deleted. Existing names gain
+  ` (2)`, ` (3)`, and so on before the extension. Photos added while the app is
+  closed are scanned when the profile next opens.
+
+### Manual receipt-inbox check
+
+Run `npm run dev` with synthetic images only. Drop several JPEG/PNG/WebP photos
+onto the main window, verify the drop overlay, oldest-first rows, thumbnails and
+sidebar count, then restart and confirm the items persist. Open a photo, complete
+the transaction form, verify the reading/low-confidence and OCR-field indicators,
+edit every prefilled field, confirm with Enter and Ctrl+Enter, and verify the
+created transaction has exactly that photo attached. Test Hungarian, German,
+Swiss, and unreadable synthetic receipt images; verify aliases/rules and
+currency-matching accounts are suggested, while an unsupported detected
+currency keeps the default account and shows a hint. Discard another receipt and use
+Undo to return it; also undo a confirmation and verify both the transaction and
+inbox state return correctly. Drop a PDF or another non-image file and verify a
+translated rejection. With the transaction drawer open, drop an image on its
+attachment drop zone and verify it attaches to that transaction instead of
+entering the receipt inbox. Restart while an item is waiting and confirm OCR is
+retried. Repeat in HU/EN/DE, using only the keyboard where applicable, and check
+light/dark and narrow-window layouts. For a packaged build, also run the smoke
+test above with networking disabled.
+
+### Phone upload
+
+Choose **Upload from phone** in the **Receipt inbox** to start a temporary HTTP
+server on a private IPv4 network connection. The dialog shows the local address
+and a QR code, and offers a connection picker when the PC has several eligible
+private interfaces. The page accepts JPEG, PNG, and WebP photos directly into
+the open profile's receipt inbox. Its random 256-bit URL token remains valid for
+the batch, while the server limits each photo to 25 MB, accepts at most two
+uploads concurrently and 50 in one session, and stops after 10 minutes, when
+the dialog closes, when the profile changes, or when the app quits. No receipt
+is sent to a cloud service.
+The page, token, and photos travel over plain HTTP on the local network, so
+anyone on the same network who sees the URL could upload or read uploads during
+that session; use phone upload only on trusted private Wi-Fi.
+
+#### Manual phone-upload check
+
+Run `npm run dev` with synthetic images only and put a phone and the PC on the
+same private Wi-Fi. Open **Receipt inbox → Upload from phone**, scan the QR code
+with the phone, and if Windows shows a firewall prompt, allow **Financial
+Tracker** on **Private networks only**. Take or select several JPEG/PNG/WebP
+photos in one batch and verify each result on the phone page, the dialog's
+uploaded count, and the inbox list/sidebar counter. Try a non-image file and
+verify the phone page reports rejection without adding it. Close the dialog and
+verify its URL no longer connects; repeat and leave it open for 10 minutes to
+verify automatic shutdown. If the phone cannot connect, confirm both devices
+use the same Wi-Fi and Windows marks the network as Private. Repeat in HU/EN/DE
+and, where available, choose each listed private network interface.
+
+### Manual watched-folder check
+
+Choose a synthetic Google Drive for Desktop folder as the watched folder and
+verify Settings shows **Watching**. Add a photo while the app is running and one
+while the profile is closed; both must enter the inbox after the profile opens.
+Simulate a half-synced file by continuing to append bytes and verify it is not
+moved until its size and modification time stay stable for two seconds. Hold a
+photo open so Windows locks it, verify intake waits, then release it and verify a
+later scan succeeds. Confirm every accepted photo moves to `feldolgozott`, files
+already there are ignored, and a same-named destination produces ` (2)` without
+overwriting either file. Temporarily disconnect or rename the folder and verify
+the status changes to **Folder unavailable**, then returns to **Watching** when
+the folder is available again. Try the app's user-data folder and a folder inside
+it, and verify each is rejected with a translated error. Clear the setting and
+verify new photos remain in place.
 
 ### Manual Categorisation rules check
 
@@ -1387,8 +1539,10 @@ window lifecycle are manual checks, not covered by the unit suite.
 
 1. Run `npm run build`, then `npx electron-builder --win nsis --publish never`.
    Run `"release/win-unpacked/Financial Tracker.exe" --smoke-test` and also with
-   `--hidden --smoke-test`: both must print **SQLite smoke test OK** and exit with
-   code 0 without a tray icon or window. Repeat the smoke test while a normal
+   `--hidden --smoke-test`: both must print **SQLite smoke test OK**, **Image
+   smoke test OK**, **OCR smoke test OK**, then **QR smoke test OK** and exit
+   with code 0 without a tray icon or window.
+   Repeat the smoke test while a normal
    instance is running to check it does not acquire/block the single-instance
    lock or steal focus. Install the generated NSIS installer from `release/`.
 2. On a fresh app-data installation, open Settings: **Start with Windows** must

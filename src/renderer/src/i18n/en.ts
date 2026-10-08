@@ -165,10 +165,41 @@ export const en = {
   'navigation.label': 'Main navigation',
   'navigation.overview': 'Overview',
   'navigation.transactions': 'Transactions',
+  'navigation.receipts': 'Receipt inbox',
   'navigation.recurring': 'Recurring',
   'navigation.reports': 'Reports',
   'navigation.accounts': 'Accounts',
   'navigation.settings': 'Settings',
+  'receipts.title': 'Receipts waiting for you',
+  'receipts.description':
+    'Review dropped receipt photos, then confirm each one as a transaction or discard it.',
+  'receipts.count': 'Receipts in inbox',
+  'receipts.loading': 'Loading receipt inbox…',
+  'receipts.empty': 'No receipt photos are waiting.',
+  'receipts.preview': 'Receipt photo preview',
+  'receipts.back': 'Back to receipt inbox',
+  'receipts.confirm': 'Confirm transaction',
+  'receipts.discard': 'Discard',
+  'receipts.reading': 'Reading receipt… You can still enter details manually.',
+  'receipts.ocrPrefilled': 'read by OCR',
+  'receipts.ocrLowConfidence':
+    'OCR confidence is low. Check every prefilled field.',
+  'receipts.currencyMismatch':
+    'No active account matches the detected currency:',
+  'receipts.source.drop': 'Dropped into the app',
+  'receipts.source.folder': 'Watched folder',
+  'receipts.source.phone': 'Phone upload',
+  'receipts.dropOverlay': 'Drop receipt photos to add them to the inbox',
+  'receipts.dropProcessing': 'Adding receipt photos…',
+  'receipts.error': 'The receipt operation could not be completed. Try again.',
+  'receipts.error.type':
+    'Drop a JPEG, PNG, or WebP image. PDFs and other files are not accepted in the receipt inbox.',
+  'receipts.error.size': 'Each receipt photo must be no larger than 25 MB.',
+  'receipts.error.path': 'The receipt photo could not be read.',
+  'receipts.error.source': 'Choose a valid receipt intake source.',
+  'receipts.error.notFound':
+    'The receipt could not be found. Refresh the inbox.',
+  'receipts.error.preview': 'The receipt preview could not be created.',
   'recurring.title': 'Recurring transactions',
   'recurring.definitions': 'Definitions',
   'recurring.sections': 'Recurring transaction sections',
@@ -451,6 +482,27 @@ export const en = {
   'transactions.deleteConfirmation':
     'Permanently delete this transaction? Its account balance will update.',
   'transactions.confirmDelete': 'Delete transaction',
+  'attachments.title': 'Attachments',
+  'attachments.add': 'Add',
+  'attachments.drop': 'Drop JPEG, PNG, WebP, or PDF files here.',
+  'attachments.empty': 'No attachments.',
+  'attachments.open': 'Open',
+  'attachments.remove': 'Remove',
+  'attachments.deleteWithTransaction': 'Delete transaction and its attachments',
+  'attachments.saveCopiesAndDelete':
+    'Save attachment copies to a folder…, then delete',
+  'attachments.error.type':
+    'Choose a JPEG, PNG, WebP, or PDF file. File types are checked from their contents.',
+  'attachments.error.size': 'Each attachment must be no larger than 25 MB.',
+  'attachments.error.path': 'The selected file could not be read.',
+  'attachments.error.store':
+    'The attachment could not be copied into this profile.',
+  'attachments.error.staged': 'The staged attachment is no longer available.',
+  'attachments.error.notFound':
+    'The attachment could not be found. Refresh the transaction.',
+  'attachments.error.copy':
+    'The attachment copies could not be saved to that folder.',
+  'attachments.error.open': 'The attachment could not be opened.',
   'transactions.cancel': 'Cancel',
   'transactions.close': 'Close transaction drawer',
   'transactions.save': 'Save transaction',
@@ -576,10 +628,24 @@ export const en = {
     'This account has transactions and cannot be deleted. Archive it instead.',
   'settings.title': 'Make yourself at home',
   'settings.description':
-    'Language, appearance and base currency are saved for this profile and apply immediately.',
+    'Language, appearance, base currency and receipt intake are saved for this profile and apply immediately.',
   'settings.baseCurrency': 'Base currency',
   'settings.version': 'App version',
   'settings.error': 'The settings could not be saved. Please try again.',
+  'watchedFolder.title': 'Watched folder',
+  'watchedFolder.hint':
+    'Any local folder outside Financial Tracker data works, including one synced by Google Drive for Desktop or OneDrive. Complete receipt photos are moved into its feldolgozott subfolder.',
+  'watchedFolder.error.userData':
+    'Choose a folder outside the Financial Tracker data folder.',
+  'watchedFolder.current': 'Current folder',
+  'watchedFolder.none': 'No folder selected',
+  'watchedFolder.status': 'Status',
+  'watchedFolder.status.watching': 'Watching',
+  'watchedFolder.status.unavailable': 'Folder unavailable',
+  'watchedFolder.choose': 'Choose folder',
+  'watchedFolder.clear': 'Clear',
+  'watchedFolder.intakeFailure': 'A watched receipt photo could not be added',
+  'watchedFolder.dismissFailure': 'Dismiss',
   'backups.title': 'Backups',
   'backups.description':
     'A database backup is taken whenever you open this profile. The last 10 startup backups are kept; pre-migration backups are stored separately.',
@@ -619,6 +685,21 @@ export const en = {
   'settings.preview': 'Formatting preview',
   'settings.date': 'Date',
   'settings.number': 'Number',
+  'phoneUpload.title': 'Upload from phone',
+  'phoneUpload.starting': 'Starting the private network upload…',
+  'phoneUpload.noPrivateNetwork':
+    'Not connected to a private network. Connect this PC to your private Wi-Fi and try again.',
+  'phoneUpload.error': 'Phone upload could not be started. Try again.',
+  'phoneUpload.interface': 'Private network connection',
+  'phoneUpload.qrAlt': 'QR code for the phone upload address',
+  'phoneUpload.address': 'Or open this address on your phone',
+  'phoneUpload.expiresIn': 'Stops automatically in {time}',
+  'phoneUpload.expired': 'This upload session has stopped.',
+  'phoneUpload.uploaded': '{count} uploaded',
+  'phoneUpload.firewallTitle': 'Windows firewall',
+  'phoneUpload.firewallGuidance':
+    'Windows may ask to allow “Financial Tracker”. Allow it on Private networks only. If the phone cannot connect, make sure both devices use the same Wi-Fi and the Windows network is set to Private.',
+  'phoneUpload.close': 'Close',
 }
 
 export type MessageKey = keyof typeof en

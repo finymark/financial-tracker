@@ -5,6 +5,7 @@ import type { Transfer } from './transfers'
 export type { Payee } from './payees'
 import type { BalanceAdjustment } from './adjustments'
 import type { BaseCurrencyTransactionTotals } from './exchange-rates'
+import type { Attachment, StagedAttachment } from './attachments'
 
 export type TransactionKind = CategoryKind
 
@@ -39,10 +40,11 @@ export interface Transaction {
   // Kept as the first line for compatibility with commands that only support
   // ordinary one-line transactions (notably linked transfer fees).
   line: TransactionLine
+  attachments: Attachment[]
   linkedTransferId?: string
 }
 
-export interface CreateTransactionInput {
+export interface TransactionFieldsInput {
   // When lines is omitted these fields describe one ordinary transaction line.
   // Supplying lines enables a split and each line owns its category, note, and tags.
   tagNames?: string[]
@@ -58,13 +60,21 @@ export interface CreateTransactionInput {
   excluded?: boolean
 }
 
+export interface CreateTransactionInput extends TransactionFieldsInput {
+  stagedAttachments?: StagedAttachment[]
+}
+
 // On update, omitted tagNames preserve existing tags; an explicit [] removes them.
-export interface UpdateTransactionInput extends CreateTransactionInput {
+export interface UpdateTransactionInput extends TransactionFieldsInput {
   id: string
 }
 
 export interface TransactionIdInput {
   id: string
+}
+
+export interface DeleteTransactionInput extends TransactionIdInput {
+  saveAttachmentsTo?: string
 }
 
 export type TransactionPeriod =

@@ -6,6 +6,7 @@ import type {
   TransactionPage,
   TransactionTotals,
   Transaction,
+  TransactionFieldsInput,
   TransactionLineInput,
   UpdateTransactionInput,
 } from '../../shared/transactions'
@@ -30,6 +31,7 @@ import { getLinesTags, setLineTags } from './profile-tags'
 import { getBalanceAdjustments } from './profile-adjustments'
 import { foldTextKey } from '../../shared/text-keys'
 import { resolvePresetDateRange } from './period-date-range'
+import { listAttachments } from './profile-attachments'
 
 type StoredTransactionPage = Omit<TransactionPage, 'baseTotals'>
 
@@ -125,6 +127,7 @@ function transactionViews(
       updatedAt: row.updatedAt,
       lines,
       line: lines[0],
+      attachments: listAttachments(database, row.id),
     }
   })
 }
@@ -207,7 +210,7 @@ interface ValidatedLine extends TransactionLineInput {
 }
 
 function validateLines(
-  input: CreateTransactionInput,
+  input: TransactionFieldsInput,
   totalMinor: number,
 ): ValidatedLine[] {
   if (input.lines === undefined) {

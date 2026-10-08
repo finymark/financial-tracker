@@ -1,0 +1,12 @@
+ALPEN BEISPIEL AG
+Testweg 7
+3000 Musterort
+UID CHE-000.000.000
+Quittung
+Ware A                         900.00
+Ware B                         334.50
+MWST      Netto       Steuer
+2.6%     900.00        23.40
+8.1%     310.00        25.10
+TOTAL CHF                   1'234.50
+01.02.2025 10:15

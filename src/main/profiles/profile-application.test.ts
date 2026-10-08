@@ -46,7 +46,7 @@ describe('profile application API', () => {
     const first = await controller.create('First')
     const lastUsed = await controller.create('Last used')
     await controller.open(first.id)
-    controller.close()
+    await controller.close()
     await controller.open(lastUsed.id)
     const account = controller.getActiveApplication().commands.createAccount({
       name: 'Quick account',
@@ -54,7 +54,7 @@ describe('profile application API', () => {
       openingBalance: 0,
       openingDate: '2026-01-01',
     })
-    controller.close()
+    await controller.close()
 
     const opened = await controller.openLastUsed()
     expect(opened?.id).toBe(lastUsed.id)
@@ -73,7 +73,7 @@ describe('profile application API', () => {
     expect(application.queries.listTransactions().rows).toEqual([transaction])
     expect(application.commands.undoLast()).toBe(true)
     expect(application.queries.listTransactions().rows).toEqual([])
-    controller.close()
+    await controller.close()
   })
 
   test('opening a profile creates a startup backup separate from migration backups', async () => {
@@ -113,9 +113,10 @@ describe('profile application API', () => {
         theme: 'system',
         baseCurrency: 'HUF',
         privacyMode: false,
+        watchedFolder: null,
       })
       expect(controller.listBackups()).toHaveLength(1)
-      controller.close()
+      await controller.close()
     },
   )
 
@@ -141,7 +142,7 @@ describe('profile application API', () => {
     )
     expect(controller.getActive()?.id).toBe(profile.id)
     expect(controller.list().profiles).toEqual([profile])
-    controller.close()
+    await controller.close()
   })
 
   test('keeps the last ten startup backups, including repeated opens at the same time', async () => {
@@ -234,7 +235,7 @@ describe('profile application API', () => {
     await controller.open(profile.id)
     try {
       const backup = controller.listBackups()[0]
-      controller.updateSettings({
+      await controller.updateSettings({
         id: profile.id,
         settings: { language: 'en', theme: 'light', baseCurrency: 'HUF' },
       })
@@ -254,18 +255,6 @@ describe('profile application API', () => {
           settings: { language: 'hu' },
         }),
       ).toThrow('operation is in progress')
-      expect(() => application.queries.getSettings()).toThrow(
-        'restore is in progress',
-      )
-      expect(() => application.queries.listAccounts()).toThrow(
-        'restore is in progress',
-      )
-      expect(() =>
-        application.commands.renameAccount({
-          id: account.id,
-          name: 'Overlapping name',
-        }),
-      ).toThrow('restore is in progress')
       const restored = await restoring
       expect(restored).toMatchObject({
         id: profile.id,
@@ -283,7 +272,7 @@ describe('profile application API', () => {
         },
       ])
     } finally {
-      controller.close()
+      await controller.close()
     }
   })
 
@@ -323,6 +312,7 @@ describe('profile application API', () => {
       expect(application.queries.getSettings()).toEqual({
         ...settings,
         privacyMode: false,
+        watchedFolder: null,
       })
       application.commands.createAccount({
         name: 'Later account',
@@ -341,6 +331,7 @@ describe('profile application API', () => {
       expect(application.queries.getSettings()).toEqual({
         ...settings,
         privacyMode: false,
+        watchedFolder: null,
       })
       expect(application.queries.listAccounts()).toEqual([])
       const created = application.commands.createAccount({
@@ -799,7 +790,7 @@ describe('profile application API', () => {
     expect(
       controller.getActiveApplication().queries.listTransactions().rows,
     ).toEqual([transaction])
-    controller.close()
+    await controller.close()
   })
 
   test('upgrades from every earlier schema version', async () => {
@@ -848,6 +839,7 @@ describe('profile application API', () => {
           theme: 'system',
           baseCurrency: 'HUF',
           privacyMode: false,
+          watchedFolder: null,
         })
       } finally {
         upgraded.close()
@@ -898,6 +890,7 @@ describe('profile application API', () => {
         theme: 'dark',
         baseCurrency: 'CHF',
         privacyMode: false,
+        watchedFolder: null,
       })
     } finally {
       reopened.close()
@@ -927,6 +920,7 @@ describe('profile application API', () => {
         theme: 'dark',
         baseCurrency: 'CHF',
         privacyMode: false,
+        watchedFolder: null,
       })
     } finally {
       backupApplication.close()

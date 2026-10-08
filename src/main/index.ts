@@ -17,6 +17,10 @@ import { registerUpdates } from './updates'
 import { openDatabase } from './db'
 import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 import { ProfileController } from './profiles/profile-controller'
+import type {
+  WatchedFolderFailure,
+  WatchedFolderStatus,
+} from '../shared/settings'
 import { registerCategoryIpc } from './profiles/category-ipc'
 import { registerAccountIpc } from './profiles/account-ipc'
 import { registerProfileIpc } from './profiles/profile-ipc'
@@ -46,6 +50,12 @@ import { buildTrayMenu, trayLanguage } from './tray-menu'
 import { desktopMessages } from '../shared/desktop-translations'
 import { startsHidden } from '../shared/desktop'
 import { QuickAddShortcut } from './global-shortcut'
+import { registerAttachmentIpc } from './profiles/attachment-ipc'
+import { registerReceiptIpc } from './profiles/receipt-ipc'
+import { registerPhoneUploadIpc, renderPhoneUploadQr } from './phone-upload-ipc'
+import sharp from 'sharp'
+import { preprocessReceiptImage } from './ocr/receipt-preprocessing'
+import { TesseractOcrEngine } from './ocr/tesseract-ocr-engine'
 
 let mainWindow: BrowserWindow | null = null
 let quickAddWindow: BrowserWindow | null = null
@@ -166,7 +176,7 @@ function showQuickAddWindow(created: boolean): void {
   }
 }
 
-function smokeTest(): void {
+async function smokeTest(): Promise<void> {
   const directory = mkdtempSync(join(tmpdir(), 'financial-tracker-smoke-'))
   let exitCode = 1
   try {
@@ -177,12 +187,51 @@ function smokeTest(): void {
       }
       if (result.result !== 'ok') throw new Error('SQLite query failed')
       console.log('SQLite smoke test OK')
-      exitCode = 0
     } finally {
       database.close()
     }
-  } catch {
-    console.error('SQLite smoke test FAILED')
+    const image = Buffer.from([255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255])
+    const processed = await sharp(image, {
+      raw: { width: 2, height: 2, channels: 3 },
+    })
+      .resize(1, 1)
+      .png()
+      .toBuffer()
+    const metadata = await sharp(processed).metadata()
+    if (metadata.width !== 1 || metadata.height !== 1)
+      throw new Error('Image processing failed')
+    console.log('Image smoke test OK')
+    const syntheticReceipt = await sharp(
+      Buffer.from(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160">
+          <rect width="100%" height="100%" fill="white"/>
+          <text x="35" y="110" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="black">TOTAL 12.50</text>
+        </svg>`,
+      ),
+    )
+      .png()
+      .toBuffer()
+    const ocr = new TesseractOcrEngine()
+    try {
+      const result = await ocr.recognize(
+        await preprocessReceiptImage(syntheticReceipt),
+        ['eng'],
+      )
+      if (!/TOTAL\s+12[.,]50/iu.test(result.text))
+        throw new Error(`OCR returned unexpected text: ${result.text}`)
+      console.log('OCR smoke test OK')
+    } finally {
+      await ocr.dispose()
+    }
+    const qrDataUrl = await renderPhoneUploadQr(
+      `http://192.168.1.2:12345/u/${'a'.repeat(43)}`,
+    )
+    if (!qrDataUrl.startsWith('data:image/png;base64,'))
+      throw new Error('QR rendering failed')
+    console.log('QR smoke test OK')
+    exitCode = 0
+  } catch (error) {
+    console.error('Smoke test FAILED', error)
   } finally {
     rmSync(directory, { recursive: true, force: true })
     app.exit(exitCode)
@@ -225,7 +274,7 @@ if (!ownsInstance) {
 
 function startApplication(): void {
   if (isSmokeTest) {
-    smokeTest()
+    void smokeTest()
     return
   }
   let settings: AppSettingsFile
@@ -239,6 +288,7 @@ function startApplication(): void {
   let trayNoticeShown = settings.isTrayNoticeShown()
   let tray: Tray | null = null
   const rateSource = new MnbExchangeRateSource(createElectronNetTransport())
+  const receiptOcr = new TesseractOcrEngine()
   const onRateStatusChanged = () => {
     if (mainWindow && !mainWindow.isDestroyed())
       mainWindow.webContents.send(IPC_CHANNELS.ratesStatusChanged)
@@ -247,6 +297,24 @@ function startApplication(): void {
     if (mainWindow && !mainWindow.isDestroyed())
       mainWindow.webContents.send(IPC_CHANNELS.pendingChanged)
   }
+  const onReceiptInboxChanged = () => {
+    if (mainWindow && !mainWindow.isDestroyed())
+      mainWindow.webContents.send(IPC_CHANNELS.receiptsChanged)
+  }
+  const onWatchedFolderStatusChanged = (status: WatchedFolderStatus | null) => {
+    if (mainWindow && !mainWindow.isDestroyed())
+      mainWindow.webContents.send(
+        IPC_CHANNELS.profilesWatchedFolderStatusChanged,
+        status,
+      )
+  }
+  const onWatchedFolderFailure = (failure: WatchedFolderFailure) => {
+    if (mainWindow && !mainWindow.isDestroyed())
+      mainWindow.webContents.send(
+        IPC_CHANNELS.profilesWatchedFolderFailure,
+        failure,
+      )
+  }
   const profiles = new ProfileController(
     new ProfileRegistry({ userDataDirectory: app.getPath('userData') }),
     app.getLocale(),
@@ -254,6 +322,10 @@ function startApplication(): void {
       exchangeRateSource: rateSource,
       onRateStatusChanged,
       onPendingTransactionsChanged,
+      onReceiptInboxChanged,
+      onWatchedFolderStatusChanged,
+      onWatchedFolderFailure,
+      ocrEngine: receiptOcr,
     },
   )
   const exchangeRates = new ExchangeRateScheduler(profiles, rateSource, {
@@ -364,6 +436,26 @@ function startApplication(): void {
     IPC_CHANNELS.getVersion,
     (): Awaited<ReturnType<AppBridge['getVersion']>> => app.getVersion(),
   )
+  const phoneUpload = registerPhoneUploadIpc(ipcMain, {
+    getActiveProfile: () => {
+      const active = profiles.getActive()
+      if (!active) throw new Error('No profile is open')
+      const application = profiles.getActiveApplication()
+      return {
+        id: active.id,
+        language: active.settings.language,
+        intake: (input, source) =>
+          application.commands.intakeReceipt(
+            { bytes: input.bytes, name: input.name },
+            source,
+          ),
+      }
+    },
+    onReceived: (received) => {
+      if (mainWindow && !mainWindow.isDestroyed())
+        mainWindow.webContents.send(IPC_CHANNELS.phoneUploadReceived, received)
+    },
+  })
   registerProfileIpc(
     ipcMain,
     profiles,
@@ -381,10 +473,13 @@ function startApplication(): void {
       if (quickAddWindow && !quickAddWindow.isDestroyed())
         quickAddWindow.webContents.send(IPC_CHANNELS.desktopProfileChanged)
     },
+    () => phoneUpload.stop(),
   )
   registerAccountIpc(ipcMain, profiles)
   registerCategoryIpc(ipcMain, profiles)
   registerTransactionIpc(ipcMain, profiles)
+  const disposeAttachmentIpc = registerAttachmentIpc(ipcMain, profiles)
+  registerReceiptIpc(ipcMain, profiles)
   registerTransactionCsvIpc(ipcMain, profiles)
   registerPayeeIpc(ipcMain, profiles)
   registerTransferIpc(ipcMain, profiles)
@@ -402,9 +497,12 @@ function startApplication(): void {
   function shutdown(): Promise<void> {
     exchangeRates.stop()
     recurring.stop()
-    shutdownPromise ??= profiles.shutdown().then(() => {
-      shutdownComplete = true
-    })
+    shutdownPromise ??= phoneUpload
+      .stop()
+      .then(() => profiles.shutdown())
+      .then(() => {
+        shutdownComplete = true
+      })
     return shutdownPromise
   }
   app.on('before-quit', (event) => {
@@ -431,7 +529,11 @@ function startApplication(): void {
   tray.on('click', showMainWindow)
   tray.on('double-click', showMainWindow)
   updateTray()
-  app.on('will-quit', disposeDesktopIntegrations)
+  app.on('will-quit', () => {
+    void receiptOcr.dispose()
+    disposeAttachmentIpc()
+    disposeDesktopIntegrations()
+  })
 
   mainWindow = createWindow(startsHidden(process.argv))
   mainWindow.on('close', (event) => {

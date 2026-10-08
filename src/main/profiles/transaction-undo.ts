@@ -6,6 +6,7 @@ import type {
 } from '../../shared/transactions'
 import { payeeAliasKey, payeeKey, tagKey } from '../../shared/text-keys'
 import type { Tag } from '../../shared/tags'
+import type { Attachment } from '../../shared/attachments'
 import { getLineTags } from './profile-tags'
 import {
   createTransaction,
@@ -14,6 +15,12 @@ import {
   updateTransaction,
 } from './profile-transactions'
 import type { UndoableCommand } from './undo-history'
+import {
+  insertAttachment,
+  listAttachments,
+  restoreAttachment,
+} from './profile-attachments'
+import { getTransaction } from './profile-transactions'
 
 interface StoredTransactionImage {
   id: string
@@ -49,6 +56,7 @@ export interface TransactionAggregateImage {
   payees: StoredPayeeImage[]
   tags: Tag[]
   lineTags: { lineId: string; tagId: string }[]
+  attachments: Attachment[]
 }
 
 function findExistingPayeeId(
@@ -84,7 +92,9 @@ function existingInputTagIds(
   })
 }
 
-function inputTagNames(input: CreateTransactionInput): unknown[] {
+function inputTagNames(
+  input: Pick<CreateTransactionInput, 'tagNames' | 'lines'>,
+): unknown[] {
   return [
     ...(Array.isArray(input.tagNames) ? input.tagNames : []),
     ...(Array.isArray(input.lines)
@@ -154,7 +164,10 @@ export function captureTransactionAggregate(
         )
         .get(id) as Tag,
   )
-  return { transaction, lines, payees, tags, lineTags }
+  const attachments = transaction
+    ? listAttachments(database, transaction.id)
+    : []
+  return { transaction, lines, payees, tags, lineTags, attachments }
 }
 
 export function restoreTransactionAggregate(
@@ -228,6 +241,8 @@ export function restoreTransactionAggregate(
       )
       .run(association.lineId, association.tagId)
   }
+  for (const attachment of before.attachments)
+    restoreAttachment(database, attachment)
   const beforeTagIds = new Set(before.tags.map((tag) => tag.id))
   for (const tag of after.tags) {
     if (!beforeTagIds.has(tag.id)) {
@@ -259,6 +274,7 @@ export function createTransactionUndoableCommand(
   database: Database.Database,
   input: CreateTransactionInput,
   clock: () => Date,
+  attachmentDirectory: string,
 ): UndoableCommand<
   TransactionAggregateImage,
   TransactionAggregateImage,
@@ -272,7 +288,21 @@ export function createTransactionUndoableCommand(
         [findExistingPayeeId(database, input.payeeName)],
         existingInputTagIds(database, inputTagNames(input)),
       ),
-    execute: () => createTransaction(database, input, clock),
+    execute: () => {
+      const transaction = createTransaction(database, input, clock)
+      for (const [position, attachment] of (
+        input.stagedAttachments ?? []
+      ).entries())
+        insertAttachment(
+          database,
+          transaction.id,
+          attachment,
+          attachmentDirectory,
+          clock,
+          position,
+        )
+      return getTransaction(database, transaction.id)
+    },
     captureAfter: (result, before) =>
       captureTransactionAggregate(
         database,
@@ -355,7 +385,13 @@ export function duplicateTransactionUndoableCommand(
     captureBefore: () => {
       const source = captureTransactionAggregate(database, id)
       if (!source.transaction) throw new Error('transactions.error.notFound')
-      return { ...source, transaction: null, lines: [], lineTags: [] }
+      return {
+        ...source,
+        transaction: null,
+        lines: [],
+        lineTags: [],
+        attachments: [],
+      }
     },
     execute: () => duplicateTransaction(database, id, clock),
     captureAfter: (result, before) =>

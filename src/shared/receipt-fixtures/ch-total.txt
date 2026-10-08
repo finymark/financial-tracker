@@ -1,0 +1,9 @@
+MUSTER MARKT AG
+Musterstrasse 12
+8000 Beispielstadt
+CHE-000.000.000 MWST
+KASSENZETTEL
+Artikel A                       5.40
+Artikel B                       7.10
+Total CHF                      12.50
+31.01.2025 16:08

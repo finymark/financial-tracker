@@ -43,7 +43,11 @@ import type {
   ProfileSummary,
   RenameProfileInput,
 } from './profiles'
-import type { ProfileSettings } from './settings'
+import type {
+  ProfileSettings,
+  WatchedFolderFailure,
+  WatchedFolderStatus,
+} from './settings'
 import type {
   CreateTransactionInput,
   TransactionListInput,
@@ -51,7 +55,17 @@ import type {
   Transaction,
   TransactionIdInput,
   UpdateTransactionInput,
+  DeleteTransactionInput,
 } from './transactions'
+import type {
+  Attachment,
+  AttachmentIdInput,
+  AttachmentTransactionInput,
+  AttachAttachmentInput,
+  ImportAttachmentInput,
+  OpenAttachmentInput,
+  StagedAttachment,
+} from './attachments'
 import type {
   CreateTransferInput,
   Transfer,
@@ -100,6 +114,21 @@ import type {
   RecurringTransactionIdInput,
   UpdateRecurringTransactionInput,
 } from './recurring'
+import type {
+  PhoneUploadReceivedEvent,
+  PhoneUploadStartInput,
+  PhoneUploadStartResult,
+  PhoneUploadStopInput,
+} from './phone-upload'
+import type {
+  ConfirmReceiptInput,
+  ConfirmedReceipt,
+  IntakeReceiptInput,
+  Receipt,
+  ReceiptIdInput,
+  ReceiptPrefill,
+  ReceiptPreviewInput,
+} from './receipts'
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
@@ -122,6 +151,10 @@ export const IPC_CHANNELS = {
   profilesOpen: 'profiles:open',
   profilesGetActive: 'profiles:get-active',
   profilesClose: 'profiles:close',
+  profilesPickWatchedFolder: 'profiles:pick-watched-folder',
+  profilesWatchedFolderStatus: 'profiles:watched-folder-status',
+  profilesWatchedFolderStatusChanged: 'profiles:watched-folder-status-changed',
+  profilesWatchedFolderFailure: 'profiles:watched-folder-failure',
   backupsList: 'backups:list',
   backupsRestore: 'backups:restore',
   categoriesList: 'categories:list',
@@ -152,6 +185,13 @@ export const IPC_CHANNELS = {
   transactionsCreate: 'transactions:create',
   transactionsUpdate: 'transactions:update',
   transactionsDelete: 'transactions:delete',
+  attachmentsPick: 'attachments:pick',
+  attachmentsPickCopyFolder: 'attachments:pick-copy-folder',
+  attachmentsImport: 'attachments:import',
+  attachmentsList: 'attachments:list',
+  attachmentsAttach: 'attachments:attach',
+  attachmentsRemove: 'attachments:remove',
+  attachmentsOpen: 'attachments:open',
   transfersCreate: 'transfers:create',
   transfersUpdate: 'transfers:update',
   transfersDelete: 'transfers:delete',
@@ -192,9 +232,49 @@ export const IPC_CHANNELS = {
   pendingConfirm: 'pending:confirm',
   pendingSkip: 'pending:skip',
   pendingChanged: 'pending:changed',
+  phoneUploadStart: 'phone-upload:start',
+  phoneUploadStop: 'phone-upload:stop',
+  phoneUploadReceived: 'phone-upload:received',
+  receiptsIntake: 'receipts:intake',
+  receiptsList: 'receipts:list',
+  receiptsCount: 'receipts:count',
+  receiptsDefaultAccount: 'receipts:default-account',
+  receiptsPrefill: 'receipts:prefill',
+  receiptsConfirm: 'receipts:confirm',
+  receiptsDiscard: 'receipts:discard',
+  receiptsPreview: 'receipts:preview',
+  receiptsChanged: 'receipts:changed',
 } as const
 
 export interface AppBridge {
+  phoneUpload: {
+    start(input: PhoneUploadStartInput): Promise<PhoneUploadStartResult>
+    stop(input: PhoneUploadStopInput): Promise<void>
+    onReceived(listener: (event: PhoneUploadReceivedEvent) => void): () => void
+  }
+  files: {
+    path(file: File): string
+  }
+  attachments: {
+    pick(): Promise<string[]>
+    pickCopyFolder(): Promise<string | null>
+    import(input: ImportAttachmentInput): Promise<StagedAttachment>
+    list(input: AttachmentTransactionInput): Promise<Attachment[]>
+    attach(input: AttachAttachmentInput): Promise<Attachment>
+    remove(input: AttachmentIdInput): Promise<void>
+    open(input: OpenAttachmentInput): Promise<void>
+  }
+  receipts: {
+    intake(input: IntakeReceiptInput): Promise<Receipt>
+    list(): Promise<Receipt[]>
+    count(): Promise<number>
+    defaultAccountId(): Promise<string | null>
+    prefill(input: ReceiptIdInput): Promise<ReceiptPrefill>
+    confirm(input: ConfirmReceiptInput): Promise<ConfirmedReceipt>
+    discard(input: ReceiptIdInput): Promise<Receipt>
+    preview(input: ReceiptPreviewInput): Promise<string>
+    onChanged(listener: () => void): () => void
+  }
   desktop: {
     autostartStatus(): Promise<AutostartStatus>
     setAutostart(input: SetAutostartInput): Promise<AutostartStatus>
@@ -268,7 +348,7 @@ export interface AppBridge {
     list(input?: TransactionListInput): Promise<TransactionPage>
     create(input: CreateTransactionInput): Promise<Transaction>
     update(input: UpdateTransactionInput): Promise<Transaction>
-    delete(input: TransactionIdInput): Promise<void>
+    delete(input: DeleteTransactionInput): Promise<void>
   }
   transfers: {
     create(input: CreateTransferInput): Promise<Transfer>
@@ -328,6 +408,14 @@ export interface AppBridge {
     open(input: ProfileIdInput): Promise<ActiveProfileInfo>
     getActive(): Promise<ActiveProfileInfo | null>
     close(): Promise<void>
+    pickWatchedFolder(): Promise<string | null>
+    watchedFolderStatus(): Promise<WatchedFolderStatus | null>
+    onWatchedFolderStatusChanged(
+      listener: (status: WatchedFolderStatus | null) => void,
+    ): () => void
+    onWatchedFolderFailure(
+      listener: (failure: WatchedFolderFailure) => void,
+    ): () => void
     updateSettings(input: UpdateProfileSettingsInput): Promise<ProfileSettings>
   }
 }
