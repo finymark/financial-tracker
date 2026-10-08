@@ -4,12 +4,16 @@ directories:
   output: release
 files:
   - out/**/*
+extraResources:
+  - from: build/icon.png
+    to: icon.png
 asar: true
 asarUnpack:
   - node_modules/better-sqlite3/**/*.node
 # better-sqlite3 ships a Node-API binary; do not run its legacy node-gyp script.
 npmRebuild: false
 win:
+  icon: build/icon.ico
   target:
     - target: nsis
       arch: [x64]

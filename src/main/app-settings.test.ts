@@ -1,0 +1,133 @@
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, expect, test, vi } from 'vitest'
+import { AppSettingsFile } from './app-settings'
+import { parseAutostartInput } from './desktop-ipc'
+
+const directories: string[] = []
+function temporaryUserData() {
+  const directory = mkdtempSync(
+    join(tmpdir(), 'financial-tracker-app-settings-'),
+  )
+  directories.push(directory)
+  return directory
+}
+
+afterEach(() => {
+  for (const directory of directories.splice(0))
+    rmSync(directory, { recursive: true, force: true })
+})
+
+test('notice is app-level, defaults to unseen, and persists across reopening', () => {
+  const directory = temporaryUserData()
+  const settings = new AppSettingsFile(directory)
+  expect(settings.isTrayNoticeShown()).toBe(false)
+  settings.markTrayNoticeShown()
+  expect(new AppSettingsFile(directory).isTrayNoticeShown()).toBe(true)
+  expect(
+    JSON.parse(readFileSync(join(directory, 'app-settings.json'), 'utf8')),
+  ).toEqual({ version: 1, trayNoticeShown: true })
+  expect(existsSync(join(directory, 'app-settings.json.tmp'))).toBe(false)
+})
+
+test.each([
+  'not JSON',
+  'null',
+  '[]',
+  '{}',
+  '{"version":2,"trayNoticeShown":true}',
+  '{"version":1,"trayNoticeShown":"true"}',
+  '{"version":1,"trayNoticeShown":0}',
+  '{"version":1,"trayNoticeShown":true,"profileId":"unexpected"}',
+])(
+  'rejects invalid stored settings without overwriting them: %s',
+  (contents) => {
+    const directory = temporaryUserData()
+    const path = join(directory, 'app-settings.json')
+    writeFileSync(path, contents)
+    expect(() => new AppSettingsFile(directory)).toThrow()
+    expect(readFileSync(path, 'utf8')).toBe(contents)
+  },
+)
+
+test('ignores a stale temporary file; never treats it as saved settings', () => {
+  const directory = temporaryUserData()
+  new AppSettingsFile(directory)
+  writeFileSync(
+    join(directory, 'app-settings.json.tmp'),
+    '{"version":1,"trayNoticeShown":true}',
+  )
+  expect(new AppSettingsFile(directory).isTrayNoticeShown()).toBe(false)
+})
+
+test.each(['EPERM', 'EACCES', 'EBUSY'])(
+  'retries %s atomic replacement with the original intact',
+  (code) => {
+    const directory = temporaryUserData()
+    const rename = vi.fn(renameSync)
+    const wait = vi.fn()
+    const settings = new AppSettingsFile(directory, { rename, wait })
+    const path = join(directory, 'app-settings.json')
+    const original = readFileSync(path, 'utf8')
+    rename.mockClear()
+    rename.mockImplementationOnce(() => {
+      throw Object.assign(new Error('Synthetic lock'), { code })
+    })
+    wait.mockImplementation(() => {
+      expect(readFileSync(path, 'utf8')).toBe(original)
+    })
+    settings.markTrayNoticeShown()
+    expect(rename).toHaveBeenCalledTimes(2)
+    expect(wait.mock.calls).toEqual([[10]])
+    expect(new AppSettingsFile(directory).isTrayNoticeShown()).toBe(true)
+    expect(existsSync(`${path}.tmp`)).toBe(false)
+  },
+)
+
+test.each(['EBUSY', 'EIO'])(
+  'failed %s replacement keeps the previous value and cleans the temporary file',
+  (code) => {
+    const directory = temporaryUserData()
+    const rename = vi.fn(renameSync)
+    const wait = vi.fn()
+    const settings = new AppSettingsFile(directory, { rename, wait })
+    rename.mockClear()
+    rename.mockImplementation(() => {
+      throw Object.assign(new Error('Synthetic failure'), { code })
+    })
+    expect(() => settings.markTrayNoticeShown()).toThrow('Synthetic failure')
+    expect(rename).toHaveBeenCalledTimes(code === 'EBUSY' ? 6 : 1)
+    expect(wait.mock.calls).toEqual(
+      code === 'EBUSY' ? [[10], [20], [40], [80], [160]] : [],
+    )
+    expect(new AppSettingsFile(directory).isTrayNoticeShown()).toBe(false)
+    expect(existsSync(join(directory, 'app-settings.json.tmp'))).toBe(false)
+  },
+)
+
+test.each([true, false])(
+  'autostart IPC accepts a boolean %s',
+  (openAtLogin) => {
+    expect(parseAutostartInput({ openAtLogin })).toEqual({ openAtLogin })
+  },
+)
+
+test.each([
+  null,
+  [],
+  {},
+  true,
+  { openAtLogin: 'true' },
+  { openAtLogin: 1 },
+  { openAtLogin: true, profileId: 'unexpected' },
+])('rejects malformed autostart IPC input: %j', (value) => {
+  expect(() => parseAutostartInput(value)).toThrow()
+})

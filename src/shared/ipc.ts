@@ -1,3 +1,4 @@
+import type { AutostartStatus, SetAutostartInput } from './desktop'
 import type { TransactionCsvInput } from './transaction-csv'
 import type {
   CreateTemplateInput,
@@ -89,6 +90,10 @@ import type {
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
+  desktopAutostartStatus: 'desktop:autostart-status',
+  desktopSetAutostart: 'desktop:set-autostart',
+  desktopQuickAdd: 'desktop:quick-add',
+  desktopTakeQuickAddRequest: 'desktop:take-quick-add-request',
   updatesIsReady: 'updates:is-ready',
   updatesReady: 'updates:ready',
   updatesRestart: 'updates:restart',
@@ -161,6 +166,12 @@ export const IPC_CHANNELS = {
 } as const
 
 export interface AppBridge {
+  desktop: {
+    autostartStatus(): Promise<AutostartStatus>
+    setAutostart(input: SetAutostartInput): Promise<AutostartStatus>
+    onQuickAdd(listener: () => void): () => void
+    takeQuickAddRequest(): Promise<boolean>
+  }
   reports: {
     cashFlow(input: ReportDateRangeInput): Promise<CashFlowReport>
     spendingPace(): Promise<SpendingPaceReport>
