@@ -51,22 +51,30 @@ export function setLineTags(
     .prepare('DELETE FROM transaction_line_tags WHERE line_id = ?')
     .run(lineId)
   for (const name of names) {
-    const normalizedName = tagKey(name)
-    let tag = database
-      .prepare('SELECT id FROM tags WHERE normalized_name = ?')
-      .get(normalizedName) as { id: string } | undefined
-    if (!tag) {
-      tag = { id: randomUUID() }
-      database
-        .prepare(
-          'INSERT INTO tags (id, name, normalized_name, created_at) VALUES (?, ?, ?, ?)',
-        )
-        .run(tag.id, name, normalizedName, timestamp)
-    }
+    const tag = getOrCreateTag(database, name, timestamp)
     database
       .prepare(
         'INSERT OR IGNORE INTO transaction_line_tags (line_id, tag_id) VALUES (?, ?)',
       )
       .run(lineId, tag.id)
   }
+}
+
+export function getOrCreateTag(
+  database: Database.Database,
+  name: string,
+  timestamp: string,
+): { id: string } {
+  const normalizedName = tagKey(name)
+  const existing = database
+    .prepare('SELECT id FROM tags WHERE normalized_name = ?')
+    .get(normalizedName) as { id: string } | undefined
+  if (existing) return existing
+  const tag = { id: randomUUID() }
+  database
+    .prepare(
+      'INSERT INTO tags (id, name, normalized_name, created_at) VALUES (?, ?, ?, ?)',
+    )
+    .run(tag.id, name, normalizedName, timestamp)
+  return tag
 }

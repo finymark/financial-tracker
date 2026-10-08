@@ -12,7 +12,7 @@ import type {
   TransactionPage,
   TransactionKind,
 } from '../../../../shared/transactions'
-import type { Account } from '../../../../shared/accounts'
+import type { AccountOption } from '../../../../shared/accounts'
 import type { TransactionTemplate } from '../../../../shared/templates'
 import type { PayeeSuggestion } from '../../../../shared/payees'
 import { amountInput } from '../../lib/amount-input-value'
@@ -453,7 +453,7 @@ export function TransactionDrawer({
       : undefined
   const transferAccounts = [
     ...[selectedAccount, selectedToAccount].filter(
-      (account): account is Account => Boolean(account?.archived),
+      (account): account is AccountOption => Boolean(account?.archived),
     ),
     ...accountOptions,
   ].filter(

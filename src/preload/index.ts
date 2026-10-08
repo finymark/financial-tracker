@@ -92,7 +92,8 @@ const bridge: AppBridge = {
   },
   accounts: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.accountsList),
-    listOptions: () => ipcRenderer.invoke(IPC_CHANNELS.accountsListOptions),
+    listOptions: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.accountsListOptions, input),
     create: (input) => ipcRenderer.invoke(IPC_CHANNELS.accountsCreate, input),
     rename: (input) => ipcRenderer.invoke(IPC_CHANNELS.accountsRename, input),
     changeCurrency: (input) =>

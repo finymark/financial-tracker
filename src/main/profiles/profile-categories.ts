@@ -186,6 +186,11 @@ export function deleteCategory(
   if (input.replacementId !== undefined) {
     database
       .prepare(
+        'UPDATE transaction_templates SET category_id = ? WHERE category_id = ?',
+      )
+      .run(input.replacementId, category.id)
+    database
+      .prepare(
         'UPDATE categorisation_rules SET category_id = ? WHERE category_id = ?',
       )
       .run(input.replacementId, category.id)

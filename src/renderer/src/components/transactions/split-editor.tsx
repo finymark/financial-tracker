@@ -1,5 +1,5 @@
 import { tagKey } from '../../../../shared/text-keys'
-import type { Account } from '../../../../shared/accounts'
+import type { AccountOption } from '../../../../shared/accounts'
 import type { Category } from '../../../../shared/categories'
 import type { Tag } from '../../../../shared/tags'
 import { parseAmountExpression } from '../../../../shared/amount-expression'
@@ -16,7 +16,7 @@ import type { ProtectedAutofillFields } from '../../lib/rule-autofill'
 interface SplitEditorProps {
   form: TransactionForm
   setForm(form: TransactionForm): void
-  selectedAccount?: Account
+  selectedAccount?: AccountOption
   drawerCategories: Category[]
   tags: Tag[]
   busy: boolean

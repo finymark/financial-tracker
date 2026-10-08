@@ -21,12 +21,18 @@ const errorKeys = [
 interface AccountsPageProps {
   language: Language
   t(key: MessageKey): string
+  onBusyChange(busy: boolean): void
   onChanged(): void
 }
 
 type Editing = { id: string; kind: 'rename' | 'currency' | 'delete' } | null
 
-export function AccountsPage({ language, t, onChanged }: AccountsPageProps) {
+export function AccountsPage({
+  language,
+  t,
+  onChanged,
+  onBusyChange,
+}: AccountsPageProps) {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -60,6 +66,7 @@ export function AccountsPage({ language, t, onChanged }: AccountsPageProps) {
 
   async function run(action: () => Promise<unknown>, offerUndo = true) {
     setBusy(true)
+    onBusyChange(true)
     setError(null)
     try {
       await action()
@@ -73,6 +80,7 @@ export function AccountsPage({ language, t, onChanged }: AccountsPageProps) {
       )
     } finally {
       setBusy(false)
+      onBusyChange(false)
     }
   }
 

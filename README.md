@@ -137,7 +137,11 @@ Production CSP permits only same-origin connections; localhost WebSockets are
 added only by the development server for hot reload. SQLite foreign-key
 enforcement and shared Unicode text functions are enabled when each profile
 connection opens. Financial writes use the profile application API, with each command
-executed in one SQLite transaction. SQLite is used only in the main
+executed in one SQLite transaction. Drawer and table account references use
+balance-free account options, including
+archived identities needed by historical transactions; new-transaction pickers
+filter to active accounts. The adjustment form records an observed balance and
+does not need to fetch a current balance. SQLite is used only in the main
 process. Profiles are listed in `profiles.json` under the app's user-data folder; each
 profile lives in `profiles/<id>/` (database, data folder, and backups). Registry
 writes replace the file atomically and briefly retry transient Windows file locks
@@ -308,14 +312,16 @@ not off-device copies or backups of the separate data folder.
   two decimal places; HUF displays no decimals (rounded for display only).
 - Rename accounts or change their currency while they have no transactions.
   Changing currency changes the denomination, not the amount; it is not a
-  currency conversion.
+  currency conversion. Account-scoped rule amount bounds keep their numeric
+  values and follow the new currency; undo restores both the account and rules.
 - Archive an account to hide it from account pickers without deleting it. Archived
   accounts remain visible on Accounts with their balance and opening date and can
   be unarchived.
 - Delete an account after confirming in the page. An opening balance alone does
   not prevent deletion: "empty" means no transactions.
 - Account create, rename, currency change, archive/unarchive, and delete commands
-  offer the shared Undo toast and work with `Ctrl+Z`.
+  offer the shared Undo toast and work with `Ctrl+Z`. Undo and shell navigation
+  wait while an account command is running.
 - Balances walk the dated account history and include the opening balance, income,
   expenses (including linked transfer fees), both signed transfer legs, and the
   recomputed effects of balance adjustments. Accounts with any of those movements
@@ -345,9 +351,12 @@ not off-device copies or backups of the separate data folder.
   of the same kind, not hidden by an archived parent.
 - Categories used by transaction lines require an active same-kind replacement
   when deleted. Reassignment and deletion happen atomically, so transaction
-  lines are never orphaned.
+  lines are never orphaned. Replacement also retargets rules and transaction
+  templates in the same command; undo restores all original references.
 - Category create, rename, reorder, archive/unarchive, and delete commands use
   the shared Undo toast and `Ctrl+Z`; delete undo restores replacement links.
+  Undo snapshots only affected categories and references. Reordering captures
+  sibling categories only and leaves lines, templates, and rules untouched.
 
 ## Transactions
 
@@ -389,7 +398,7 @@ not off-device copies or backups of the separate data folder.
   confirmation. Create, edit, delete, category reassignment, and balance updates
   run through the profile application command boundary in one SQLite transaction.
 - After a transaction or transfer is created, edited, or deleted, a toast offers **Undo**.
-  `Ctrl+Z` also undoes the latest transaction command unless focus is in a text
+  `Ctrl+Z` also undoes the last change unless focus is in a text
   editing control. Undo restores the transaction header, all of its lines,
   timestamps, identifiers, payee reference, and any payee created by that command
   from before/after aggregate images captured in the original write transaction.
@@ -413,6 +422,9 @@ not off-device copies or backups of the separate data folder.
   ignores case and diacritics. Amount bounds carry a currency: an account-scoped
   rule uses that account's currency; otherwise the editor defaults to the base
   currency and lets it be chosen. Other-currency transactions do not match.
+  The rule list displays bounds with that currency. Rules whose account or
+  category was later archived can still be disabled or edited; changing a
+  reference requires an active account/category.
   Actions set a payee, set a category, and/or add existing tags.
   Matching is deterministic and entirely local; it uses no AI or network service.
   Create, edit, delete, and reorder are undoable commands. Rules prefill new
@@ -445,7 +457,10 @@ uncategorized transactions. In **Settings → Categorisation rules**, create two
 rules that both match and move them up/down; verify only the first one prefills a
 new drawer. Check canonical and alias payee input, accented/unaccented text in
 the note (and verify payee text alone does not satisfy it), account and inclusive
-amount boundaries in both currencies, disabled rules, and payee-only,
+amount boundaries in both currencies and check the currency beside list bounds.
+Archive a referenced account/category, then disable and edit its rule without
+changing the archived reference; new archived references must be rejected. Check
+disabled rules and payee-only,
 category-only, and tag-only actions. With no matching rule, verify the latest
 unsplit category and tags for that payee are used; with no payee history, verify
 both stay empty. Change category/tags by hand, then alter amount, account, payee,
@@ -543,17 +558,21 @@ and light/dark themes.
 - Only the template name is required (1–100 characters). Kind, account, positive
   amount, payee, category, tags, note, and the Excluded flag are optional. The
   amount uses the shared calculator and exact integer-hundredths storage. Template
-  tags reference existing tag identities: renaming a tag updates the displayed
+  tags reference tag identities: renaming a tag updates the displayed
   template value and deleting it removes it from templates; undo restores the
-  association. Entering an unknown tag name does not create a tag. Payee text
+  association. Saving creates missing tags inline and reuses existing names
+  case-insensitively with Unicode NFC normalization, just like transaction tags.
+  Undo removes only tags created by that template command, and only if unused
+  by transactions, templates, or rules. Cancelling creates no tags. Payee text
   remains a prefill string. Creating or editing a template does not create
-  payees, tags, transactions, or balances.
+  payees, transactions, or balances.
 - Select a template and choose **Use template** to replace the drawer draft with
   a new transaction dated today. An omitted kind defaults to its category's kind
   (otherwise expense), and an omitted account uses the first active account.
   Archived references are preserved in the draft, but must be replaced with active
   choices before saving a new transaction. Deleted account/category references
-  become empty without blocking account/category deletion. Verify the draft
+  become empty without blocking account/category deletion (a category replacement
+  is retained instead when provided). Verify the draft
   before saving. A template without an amount leaves it blank, focuses the amount
   field, and requires a positive amount before the transaction can be saved.
   Every template use focuses Amount and supports Enter to save and Ctrl+Enter
@@ -577,7 +596,9 @@ Run `npm run dev`. Duplicate an included expense, an excluded expense, and an
 income from the table and drawer. Verify today's date, all values/tags, balances,
 and totals, then use the toast and Ctrl+Z to remove just the copy. In the drawer,
 create a name-only template, one with every optional field, and one without an
-amount; cancel another new template and verify no payees/tags or transactions
+amount. Save fresh tag names and case variants, check reuse and the translated
+hint, then undo create/edit and confirm only newly created unused tags disappear.
+Cancel another new template and verify no payees/tags or transactions
 were created. Save an existing transaction as a template and check unsaved edits
 are not included. Include an excluded source/template and verify the flag is
 copied into the draft and saved transaction (balance still changes; totals do not).
@@ -859,7 +880,10 @@ Rename a default and create custom main/subcategories; check their names survive
 language changes, profile switches, and restart. Move categories up/down; confirm
 only siblings move. Archive a main category and verify its subcategories are
 marked hidden too. Try deletion, cancel, then confirm with an optional same-kind
-replacement. Delete subcategories before deleting their parent. Restore a backup
+replacement. Include a transaction, template, and rule referencing the deleted
+category; verify replacement in all three and exact restoration with Undo.
+Reorder then undo while these references exist; they must not change.
+Delete subcategories before deleting their parent. Restore a backup
 and verify the category list refreshes to the restored state. Repeat in light/dark
 appearance and with keyboard navigation. UI checks are manual; application-API
 SQLite tests cover defaults, language/custom-name precedence, hierarchy, ordering,
@@ -896,7 +920,12 @@ Run `npm run dev`, open a profile, and navigate to Accounts. Create HUF and CHF
 accounts with positive, zero, and negative opening balances; confirm HUF has no
 decimals and CHF has two. Enter a comma decimal separator and verify the amount
 round-trips after restarting. Rename an account, change its currency while empty,
-archive it, and confirm it remains listed as archived. Try deleting an account,
+archive it, and confirm it remains listed as archived. Edit an existing
+transaction/transfer on archived accounts and verify the account names/currencies
+remain available while new drafts list only active accounts. Create an amount rule
+for an empty account, change its currency, verify the rule follows, and undo both.
+While an account command is in flight, Ctrl+Z and the Undo button must wait;
+after completion Undo should revert only that command. Try deleting an account,
 cancel, then confirm deletion. Switch profiles and check that accounts remain
 separate. Repeat with Hungarian/German and light/dark themes; check keyboard
 navigation, focus indicators, and validation errors. UI checks are manual.

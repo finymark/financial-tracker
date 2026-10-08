@@ -3,11 +3,13 @@ import type Database from 'better-sqlite3'
 import type {
   Account,
   AccountOption,
+  ListAccountOptionsInput,
   ChangeAccountCurrencyInput,
   CreateAccountInput,
   RenameAccountInput,
 } from '../../shared/accounts'
 import {
+  parseListAccountOptionsInput,
   validateAccountCurrency,
   validateAccountId,
   validateAccountName,
@@ -91,13 +93,18 @@ export function listAccounts(database: Database.Database): Account[] {
 
 export function listAccountOptions(
   database: Database.Database,
+  value?: ListAccountOptionsInput,
 ): AccountOption[] {
+  const input = parseListAccountOptionsInput(value)
   const accounts = database
     .prepare(
       `SELECT id, name, currency, archived FROM accounts
-       WHERE archived = 0 ORDER BY created_at, rowid`,
+       WHERE (? = 1 OR archived = 0) ORDER BY created_at, rowid`,
     )
-    .all() as (Omit<AccountOption, 'archived'> & {
+    .all(Number(input.includeArchived === true)) as (Omit<
+    AccountOption,
+    'archived'
+  > & {
     archived: number
   })[]
   return accounts.map((account) => ({
@@ -154,6 +161,12 @@ export function changeAccountCurrency(
   }
   database
     .prepare('UPDATE accounts SET currency = ? WHERE id = ?')
+    .run(currency, account.id)
+  database
+    .prepare(
+      `UPDATE categorisation_rules SET amount_currency = ?
+    WHERE account_id = ? AND amount_currency IS NOT NULL`,
+    )
     .run(currency, account.id)
   return accountView(database, getAccount(database, account.id))
 }

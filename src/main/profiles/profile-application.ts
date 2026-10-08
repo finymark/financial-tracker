@@ -43,6 +43,7 @@ import {
 import type {
   Account,
   AccountOption,
+  ListAccountOptionsInput,
   CreateAccountInput,
   RenameAccountInput,
   ChangeAccountCurrencyInput,
@@ -222,7 +223,7 @@ export interface ProfileQueries {
   listBackups(): ProfileBackup[]
   getProfileInfo(): ProfileInfo
   listAccounts(): Account[]
-  listAccountOptions(): AccountOption[]
+  listAccountOptions(input?: ListAccountOptionsInput): AccountOption[]
   getAccountBalance(id: string): number
   hasAccountTransactions(id: string): boolean
   getSettings(): ProfileSettings
@@ -997,32 +998,36 @@ class OpenProfileApplication implements ProfileApplication {
       },
       deleteCategory: (input) =>
         this.#executeUndoableCommand(
-          categoryUndoableCommand(this.#database, () =>
-            deleteCategory(this.#database, input),
+          categoryUndoableCommand(
+            this.#database,
+            { kind: 'delete', id: input.id },
+            () => deleteCategory(this.#database, input),
           ),
         ),
       reorderCategory: (input) =>
         this.#executeUndoableCommand(
-          categoryUndoableCommand(this.#database, () =>
-            reorderCategory(this.#database, input),
+          categoryUndoableCommand(
+            this.#database,
+            { kind: 'reorder', id: input.id },
+            () => reorderCategory(this.#database, input),
           ),
         ),
       archiveCategory: (id) =>
         this.#executeUndoableCommand(
-          categoryUndoableCommand(this.#database, () =>
+          categoryUndoableCommand(this.#database, { kind: 'edit', id }, () =>
             archiveCategory(this.#database, id),
           ),
         ),
       unarchiveCategory: (id) =>
         this.#executeUndoableCommand(
-          categoryUndoableCommand(this.#database, () =>
+          categoryUndoableCommand(this.#database, { kind: 'edit', id }, () =>
             unarchiveCategory(this.#database, id),
           ),
         ),
       createCategory: (input) =>
         (() => {
           const id = this.#executeUndoableCommand(
-            categoryUndoableCommand(this.#database, () =>
+            categoryUndoableCommand(this.#database, { kind: 'create' }, () =>
               createCategory(this.#database, input),
             ),
           )
@@ -1033,8 +1038,10 @@ class OpenProfileApplication implements ProfileApplication {
       renameCategory: (input) =>
         (() => {
           const id = this.#executeUndoableCommand(
-            categoryUndoableCommand(this.#database, () =>
-              renameCategory(this.#database, input),
+            categoryUndoableCommand(
+              this.#database,
+              { kind: 'edit', id: input.id },
+              () => renameCategory(this.#database, input),
             ),
           )
           return this.queries
@@ -1134,9 +1141,9 @@ class OpenProfileApplication implements ProfileApplication {
         this.#assertAvailable()
         return listAccounts(this.#database)
       },
-      listAccountOptions: () => {
+      listAccountOptions: (input) => {
         this.#assertAvailable()
-        return listAccountOptions(this.#database)
+        return listAccountOptions(this.#database, input)
       },
       getAccountBalance: (id) => {
         this.#assertAvailable()

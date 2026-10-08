@@ -8,8 +8,7 @@ export const hu = {
     'Nyitott profilban: az új tranzakció és a visszavonás szövegbevitelen kívül működik. A típusváltás és a mentés a tranzakcióablakban használható.',
   'shortcuts.navigation':
     'A Tab / Shift+Tab a mezők között lépked, és a nyitott párbeszédablakban marad.',
-  'shortcuts.undo':
-    'Legutóbbi tranzakcióművelet visszavonása (szövegbevitelen kívül)',
+  'shortcuts.undo': 'Legutóbbi módosítás visszavonása (szövegbevitelen kívül)',
   'shortcuts.close': 'Mégse / tranzakcióablak vagy billentyűsúgó bezárása',
   'shortcuts.help': 'Billentyűparancsok',
   'shortcuts.save':
@@ -256,7 +255,7 @@ export const hu = {
   'templates.optionalHint':
     'Csak a név kötelező. A többi mezőt üresen hagyhatod, és a sablon használatakor töltheted ki.',
   'templates.tagsHint':
-    'Soronként egy címkenév. A címkék csak a tranzakció rögzítésekor jönnek létre.',
+    'Soronként egy címkenév. A hiányzó címkék a sablon mentésekor jönnek létre.',
   'templates.deleteConfirmation': 'Törlöd ezt a tranzakciós sablont?',
   'templates.amountRequired':
     'A tranzakció mentése előtt adj meg egy összeget.',

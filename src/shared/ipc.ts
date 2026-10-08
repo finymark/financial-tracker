@@ -18,6 +18,7 @@ import type {
 import type {
   Account,
   AccountOption,
+  ListAccountOptionsInput,
   AccountIdInput,
   CreateAccountInput,
   RenameAccountInput,
@@ -216,7 +217,7 @@ export interface AppBridge {
   }
   accounts: {
     list(): Promise<Account[]>
-    listOptions(): Promise<AccountOption[]>
+    listOptions(input?: ListAccountOptionsInput): Promise<AccountOption[]>
     create(input: CreateAccountInput): Promise<Account>
     rename(input: RenameAccountInput): Promise<Account>
     changeCurrency(input: ChangeAccountCurrencyInput): Promise<Account>
