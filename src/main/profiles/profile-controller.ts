@@ -19,6 +19,7 @@ interface ProfileControllerOptions {
   exchangeRateSource?: ExchangeRateSource
   onRateStatusChanged?: () => void
   onPendingTransactionsChanged?: () => void
+  onReceiptInboxChanged?: () => void
   logger?: Pick<Console, 'error'>
   clock?: () => Date
 }
