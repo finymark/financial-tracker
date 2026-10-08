@@ -59,7 +59,12 @@ import { preprocessReceiptImage } from './ocr/receipt-preprocessing'
 import { TesseractOcrEngine } from './ocr/tesseract-ocr-engine'
 import { titleBarOverlay } from '../shared/window-chrome'
 import { registerWindowChromeIpc } from './window-chrome'
-import { blocksPackagedShortcut, zoomCommand } from './window-shortcuts'
+import {
+  blocksPackagedShortcut,
+  developmentWindowCommand,
+  nextZoomLevel,
+  zoomCommand,
+} from './window-shortcuts'
 
 let mainWindow: BrowserWindow | null = null
 let quickAddWindow: BrowserWindow | null = null
@@ -114,16 +119,20 @@ function createAppWindow(
       event.preventDefault()
       return
     }
+    if (!app.isPackaged) {
+      const developmentCommand = developmentWindowCommand(input)
+      if (developmentCommand) {
+        event.preventDefault()
+        if (developmentCommand === 'reload') window.webContents.reload()
+        else window.webContents.toggleDevTools()
+        return
+      }
+    }
     const command = zoomCommand(input)
     if (!command) return
     event.preventDefault()
-    if (command === 'reset') {
-      window.webContents.setZoomLevel(0)
-      return
-    }
-    const direction = command === 'in' ? 0.5 : -0.5
     window.webContents.setZoomLevel(
-      window.webContents.getZoomLevel() + direction,
+      nextZoomLevel(window.webContents.getZoomLevel(), command),
     )
   })
 

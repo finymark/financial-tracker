@@ -1,6 +1,11 @@
 import { expect, test } from 'vitest'
 
-import { blocksPackagedShortcut, zoomCommand } from './window-shortcuts'
+import {
+  blocksPackagedShortcut,
+  developmentWindowCommand,
+  nextZoomLevel,
+  zoomCommand,
+} from './window-shortcuts'
 
 function input(
   key: string,
@@ -53,3 +58,35 @@ test.each([
 ] as const)('allows unrelated packaged input: %j', (value) => {
   expect(blocksPackagedShortcut(value)).toBe(false)
 })
+
+test.each([
+  [input('r'), 'reload'],
+  [input('R', { shift: true }), 'reload'],
+  [input('i', { shift: true }), 'toggle-devtools'],
+  [input('F12', { control: false }), 'toggle-devtools'],
+] as const)('maps development window input %j to %s', (value, command) => {
+  expect(developmentWindowCommand(value)).toBe(command)
+})
+
+test.each([
+  input('i'),
+  input('r', { alt: true }),
+  input('F12', { control: false, type: 'keyUp' }),
+] as const)('ignores unrelated development window input: %j', (value) => {
+  expect(developmentWindowCommand(value)).toBeNull()
+})
+
+test.each([
+  [0, 'in', 0.5],
+  [0, 'out', -0.5],
+  [2.75, 'in', 3],
+  [3, 'in', 3],
+  [-2.75, 'out', -3],
+  [-3, 'out', -3],
+  [2, 'reset', 0],
+] as const)(
+  'clamps zoom level %s with %s to %s',
+  (level, command, expected) => {
+    expect(nextZoomLevel(level, command)).toBe(expected)
+  },
+)
