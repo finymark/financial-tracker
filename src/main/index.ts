@@ -47,6 +47,7 @@ import { desktopMessages } from '../shared/desktop-translations'
 import { startsHidden } from '../shared/desktop'
 import { QuickAddShortcut } from './global-shortcut'
 import { registerAttachmentIpc } from './profiles/attachment-ipc'
+import { registerReceiptIpc } from './profiles/receipt-ipc'
 import sharp from 'sharp'
 
 let mainWindow: BrowserWindow | null = null
@@ -260,6 +261,10 @@ function startApplication(): void {
     if (mainWindow && !mainWindow.isDestroyed())
       mainWindow.webContents.send(IPC_CHANNELS.pendingChanged)
   }
+  const onReceiptInboxChanged = () => {
+    if (mainWindow && !mainWindow.isDestroyed())
+      mainWindow.webContents.send(IPC_CHANNELS.receiptsChanged)
+  }
   const profiles = new ProfileController(
     new ProfileRegistry({ userDataDirectory: app.getPath('userData') }),
     app.getLocale(),
@@ -267,6 +272,7 @@ function startApplication(): void {
       exchangeRateSource: rateSource,
       onRateStatusChanged,
       onPendingTransactionsChanged,
+      onReceiptInboxChanged,
     },
   )
   const exchangeRates = new ExchangeRateScheduler(profiles, rateSource, {
@@ -399,6 +405,7 @@ function startApplication(): void {
   registerCategoryIpc(ipcMain, profiles)
   registerTransactionIpc(ipcMain, profiles)
   const disposeAttachmentIpc = registerAttachmentIpc(ipcMain, profiles)
+  registerReceiptIpc(ipcMain, profiles)
   registerTransactionCsvIpc(ipcMain, profiles)
   registerPayeeIpc(ipcMain, profiles)
   registerTransferIpc(ipcMain, profiles)

@@ -2,7 +2,7 @@
 
 A local-first personal expense tracker for Windows, built with Electron, React,
 TypeScript, and SQLite. The app opens to a collapsible sidebar with Overview,
-Transactions, Recurring, Reports, Accounts, and Settings pages. On start you
+Transactions, Receipt inbox, Recurring, Reports, Accounts, and Settings pages. On start you
 pick or create a profile; each profile has its own SQLite database and data
 folder. Financial data stays local. Accounts track opening balances, signed
 expense/income transactions, both legs of transfers, and target-based balance
@@ -814,6 +814,36 @@ and verify the attachment opens again.
 Build with `npx electron-builder --win nsis --publish never`, then run
 `"release/win-unpacked/Financial Tracker.exe" --smoke-test`. It must print
 `SQLite smoke test OK` followed by `Image smoke test OK` and exit successfully.
+
+## Receipt inbox
+
+- Drop JPEG, PNG, or WebP receipt photos anywhere on the main window to add
+  them to the open profile's **Receipt inbox**. PDF and other files are rejected,
+  and every photo uses the same 25 MB limit, orientation correction, and
+  2,000-pixel image bound as transaction image attachments.
+- The sidebar badge counts received and read photos. The inbox lists them oldest
+  first with a thumbnail, original name, received date, and intake source.
+- Open a receipt to view its photo beside an empty transaction form. The form
+  defaults to an expense, today's date, and the last active account used by a
+  transaction. Confirming creates the transaction with exactly that photo as its
+  attachment; discarding hides the receipt. Both decisions are undoable.
+- Inbox intake is a background write and does not replace or clear the existing
+  Undo history. Active inbox photos are retained by the attachment sweep and are
+  included in the incremental attachment backup pool and restore process.
+
+### Manual receipt-inbox check
+
+Run `npm run dev` with synthetic images only. Drop several JPEG/PNG/WebP photos
+onto the main window, verify the drop overlay, oldest-first rows, thumbnails and
+sidebar count, then restart and confirm the items persist. Open a photo, complete
+the transaction form, confirm with Enter and Ctrl+Enter, and verify the created
+transaction has exactly that photo attached. Discard another receipt and use
+Undo to return it; also undo a confirmation and verify both the transaction and
+inbox state return correctly. Drop a PDF or another non-image file and verify a
+translated rejection. With the transaction drawer open, drop an image on its
+attachment drop zone and verify it attaches to that transaction instead of
+entering the receipt inbox. Repeat in HU/EN/DE, using only the keyboard where
+applicable, and check light/dark and narrow-window layouts.
 
 ### Manual Categorisation rules check
 
