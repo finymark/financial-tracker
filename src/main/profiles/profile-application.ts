@@ -153,6 +153,17 @@ import {
   reorderCategorisationRuleUndoableCommand,
   updateCategorisationRuleUndoableCommand,
 } from './rule-undo'
+import type { ExchangeRateSource } from '../exchange-rates/exchange-rate-source'
+import type {
+  BaseCurrencyConversion,
+  ConversionLine,
+  RateStatus,
+} from '../../shared/exchange-rates'
+import {
+  convertToBaseCurrency,
+  getRateStatus,
+  refreshExchangeRates as refreshProfileExchangeRates,
+} from './profile-exchange-rates'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -207,6 +218,10 @@ export interface OpenProfileApplicationOptions {
 }
 
 export interface ProfileQueries {
+  convertToBaseCurrency(
+    lines: readonly ConversionLine[],
+  ): BaseCurrencyConversion
+  getRateStatus(): RateStatus
   listTemplates(): TransactionTemplate[]
   listCategorisationRules(): CategorisationRule[]
   getCategorisationAutofill(
@@ -230,6 +245,7 @@ export interface ProfileQueries {
 }
 
 export interface ProfileCommands {
+  refreshExchangeRates(source: ExchangeRateSource): Promise<void>
   updateTemplate(input: UpdateTemplateInput): TransactionTemplate
   deleteTemplate(id: string): void
   saveTransactionAsTemplate(
@@ -740,6 +756,33 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
       ON transaction_template_tags(tag_id, template_id);
   `,
   ),
+  defineSqlMigration(
+    17,
+    'MNB exchange-rate cache',
+    `
+    CREATE TABLE exchange_rates (
+      date TEXT NOT NULL CHECK (date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+      currency TEXT NOT NULL CHECK (currency = 'CHF'),
+      rate TEXT NOT NULL CHECK (length(rate) > 0),
+      unit INTEGER NOT NULL CHECK (typeof(unit) = 'integer' AND unit > 0),
+      PRIMARY KEY (date, currency)
+    ) WITHOUT ROWID;
+    CREATE TABLE exchange_rate_cache_metadata (
+      id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),
+      coverage_start_date TEXT,
+      coverage_end_date TEXT,
+      last_refresh_at TEXT,
+      CHECK (
+        (coverage_start_date IS NULL AND coverage_end_date IS NULL) OR
+        (coverage_start_date IS NOT NULL AND coverage_end_date IS NOT NULL AND
+          coverage_start_date <= coverage_end_date)
+      )
+    );
+    INSERT INTO exchange_rate_cache_metadata
+      (id, coverage_start_date, coverage_end_date, last_refresh_at)
+    VALUES (1, NULL, NULL, NULL);
+  `,
+  ),
 ]
 
 function validateMigrations(
@@ -880,6 +923,14 @@ class OpenProfileApplication implements ProfileApplication {
     this.#options = options
     this.#clock = options.clock ?? (() => new Date())
     this.commands = {
+      refreshExchangeRates: (source) =>
+        refreshProfileExchangeRates(
+          this.#database,
+          source,
+          this.#clock,
+          () => this.#assertAvailable(),
+          (operation) => this.#executeBackgroundWrite(operation),
+        ),
       updateTemplate: (input) =>
         this.#executeUndoableCommand(
           updateTemplateUndoableCommand(this.#database, input, this.#clock),
@@ -1077,6 +1128,14 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      convertToBaseCurrency: (lines) => {
+        this.#assertAvailable()
+        return convertToBaseCurrency(this.#database, lines, this.#clock)
+      },
+      getRateStatus: () => {
+        this.#assertAvailable()
+        return getRateStatus(this.#database, this.#clock)
+      },
       listTemplates: () => {
         this.#assertAvailable()
         return listTemplates(this.#database)
@@ -1091,7 +1150,60 @@ class OpenProfileApplication implements ProfileApplication {
       },
       listTransactions: (input) => {
         this.#assertAvailable()
-        return listTransactions(this.#database, input, this.#clock)
+        const page = listTransactions(this.#database, input, this.#clock)
+        const expense = convertToBaseCurrency(
+          this.#database,
+          page.days.flatMap((day) =>
+            day.totals.map((total) => ({
+              date: day.date,
+              currency: total.currency,
+              amountMinor: total.expenseMinor,
+            })),
+          ),
+          this.#clock,
+        )
+        const income = convertToBaseCurrency(
+          this.#database,
+          page.days.flatMap((day) =>
+            day.totals.map((total) => ({
+              date: day.date,
+              currency: total.currency,
+              amountMinor: total.incomeMinor,
+            })),
+          ),
+          this.#clock,
+        )
+        const unconverted = new Map<
+          (typeof expense.unconverted)[number]['currency'],
+          { expenseMinor: number; incomeMinor: number }
+        >()
+        for (const item of expense.unconverted)
+          unconverted.set(item.currency, {
+            expenseMinor: item.amountMinor,
+            incomeMinor: 0,
+          })
+        for (const item of income.unconverted) {
+          const current = unconverted.get(item.currency) ?? {
+            expenseMinor: 0,
+            incomeMinor: 0,
+          }
+          current.incomeMinor = item.amountMinor
+          unconverted.set(item.currency, current)
+        }
+        return {
+          ...page,
+          baseTotals: {
+            currency: expense.baseCurrency,
+            expenseMinor: expense.roundedMinor,
+            incomeMinor: income.roundedMinor,
+            unconverted: [...unconverted.entries()]
+              .map(([currency, totals]) => ({ currency, ...totals }))
+              .sort((left, right) =>
+                left.currency.localeCompare(right.currency),
+              ),
+            stale: expense.stale || income.stale,
+          },
+        }
       },
       listTags: () => {
         this.#assertAvailable()
@@ -1288,6 +1400,13 @@ class OpenProfileApplication implements ProfileApplication {
     // undo. New undoable command families should use UndoHistory.execute.
     this.#undoHistory.clear()
     return result
+  }
+
+  #executeBackgroundWrite(operation: () => void): void {
+    this.#assertAvailable()
+    // Cache maintenance is not a user-data command. It must neither be
+    // undoable nor invalidate user-data images already in the undo history.
+    this.#database.transaction(operation)()
   }
 
   #executeUndoableCommand<BeforeImage, AfterImage, Result>(

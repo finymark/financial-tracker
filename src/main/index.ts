@@ -19,6 +19,12 @@ import { registerBalanceAdjustmentIpc } from './profiles/adjustment-ipc'
 import { ProfileRegistry } from './profiles/profile-registry'
 import { registerIpcHandler } from './ipc'
 import { registerCategorisationRuleIpc } from './profiles/rule-ipc'
+import { registerExchangeRateIpc } from './profiles/exchange-rate-ipc'
+import {
+  createElectronNetTransport,
+  MnbExchangeRateSource,
+} from './exchange-rates/mnb-source'
+import { ExchangeRateScheduler } from './exchange-rates/exchange-rate-scheduler'
 
 const APP_ID = 'com.finymark.financial-tracker'
 const APP_NAME = 'Financial Tracker'
@@ -84,13 +90,27 @@ void app.whenReady().then(() => {
     new ProfileRegistry({ userDataDirectory: app.getPath('userData') }),
     app.getLocale(),
   )
+  let window: BrowserWindow | null = null
+  const exchangeRates = new ExchangeRateScheduler(
+    profiles,
+    new MnbExchangeRateSource(createElectronNetTransport()),
+    {
+      onStatusChanged: () => {
+        if (window && !window.isDestroyed())
+          window.webContents.send(IPC_CHANNELS.ratesStatusChanged)
+      },
+    },
+  )
+  exchangeRates.start()
 
   registerIpcHandler(
     ipcMain,
     IPC_CHANNELS.getVersion,
     (): Awaited<ReturnType<AppBridge['getVersion']>> => app.getVersion(),
   )
-  registerProfileIpc(ipcMain, profiles)
+  registerProfileIpc(ipcMain, profiles, () => {
+    void exchangeRates.refreshActive()
+  })
   registerAccountIpc(ipcMain, profiles)
   registerCategoryIpc(ipcMain, profiles)
   registerTransactionIpc(ipcMain, profiles)
@@ -101,10 +121,12 @@ void app.whenReady().then(() => {
   registerTagIpc(ipcMain, profiles)
   registerCategorisationRuleIpc(ipcMain, profiles)
   registerTemplateIpc(ipcMain, profiles)
+  registerExchangeRateIpc(ipcMain, profiles)
 
   let shutdownPromise: Promise<void> | null = null
   let shutdownComplete = false
   function shutdown(): Promise<void> {
+    exchangeRates.stop()
     shutdownPromise ??= profiles.shutdown().then(() => {
       shutdownComplete = true
     })
@@ -115,11 +137,13 @@ void app.whenReady().then(() => {
     event.preventDefault()
     void shutdown().then(() => app.quit())
   })
-  const window = createWindow()
+  window = createWindow()
   registerUpdates(ipcMain, window, app.isPackaged, shutdown, async () => {
     shutdownPromise = null
     shutdownComplete = false
     await profiles.recoverFromFailedShutdown()
+    exchangeRates.start()
+    void exchangeRates.refreshActive()
   })
 })
 

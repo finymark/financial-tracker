@@ -16,7 +16,11 @@ import { CardContent } from './components/ui/card'
 import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
 import type { Language, MessageKey } from './i18n'
-import { TransactionTable, Totals } from './components/transaction-table'
+import {
+  BaseCurrencyTotals,
+  TransactionTable,
+  Totals,
+} from './components/transaction-table'
 import { TransactionDrawer } from './components/transactions/transaction-drawer'
 import { TagManager } from './components/transactions/tag-manager'
 import {
@@ -51,6 +55,13 @@ export function TransactionsPage({
     totals: [],
     days: [],
     totalCount: 0,
+    baseTotals: {
+      currency: baseCurrency,
+      expenseMinor: 0,
+      incomeMinor: 0,
+      unconverted: [],
+      stale: false,
+    },
   })
   const [request, setRequest] = useState<TransactionListInput>({
     period: 'all',
@@ -406,7 +417,14 @@ export function TransactionsPage({
                 {t('transactions.filteredTotals')} · {page.totalCount}{' '}
                 {t('transactions.matches')}
               </span>
-              <Totals totals={page.totals} language={language} t={t} />
+              <span className="inline-flex flex-col items-end gap-1">
+                <Totals totals={page.totals} language={language} t={t} />
+                <BaseCurrencyTotals
+                  totals={page.baseTotals}
+                  language={language}
+                  t={t}
+                />
+              </span>
             </div>
             {page.rows.length === 0 ? (
               <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">

@@ -20,6 +20,7 @@ import type {
 } from '../../../shared/transactions'
 import type { Transfer } from '../../../shared/transfers'
 import type { BalanceAdjustment } from '../../../shared/adjustments'
+import type { BaseCurrencyTransactionTotals } from '../../../shared/exchange-rates'
 import { createFormatters, type Language, type MessageKey } from '../i18n'
 import { Button } from './ui/button'
 
@@ -56,6 +57,38 @@ export function Totals({
           {format.money(total.incomeMinor, total.currency)}
         </span>
       ))}
+    </span>
+  )
+}
+
+export function BaseCurrencyTotals({
+  totals,
+  language,
+  t,
+}: Pick<Props, 'language' | 't'> & {
+  totals: BaseCurrencyTransactionTotals
+}) {
+  return (
+    <span className="inline-flex flex-wrap justify-end gap-x-2 gap-y-1 text-xs text-muted-foreground">
+      <span>{t('transactions.baseTotal')}:</span>
+      <Totals
+        totals={[
+          {
+            currency: totals.currency,
+            expenseMinor: totals.expenseMinor,
+            incomeMinor: totals.incomeMinor,
+          },
+        ]}
+        language={language}
+        t={t}
+      />
+      {totals.unconverted.map((item) => (
+        <span key={item.currency} className="inline-flex gap-1">
+          {t('transactions.unconverted')}:
+          <Totals totals={[item]} language={language} t={t} />
+        </span>
+      ))}
+      {totals.stale && <span>({t('transactions.provisional')})</span>}
     </span>
   )
 }
