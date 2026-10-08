@@ -1224,13 +1224,10 @@ async function createVerifiedBackup(
   }
 }
 
-function removeDatabaseFiles(databasePath: string): void {
-  for (const path of [
-    databasePath,
-    `${databasePath}-wal`,
-    `${databasePath}-shm`,
-  ]) {
-    rmSync(path, { force: true })
+// A leftover journal beside a replaced database file could be applied to it.
+function removeDatabaseSidecarFiles(databasePath: string): void {
+  for (const suffix of ['-journal', '-wal', '-shm']) {
+    rmSync(`${databasePath}${suffix}`, { force: true })
   }
 }
 
@@ -1917,8 +1914,7 @@ class OpenProfileApplication implements ProfileApplication {
       this.#database.close()
       recoveryNeeded = true
       try {
-        rmSync(`${paths.databasePath}-wal`, { force: true })
-        rmSync(`${paths.databasePath}-shm`, { force: true })
+        removeDatabaseSidecarFiles(paths.databasePath)
         renameSync(stagedPath, paths.databasePath)
         this.#database = await openProfileDatabase(this.#options)
         this.#validateIdentity(this.#database)
@@ -1932,8 +1928,7 @@ class OpenProfileApplication implements ProfileApplication {
       } catch (error) {
         try {
           if (this.#database.open) this.#database.close()
-          rmSync(`${paths.databasePath}-wal`, { force: true })
-          rmSync(`${paths.databasePath}-shm`, { force: true })
+          removeDatabaseSidecarFiles(paths.databasePath)
           copyFileSync(recoveryPath, stagedPath)
           renameSync(stagedPath, paths.databasePath)
           this.#database = openDatabase(paths.databasePath)
@@ -2260,11 +2255,13 @@ async function openProfileDatabase(
         })()
       } catch (error) {
         database.close()
+        // Sidecars go first: if their removal fails, the rolled-back database
+        // file is still in place and the next open retries the migration.
+        removeDatabaseSidecarFiles(options.paths.databasePath)
         if (backupPath) {
-          removeDatabaseFiles(options.paths.databasePath)
           copyFileSync(backupPath, options.paths.databasePath)
         } else {
-          removeDatabaseFiles(options.paths.databasePath)
+          rmSync(options.paths.databasePath, { force: true })
         }
         throw new MigrationError(migration, backupPath, error)
       }
