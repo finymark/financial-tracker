@@ -302,7 +302,7 @@ not off-device copies or backups of the separate data folder.
   switches profiles. Accounts lists active and archived accounts with balances in
   their own currency. Transactions provides a filterable, virtualised table and a
   right-side create/edit drawer. Reports provides base-currency expense totals by
-  main category and subcategory; Overview remains a placeholder.
+  main category and subcategory plus spending pace; Overview remains a placeholder.
 
 ## Exchange rates and base-currency conversion
 
@@ -340,6 +340,42 @@ not off-device copies or backups of the separate data folder.
 - Switch between pie and bar charts. Choose a main category to see its direct
   lines and subcategories, then open Transactions with that category and the
   inclusive report range applied.
+- **Spending pace** is a separate section, independent of the category date-range
+  filter. It compares expenses from the first of this month through today with
+  the average of the previous three calendar months, each cut at today’s day of
+  month and clamped to that month’s length. Empty months still count in the
+  three-month average. The query uses the application clock.
+- Total and main-category comparisons show this month, the exact three-month
+  average, and ahead/behind by amount and percentage. Uncategorized and
+  historical-only categories stay visible. The average and difference are
+  computed from exact converted amounts and rounded once; percentages use the
+  exact average, not its rounded display value. A zero average has no percentage
+  baseline. Ahead/behind is determined before rounding, so a tiny difference can
+  display as zero while its percentage remains nonzero.
+- The pace chart compares current spending with the average using theme tokens.
+  Affected months retain explicit unconverted currency buckets and make the
+  comparison partial; provisional rates remain flagged. **Refresh pace** reloads
+  the comparison, and background exchange-rate updates refresh it automatically.
+
+### Manual Reports and charts check
+
+Run `npm run dev` with synthetic HUF/CHF expenses across this month and the prior
+three months. In Reports, check pie/bar category drill-down and custom ranges,
+then scroll to **Spending pace**. Verify its current-month dates stay independent
+of the category range. Check total and main-category current/average amounts,
+ahead/behind amount and percent, split parts, uncategorized lines, categories
+used only in earlier months, empty months, and zero baselines. Include expenses
+at both window endpoints and just after the same day in earlier months; check
+31st-day comparisons include February’s last day and 30-day months’ last day.
+Include excluded expenses, income, transfers, and adjustments and verify they
+never inflate pace. Test an offline/missing-rate month: its currency bucket must
+be visible, the total/category comparison marked partial, and cached provisional
+rates flagged. Refresh rates and pace and verify the numbers update. Repeat in
+HU/EN/DE, light/dark themes, and with keyboard navigation; check bar labels,
+tooltip currency formatting/contrast, and narrow-window table scrolling. Charts
+remain manual checks; temporary SQLite profile-application tests cover the pace
+query, injected clock, leap/non-leap clamping, grouping/exclusions, and exact
+conversion/rounding.
 
 ## Accounts
 

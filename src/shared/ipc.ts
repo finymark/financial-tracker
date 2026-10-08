@@ -78,7 +78,11 @@ import type {
   UpdateCategorisationRuleInput,
 } from './rules'
 import type { RateStatus } from './exchange-rates'
-import type { CategoryBreakdownReport, ReportDateRangeInput } from './reports'
+import type {
+  CategoryBreakdownReport,
+  ReportDateRangeInput,
+  SpendingPaceReport,
+} from './reports'
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
@@ -147,10 +151,12 @@ export const IPC_CHANNELS = {
   ratesStatus: 'rates:status',
   ratesStatusChanged: 'rates:status-changed',
   reportsCategoryBreakdown: 'reports:category-breakdown',
+  reportsSpendingPace: 'reports:spending-pace',
 } as const
 
 export interface AppBridge {
   reports: {
+    spendingPace(): Promise<SpendingPaceReport>
     categoryBreakdown(
       input: ReportDateRangeInput,
     ): Promise<CategoryBreakdownReport>

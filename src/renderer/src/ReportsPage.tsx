@@ -18,6 +18,7 @@ import type {
   ReportDateRangeInput,
   ReportPeriod,
 } from '../../shared/reports'
+import { SpendingPaceSection } from './SpendingPaceSection'
 import { Button } from './components/ui/button'
 import { CardContent } from './components/ui/card'
 import { Input } from './components/ui/input'
@@ -449,6 +450,7 @@ export function ReportsPage({
           </section>
         </>
       )}
+      <SpendingPaceSection language={language} t={t} />
     </CardContent>
   )
 }

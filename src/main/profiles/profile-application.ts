@@ -168,6 +168,7 @@ import {
 } from './profile-exchange-rates'
 import type {
   CategoryBreakdownReport,
+  SpendingPaceReport,
   ReportDateRangeInput,
 } from '../../shared/reports'
 import {
@@ -175,6 +176,7 @@ import {
   resolveReportDateRange,
 } from './report-validation'
 import { getCategoryBreakdown } from './profile-reports'
+import { getSpendingPace } from './profile-report-pace'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -229,6 +231,7 @@ export interface OpenProfileApplicationOptions {
 }
 
 export interface ProfileQueries {
+  getSpendingPace(): SpendingPaceReport
   getCategoryBreakdown(input: ReportDateRangeInput): CategoryBreakdownReport
   convertToBaseCurrency(
     lines: readonly ConversionLine[],
@@ -1141,6 +1144,12 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      getSpendingPace: () => {
+        this.#assertAvailable()
+        return this.#database.transaction(() =>
+          getSpendingPace(this.#database, this.#clock),
+        )()
+      },
       getCategoryBreakdown: (input) => {
         this.#assertAvailable()
         const range = resolveReportDateRange(
