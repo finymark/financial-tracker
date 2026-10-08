@@ -319,6 +319,12 @@ not pruned. These are local backups, not off-device copies.
 - The system theme follows Windows through `prefers-color-scheme`, using
   Electron's default system `nativeTheme`. Explicit light/dark modes override
   that preference in the renderer, including native form controls.
+- Help hints: a small "?" button (`components/ui/help-hint.tsx`) next to every
+  page header, section heading and non-obvious field or action explains what it
+  is and what to do. Hover or keyboard focus shows the tooltip, click/Enter/Space
+  pins it, Esc or blur closes it; its text is the button's accessible
+  description. Texts live under `help.*` in the HU/EN/DE catalogs. Obvious
+  fields (names, dates) intentionally have no hint.
 - A small typed i18n module uses HU/EN/DE catalogs in
   `src/renderer/src/i18n/`, without a runtime library. `createFormatters` uses
   `Intl` with `hu-HU`, `en-GB`, and `de-DE` for dates and numbers. The
@@ -1488,6 +1494,34 @@ Windows' app color mode and verify the shell follows it. Explicit Light/Dark
 must stay unchanged when Windows changes. Check keyboard navigation and focus
 indicators with both sidebar sizes. UI behavior is checked manually, not by the
 automated test suite.
+
+### Manual help-hints check
+
+Run `npm run dev` with synthetic data only (set `APPDATA` to a temporary folder
+to keep it apart from real profiles). Repeat in HU/EN/DE, light/dark themes,
+narrow and wide windows, and with transaction drawers and dialogs open. Visit
+the profile picker, every page and report view, every Settings section and the
+Quick Add window; verify each heading and non-obvious field/action has one
+uncluttered question-mark hint (including Privacy mode, exchange-rate status,
+base currency, formatting preview, and the Quick Add amount and tag fields),
+while obvious fields such as names and dates do not. Read every text for
+factual accuracy against the feature it explains.
+
+Hover each hint and focus it with Tab: the translated tooltip must appear without
+moving focus or shifting the surrounding layout. Click it and activate it with
+Enter and Space to pin and toggle it; unpinned pointer leave, blur and Esc must
+close it. In a transaction drawer, Enter or Space on the hint must not save, and
+Esc on an open hint must close only the hint. With a hint focused, press `?` and
+verify the keyboard-shortcut dialog opens exactly once and returns focus correctly.
+
+Check hints near every window edge, after scrolling, and in narrow drawers and
+dialogs: tooltips must flip or shift inside the window, stay below the themed
+title strip without overlapping the native minimize, maximize or close buttons,
+remain above modal content, use the light/dark card tokens, and never block
+typing or pointer use. With a screen reader, verify each button is announced as
+“Help: <topic>” in the active language and its tooltip text is read as the
+description. Confirm focus traps still contain the hint buttons and no tooltip
+itself receives focus.
 
 ### Manual backup check
 
