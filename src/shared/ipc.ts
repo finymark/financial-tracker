@@ -43,7 +43,11 @@ import type {
   ProfileSummary,
   RenameProfileInput,
 } from './profiles'
-import type { ProfileSettings } from './settings'
+import type {
+  ProfileSettings,
+  WatchedFolderFailure,
+  WatchedFolderStatus,
+} from './settings'
 import type {
   CreateTransactionInput,
   TransactionListInput,
@@ -111,6 +115,12 @@ import type {
   UpdateRecurringTransactionInput,
 } from './recurring'
 import type {
+  PhoneUploadReceivedEvent,
+  PhoneUploadStartInput,
+  PhoneUploadStartResult,
+  PhoneUploadStopInput,
+} from './phone-upload'
+import type {
   ConfirmReceiptInput,
   ConfirmedReceipt,
   IntakeReceiptInput,
@@ -140,6 +150,10 @@ export const IPC_CHANNELS = {
   profilesOpen: 'profiles:open',
   profilesGetActive: 'profiles:get-active',
   profilesClose: 'profiles:close',
+  profilesPickWatchedFolder: 'profiles:pick-watched-folder',
+  profilesWatchedFolderStatus: 'profiles:watched-folder-status',
+  profilesWatchedFolderStatusChanged: 'profiles:watched-folder-status-changed',
+  profilesWatchedFolderFailure: 'profiles:watched-folder-failure',
   backupsList: 'backups:list',
   backupsRestore: 'backups:restore',
   categoriesList: 'categories:list',
@@ -217,6 +231,9 @@ export const IPC_CHANNELS = {
   pendingConfirm: 'pending:confirm',
   pendingSkip: 'pending:skip',
   pendingChanged: 'pending:changed',
+  phoneUploadStart: 'phone-upload:start',
+  phoneUploadStop: 'phone-upload:stop',
+  phoneUploadReceived: 'phone-upload:received',
   receiptsIntake: 'receipts:intake',
   receiptsList: 'receipts:list',
   receiptsCount: 'receipts:count',
@@ -228,6 +245,11 @@ export const IPC_CHANNELS = {
 } as const
 
 export interface AppBridge {
+  phoneUpload: {
+    start(input: PhoneUploadStartInput): Promise<PhoneUploadStartResult>
+    stop(input: PhoneUploadStopInput): Promise<void>
+    onReceived(listener: (event: PhoneUploadReceivedEvent) => void): () => void
+  }
   files: {
     path(file: File): string
   }
@@ -383,6 +405,14 @@ export interface AppBridge {
     open(input: ProfileIdInput): Promise<ActiveProfileInfo>
     getActive(): Promise<ActiveProfileInfo | null>
     close(): Promise<void>
+    pickWatchedFolder(): Promise<string | null>
+    watchedFolderStatus(): Promise<WatchedFolderStatus | null>
+    onWatchedFolderStatusChanged(
+      listener: (status: WatchedFolderStatus | null) => void,
+    ): () => void
+    onWatchedFolderFailure(
+      listener: (failure: WatchedFolderFailure) => void,
+    ): () => void
     updateSettings(input: UpdateProfileSettingsInput): Promise<ProfileSettings>
   }
 }

@@ -1,7 +1,24 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
+import type {
+  WatchedFolderFailure,
+  WatchedFolderStatus,
+} from '../shared/settings'
 
 const bridge: AppBridge = {
+  phoneUpload: {
+    start: (input) => ipcRenderer.invoke(IPC_CHANNELS.phoneUploadStart, input),
+    stop: (input) => ipcRenderer.invoke(IPC_CHANNELS.phoneUploadStop, input),
+    onReceived: (listener) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        received: Parameters<typeof listener>[0],
+      ) => listener(received)
+      ipcRenderer.on(IPC_CHANNELS.phoneUploadReceived, handler)
+      return () =>
+        ipcRenderer.removeListener(IPC_CHANNELS.phoneUploadReceived, handler)
+    },
+  },
   files: {
     path: (file) => webUtils.getPathForFile(file),
   },
@@ -209,6 +226,34 @@ const bridge: AppBridge = {
     open: (input) => ipcRenderer.invoke(IPC_CHANNELS.profilesOpen, input),
     getActive: () => ipcRenderer.invoke(IPC_CHANNELS.profilesGetActive),
     close: () => ipcRenderer.invoke(IPC_CHANNELS.profilesClose),
+    pickWatchedFolder: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.profilesPickWatchedFolder),
+    watchedFolderStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.profilesWatchedFolderStatus),
+    onWatchedFolderStatusChanged: (listener) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        status: WatchedFolderStatus | null,
+      ) => listener(status)
+      ipcRenderer.on(IPC_CHANNELS.profilesWatchedFolderStatusChanged, handler)
+      return () =>
+        ipcRenderer.removeListener(
+          IPC_CHANNELS.profilesWatchedFolderStatusChanged,
+          handler,
+        )
+    },
+    onWatchedFolderFailure: (listener) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        failure: WatchedFolderFailure,
+      ) => listener(failure)
+      ipcRenderer.on(IPC_CHANNELS.profilesWatchedFolderFailure, handler)
+      return () =>
+        ipcRenderer.removeListener(
+          IPC_CHANNELS.profilesWatchedFolderFailure,
+          handler,
+        )
+    },
     updateSettings: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.profilesUpdateSettings, input),
   },

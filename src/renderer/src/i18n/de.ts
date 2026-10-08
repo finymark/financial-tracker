@@ -649,11 +649,24 @@ export const de = {
     'Dieses Konto hat Transaktionen und kann nicht gelöscht werden. Archiviere es stattdessen.',
   'settings.title': 'Fühl dich wie zu Hause',
   'settings.description':
-    'Sprache, Darstellung und Basiswährung werden für dieses Profil gespeichert und sofort übernommen.',
+    'Sprache, Darstellung, Basiswährung und Belegeingang werden für dieses Profil gespeichert und sofort übernommen.',
   'settings.baseCurrency': 'Basiswährung',
   'settings.version': 'App-Version',
   'settings.error':
     'Die Einstellungen konnten nicht gespeichert werden. Bitte versuche es erneut.',
+  'watchedFolder.title': 'Überwachter Ordner',
+  'watchedFolder.hint':
+    'Jeder lokale Ordner funktioniert, auch ein mit Google Drive für Desktop oder OneDrive synchronisierter Ordner. Vollständig übertragene Belegfotos werden in den Unterordner feldolgozott verschoben.',
+  'watchedFolder.current': 'Aktueller Ordner',
+  'watchedFolder.none': 'Kein Ordner ausgewählt',
+  'watchedFolder.status': 'Status',
+  'watchedFolder.status.watching': 'Wird überwacht',
+  'watchedFolder.status.unavailable': 'Ordner nicht verfügbar',
+  'watchedFolder.choose': 'Ordner auswählen',
+  'watchedFolder.clear': 'Entfernen',
+  'watchedFolder.intakeFailure':
+    'Ein überwachtes Belegfoto konnte nicht hinzugefügt werden',
+  'watchedFolder.dismissFailure': 'Schließen',
   'backups.title': 'Sicherungen',
   'backups.description':
     'Bei jedem Öffnen dieses Profils wird die Datenbank gesichert. Die letzten 10 Startsicherungen bleiben erhalten; Sicherungen vor Migrationen werden getrennt gespeichert.',
@@ -696,4 +709,20 @@ export const de = {
   'settings.preview': 'Formatierungsvorschau',
   'settings.date': 'Datum',
   'settings.number': 'Zahl',
+  'phoneUpload.title': 'Vom Handy hochladen',
+  'phoneUpload.starting': 'Privater Netzwerk-Upload wird gestartet…',
+  'phoneUpload.noPrivateNetwork':
+    'Keine Verbindung mit einem privaten Netzwerk. Verbinde diesen PC mit deinem privaten WLAN und versuche es erneut.',
+  'phoneUpload.error':
+    'Der Handy-Upload konnte nicht gestartet werden. Versuche es erneut.',
+  'phoneUpload.interface': 'Private Netzwerkverbindung',
+  'phoneUpload.qrAlt': 'QR-Code für die Handy-Upload-Adresse',
+  'phoneUpload.address': 'Oder öffne diese Adresse auf dem Handy',
+  'phoneUpload.expiresIn': 'Automatischer Stopp in {time}',
+  'phoneUpload.expired': 'Diese Upload-Sitzung wurde beendet.',
+  'phoneUpload.uploaded': '{count} hochgeladen',
+  'phoneUpload.firewallTitle': 'Windows-Firewall',
+  'phoneUpload.firewallGuidance':
+    'Windows fragt möglicherweise nach einer Freigabe für „Financial Tracker“. Erlaube sie nur in privaten Netzwerken. Wenn das Handy keine Verbindung herstellen kann, müssen beide Geräte dasselbe WLAN verwenden und das Windows-Netzwerk muss auf Privat eingestellt sein.',
+  'phoneUpload.close': 'Schließen',
 } satisfies MessageCatalog

@@ -64,7 +64,7 @@ jobs:
           $log = Join-Path $env:RUNNER_TEMP 'native-smoke.log'
           $process = Start-Process -FilePath $exe -ArgumentList '--smoke-test' -Wait -PassThru -RedirectStandardOutput $log
           Get-Content $log
-          if ($process.ExitCode -ne 0 -or !(Select-String -Path $log -SimpleMatch 'SQLite smoke test OK' -Quiet) -or !(Select-String -Path $log -SimpleMatch 'Image smoke test OK' -Quiet) -or !(Select-String -Path $log -SimpleMatch 'OCR smoke test OK' -Quiet)) {
+          if ($process.ExitCode -ne 0 -or !(Select-String -Path $log -SimpleMatch 'SQLite smoke test OK' -Quiet) -or !(Select-String -Path $log -SimpleMatch 'Image smoke test OK' -Quiet) -or !(Select-String -Path $log -SimpleMatch 'QR smoke test OK' -Quiet) -or !(Select-String -Path $log -SimpleMatch 'OCR smoke test OK' -Quiet)) {
             throw 'Packaged native module smoke test failed'
           }
 

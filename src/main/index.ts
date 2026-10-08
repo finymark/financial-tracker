@@ -17,6 +17,10 @@ import { registerUpdates } from './updates'
 import { openDatabase } from './db'
 import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 import { ProfileController } from './profiles/profile-controller'
+import type {
+  WatchedFolderFailure,
+  WatchedFolderStatus,
+} from '../shared/settings'
 import { registerCategoryIpc } from './profiles/category-ipc'
 import { registerAccountIpc } from './profiles/account-ipc'
 import { registerProfileIpc } from './profiles/profile-ipc'
@@ -48,6 +52,7 @@ import { startsHidden } from '../shared/desktop'
 import { QuickAddShortcut } from './global-shortcut'
 import { registerAttachmentIpc } from './profiles/attachment-ipc'
 import { registerReceiptIpc } from './profiles/receipt-ipc'
+import { registerPhoneUploadIpc, renderPhoneUploadQr } from './phone-upload-ipc'
 import sharp from 'sharp'
 import { preprocessReceiptImage } from './ocr/receipt-preprocessing'
 import { TesseractOcrEngine } from './ocr/tesseract-ocr-engine'
@@ -218,6 +223,12 @@ async function smokeTest(): Promise<void> {
     } finally {
       await ocr.dispose()
     }
+    const qrDataUrl = await renderPhoneUploadQr(
+      `http://192.168.1.2:12345/u/${'a'.repeat(43)}`,
+    )
+    if (!qrDataUrl.startsWith('data:image/png;base64,'))
+      throw new Error('QR rendering failed')
+    console.log('QR smoke test OK')
     exitCode = 0
   } catch (error) {
     console.error('Smoke test FAILED', error)
@@ -289,6 +300,20 @@ function startApplication(): void {
     if (mainWindow && !mainWindow.isDestroyed())
       mainWindow.webContents.send(IPC_CHANNELS.receiptsChanged)
   }
+  const onWatchedFolderStatusChanged = (status: WatchedFolderStatus | null) => {
+    if (mainWindow && !mainWindow.isDestroyed())
+      mainWindow.webContents.send(
+        IPC_CHANNELS.profilesWatchedFolderStatusChanged,
+        status,
+      )
+  }
+  const onWatchedFolderFailure = (failure: WatchedFolderFailure) => {
+    if (mainWindow && !mainWindow.isDestroyed())
+      mainWindow.webContents.send(
+        IPC_CHANNELS.profilesWatchedFolderFailure,
+        failure,
+      )
+  }
   const profiles = new ProfileController(
     new ProfileRegistry({ userDataDirectory: app.getPath('userData') }),
     app.getLocale(),
@@ -297,6 +322,8 @@ function startApplication(): void {
       onRateStatusChanged,
       onPendingTransactionsChanged,
       onReceiptInboxChanged,
+      onWatchedFolderStatusChanged,
+      onWatchedFolderFailure,
     },
   )
   const exchangeRates = new ExchangeRateScheduler(profiles, rateSource, {
@@ -407,6 +434,26 @@ function startApplication(): void {
     IPC_CHANNELS.getVersion,
     (): Awaited<ReturnType<AppBridge['getVersion']>> => app.getVersion(),
   )
+  const phoneUpload = registerPhoneUploadIpc(ipcMain, {
+    getActiveProfile: () => {
+      const active = profiles.getActive()
+      if (!active) throw new Error('No profile is open')
+      const application = profiles.getActiveApplication()
+      return {
+        id: active.id,
+        language: active.settings.language,
+        intake: (input, source) =>
+          application.commands.intakeReceipt(
+            { bytes: input.bytes, name: input.name },
+            source,
+          ),
+      }
+    },
+    onReceived: (received) => {
+      if (mainWindow && !mainWindow.isDestroyed())
+        mainWindow.webContents.send(IPC_CHANNELS.phoneUploadReceived, received)
+    },
+  })
   registerProfileIpc(
     ipcMain,
     profiles,
@@ -424,6 +471,7 @@ function startApplication(): void {
       if (quickAddWindow && !quickAddWindow.isDestroyed())
         quickAddWindow.webContents.send(IPC_CHANNELS.desktopProfileChanged)
     },
+    () => phoneUpload.stop(),
   )
   registerAccountIpc(ipcMain, profiles)
   registerCategoryIpc(ipcMain, profiles)
@@ -447,9 +495,12 @@ function startApplication(): void {
   function shutdown(): Promise<void> {
     exchangeRates.stop()
     recurring.stop()
-    shutdownPromise ??= profiles.shutdown().then(() => {
-      shutdownComplete = true
-    })
+    shutdownPromise ??= phoneUpload
+      .stop()
+      .then(() => profiles.shutdown())
+      .then(() => {
+        shutdownComplete = true
+      })
     return shutdownPromise
   }
   app.on('before-quit', (event) => {
