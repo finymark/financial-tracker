@@ -77,6 +77,7 @@ import type {
   ReorderCategorisationRuleInput,
   UpdateCategorisationRuleInput,
 } from './rules'
+import type { RateStatus } from './exchange-rates'
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
@@ -142,9 +143,15 @@ export const IPC_CHANNELS = {
   rulesUpdate: 'rules:update',
   rulesReorder: 'rules:reorder',
   rulesDelete: 'rules:delete',
+  ratesStatus: 'rates:status',
+  ratesStatusChanged: 'rates:status-changed',
 } as const
 
 export interface AppBridge {
+  rates: {
+    status(): Promise<RateStatus>
+    onStatusChanged(listener: () => void): () => void
+  }
   rules: {
     list(): Promise<CategorisationRule[]>
     autofill(

@@ -932,7 +932,19 @@ test('resolves preset boundaries from the clock and custom endpoints inclusively
       .rows.map((row) => row.date),
   ).toEqual(['2026-01-01', '2025-12-31'])
   const empty = application.queries.listTransactions({ search: 'missing' })
-  expect(empty).toEqual({ rows: [], totalCount: 0, totals: [], days: [] })
+  expect(empty).toEqual({
+    rows: [],
+    totalCount: 0,
+    totals: [],
+    days: [],
+    baseTotals: {
+      currency: 'HUF',
+      expenseMinor: 0,
+      incomeMinor: 0,
+      unconverted: [],
+      stale: false,
+    },
+  })
   expect(application.queries.listTransactions({ offset: 100 }).totals).toEqual(
     application.queries.listTransactions().totals,
   )
@@ -1292,6 +1304,13 @@ test('upgrades the previous ledger schema and keeps transaction filters and tota
         totals: [{ currency: 'CHF', expenseMinor: 0, incomeMinor: 12345 }],
       },
     ],
+    baseTotals: {
+      currency: 'HUF',
+      expenseMinor: 0,
+      incomeMinor: 0,
+      unconverted: [{ currency: 'CHF', expenseMinor: 0, incomeMinor: 12345 }],
+      stale: false,
+    },
   })
 })
 

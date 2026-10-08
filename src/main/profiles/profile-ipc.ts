@@ -69,6 +69,7 @@ function parseUpdateSettingsInput(value: unknown): UpdateProfileSettingsInput {
 export function registerProfileIpc(
   ipcMain: IpcMain,
   controller: ProfileController,
+  onProfileNeedsRateRefresh: () => void = () => {},
 ): void {
   registerIpcHandler(
     ipcMain,
@@ -128,7 +129,9 @@ export function registerProfileIpc(
       value: unknown,
     ): Promise<Awaited<ReturnType<AppBridge['profiles']['open']>>> => {
       const input = parseProfileIdInput(value)
-      return controller.open(input.id)
+      const opened = await controller.open(input.id)
+      onProfileNeedsRateRefresh()
+      return opened
     },
   )
   registerIpcHandler(
@@ -143,8 +146,12 @@ export function registerProfileIpc(
     (
       _event,
       value: unknown,
-    ): Awaited<ReturnType<AppBridge['profiles']['updateSettings']>> =>
-      controller.updateSettings(parseUpdateSettingsInput(value)),
+    ): Awaited<ReturnType<AppBridge['profiles']['updateSettings']>> => {
+      const input = parseUpdateSettingsInput(value)
+      const settings = controller.updateSettings(input)
+      if (input.settings.baseCurrency) onProfileNeedsRateRefresh()
+      return settings
+    },
   )
   registerIpcHandler(ipcMain, IPC_CHANNELS.profilesClose, (): Promise<void> => {
     controller.close()

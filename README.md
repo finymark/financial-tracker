@@ -288,7 +288,8 @@ not off-device copies or backups of the separate data folder.
   the identity-only schema retain the migration's English default. Saved choices apply immediately and return when the
   profile is opened again; switching profiles switches its language and theme.
   Failed saves show a translated error and leave the previous choices applied.
-  Base currency is stored for later reports; currency conversion is not included.
+  Base currency drives exact HUF/CHF conversion with official MNB rates cached
+  inside that profile's database.
 - The system theme follows Windows through `prefers-color-scheme`, using
   Electron's default system `nativeTheme`. Explicit light/dark modes override
   that preference in the renderer, including native form controls.
@@ -301,6 +302,29 @@ not off-device copies or backups of the separate data folder.
   switches profiles. Accounts lists active and archived accounts with balances in
   their own currency. Transactions provides a filterable, virtualised table and a
   right-side create/edit drawer; Overview remains a placeholder.
+
+## Exchange rates and base-currency conversion
+
+- Profiles with an account outside their base currency fetch official CHF rates
+  from the MNB SOAP service after the profile opens and every 24 hours while the
+  app runs. Requests use Electron's system-proxy-aware network stack and never
+  block the renderer. Failures are logged and leave the visible rate status stale
+  or missing.
+- Migration 17 stores each quoted decimal string and unit by publication date,
+  plus fetched coverage and the last successful refresh, in the profile database.
+  Profile backups and restores therefore remain self-contained. Weekends and
+  holidays use the latest earlier published rate within fetched coverage; dates
+  after coverage use the latest cached rate as provisional. An amount without an
+  earlier rate remains explicitly unconverted, never zero.
+- Conversion uses exact BigInt rational arithmetic. CHF converts to HUF with the
+  MNB HUF-per-quoted-unit rate; HUF converts to CHF with its exact inverse. Values
+  are aggregated exactly and rounded once per displayed total to integer
+  hundredths, with ties away from zero. Transfers retain both recorded legs and
+  are not converted into expense or income totals.
+- The shell shows whether rates are up to date, stale, or missing and includes the
+  last refresh date. Filtered transaction totals retain their per-currency values
+  and additionally show a base-currency total, provisional state, and any
+  unconverted currency bucket.
 
 ## Accounts
 

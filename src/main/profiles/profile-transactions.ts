@@ -30,6 +30,8 @@ import { getLinesTags, setLineTags } from './profile-tags'
 import { getBalanceAdjustments } from './profile-adjustments'
 import { foldTextKey } from '../../shared/text-keys'
 
+type StoredTransactionPage = Omit<TransactionPage, 'baseTotals'>
+
 interface StoredTransaction {
   id: string
   accountId: string
@@ -675,7 +677,7 @@ export function listTransactions(
   database: Database.Database,
   value: TransactionListInput | undefined,
   clock: () => Date,
-): TransactionPage {
+): StoredTransactionPage {
   return withFilteredMovements(database, value, clock, (input) => {
     const pageRows = database
       .prepare(

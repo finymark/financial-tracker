@@ -41,6 +41,7 @@ import {
   type ProfileSettingsChanges,
 } from '../../shared/settings'
 import { cn } from './lib/utils'
+import type { RateStatus } from '../../shared/exchange-rates'
 
 const pages = [
   { id: 'overview', icon: LayoutDashboard },
@@ -377,7 +378,34 @@ function Shell({
   const [undoOffered, setUndoOffered] = useState(false)
   const [undoBusy, setUndoBusy] = useState(false)
   const [undoError, setUndoError] = useState(false)
+  const [rateStatus, setRateStatus] = useState<RateStatus | null>(null)
   const format = createFormatters(language)
+
+  useEffect(() => {
+    let ignore = false
+    const load = () => {
+      void window.app.rates
+        .status()
+        .then((status) => {
+          if (!ignore) setRateStatus(status)
+        })
+        .catch(() => {
+          if (!ignore)
+            setRateStatus({
+              coverage: null,
+              lastRefresh: null,
+              stale: true,
+              missing: true,
+            })
+        })
+    }
+    load()
+    const unsubscribe = window.app.rates.onStatusChanged(load)
+    return () => {
+      ignore = true
+      unsubscribe()
+    }
+  }, [])
 
   const undoLast = useCallback(async () => {
     if (undoBusy || accountBusy) return
@@ -573,6 +601,24 @@ function Shell({
             <p className="mb-2 text-sm text-muted-foreground">
               {t('app.tagline')}
             </p>
+            {rateStatus && (
+              <p className="mb-2 text-xs text-muted-foreground" role="status">
+                {t(
+                  rateStatus.missing
+                    ? 'rates.status.missing'
+                    : rateStatus.stale
+                      ? 'rates.status.stale'
+                      : 'rates.status.upToDate',
+                )}
+                {rateStatus.lastRefresh && (
+                  <>
+                    {' · '}
+                    {t('rates.status.lastRefresh')}:{' '}
+                    {format.date(new Date(rateStatus.lastRefresh))}
+                  </>
+                )}
+              </p>
+            )}
             <h1
               id="page-title"
               className="text-2xl font-semibold tracking-tight"

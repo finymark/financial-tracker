@@ -2,6 +2,15 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 
 const bridge: AppBridge = {
+  rates: {
+    status: () => ipcRenderer.invoke(IPC_CHANNELS.ratesStatus),
+    onStatusChanged: (listener) => {
+      const handler = () => listener()
+      ipcRenderer.on(IPC_CHANNELS.ratesStatusChanged, handler)
+      return () =>
+        ipcRenderer.removeListener(IPC_CHANNELS.ratesStatusChanged, handler)
+    },
+  },
   rules: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.rulesList),
     autofill: (input) => ipcRenderer.invoke(IPC_CHANNELS.rulesAutofill, input),

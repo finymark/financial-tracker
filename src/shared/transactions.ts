@@ -4,6 +4,7 @@ import type { Tag } from './tags'
 import type { Transfer } from './transfers'
 export type { Payee } from './payees'
 import type { BalanceAdjustment } from './adjustments'
+import type { BaseCurrencyTransactionTotals } from './exchange-rates'
 
 export type TransactionKind = CategoryKind
 
@@ -108,4 +109,5 @@ export interface TransactionPage {
   // and always omit excluded amounts.
   totals: TransactionTotals[]
   days: TransactionDayTotals[]
+  baseTotals: BaseCurrencyTransactionTotals
 }
