@@ -22,6 +22,10 @@ import { matchShortcut, shortcuts } from './lib/shortcuts'
 import { PrivacyProvider } from './lib/privacy'
 import { shortcutTargetContext } from './lib/shortcut-context'
 import { AutostartSettings } from './components/autostart-settings'
+import {
+  ShortcutSettings,
+  shortcutConflictMessage,
+} from './components/shortcut-settings'
 import { UpdateNotice } from './components/update-notice'
 import { BackupSettings } from './components/backup-settings'
 import { CategorySettings } from './components/category-settings'
@@ -353,8 +357,6 @@ function ProfilePicker({
 }
 
 interface ShellProps {
-  quickAddRequested: boolean
-  onQuickAddHandled(): void
   active: ActiveProfileInfo
   version: string
   t: Translate
@@ -364,8 +366,6 @@ interface ShellProps {
 }
 
 function Shell({
-  quickAddRequested,
-  onQuickAddHandled,
   active,
   version,
   t,
@@ -418,6 +418,19 @@ function Shell({
     onSettingsChange,
     active.settings.privacyMode,
   ])
+
+  useEffect(
+    () =>
+      window.app.desktop.onDataChanged((offerUndo) => {
+        setUndoRevision((revision) => revision + 1)
+        setCategoryRevision((revision) => revision + 1)
+        if (offerUndo) {
+          setUndoError(false)
+          setUndoOffered(true)
+        }
+      }),
+    [],
+  )
 
   useEffect(() => {
     let ignore = false
@@ -523,44 +536,6 @@ function Shell({
     ruleBusy,
     showShortcutHelp,
     togglePrivacy,
-  ])
-
-  useEffect(() => {
-    if (
-      !quickAddRequested ||
-      savingSettings ||
-      accountBusy ||
-      backupBusy ||
-      categoryBusy ||
-      payeeBusy ||
-      ruleBusy ||
-      undoBusy
-    )
-      return
-    let ignore = false
-    queueMicrotask(() => {
-      if (ignore) return
-      // Preserve an existing drawer or modal and its unsaved input.
-      if (!document.querySelector('[role="dialog"]')) {
-        setReportTransactionFilter(null)
-        setNewTransactionRequested(true)
-        setPage('transactions')
-      }
-      onQuickAddHandled()
-    })
-    return () => {
-      ignore = true
-    }
-  }, [
-    quickAddRequested,
-    onQuickAddHandled,
-    savingSettings,
-    accountBusy,
-    backupBusy,
-    categoryBusy,
-    payeeBusy,
-    ruleBusy,
-    undoBusy,
   ])
 
   async function saveSettings(changes: ProfileSettingsChanges) {
@@ -902,6 +877,7 @@ function Shell({
                   </div>
                 </div>
                 <AutostartSettings t={t} />
+                <ShortcutSettings t={t} />
                 <p className="text-sm text-muted-foreground">
                   {t('settings.version')}: {version}
                 </p>
@@ -1033,13 +1009,14 @@ function Shell({
 }
 
 export default function App() {
-  const [quickAddRequested, setQuickAddRequested] = useState(false)
-  const quickAddHandled = useCallback(() => setQuickAddRequested(false), [])
   const [snapshot, setSnapshot] = useState(emptySnapshot)
   const [active, setActive] = useState<ActiveProfileInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [showPicker, setShowPicker] = useState(true)
   const [version, setVersion] = useState('')
+  const [startupShortcutFailure, setStartupShortcutFailure] = useState<
+    string | null
+  >(null)
   const { language, theme } = active?.settings ?? DEFAULT_PROFILE_SETTINGS
   const t: Translate = (key) => translate(language, key)
   useTheme(theme)
@@ -1054,36 +1031,30 @@ export default function App() {
       window.app.profiles.list(),
       window.app.profiles.getActive(),
       window.app.getVersion(),
+      window.app.desktop.shortcutStatus(),
     ])
-      .then(([registry, current, appVersion]) => {
+      .then(([registry, current, appVersion, shortcut]) => {
         setSnapshot(registry)
         setActive(current)
         setVersion(appVersion)
+        setStartupShortcutFailure(shortcut.failureAccelerator)
       })
       .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
-    let ignore = false
-    const receive = () => {
-      void window.app.desktop
-        .takeQuickAddRequest()
-        .then((requested) => {
-          if (ignore || !requested) return
-          setQuickAddRequested(true)
-          setShowPicker(false)
-        })
-        .catch(() => {})
-    }
-    const unsubscribe = window.app.desktop.onQuickAdd(receive)
-    // Also consume requests made before subscription. Defer so StrictMode's
-    // discarded mount cannot consume a pending main-process request.
-    queueMicrotask(() => {
-      if (!ignore) receive()
+    const unsubscribeProfile = window.app.desktop.onProfileChanged(() => {
+      void Promise.all([
+        window.app.profiles.list(),
+        window.app.profiles.getActive(),
+      ]).then(([registry, current]) => {
+        setSnapshot(registry)
+        setActive(current)
+        if (current) setShowPicker(false)
+      })
     })
     return () => {
-      ignore = true
-      unsubscribe()
+      unsubscribeProfile()
     }
   }, [])
 
@@ -1117,8 +1088,6 @@ export default function App() {
       >
         <Shell
           key={active.id}
-          quickAddRequested={quickAddRequested}
-          onQuickAddHandled={quickAddHandled}
           active={active}
           version={version}
           t={t}
@@ -1142,6 +1111,20 @@ export default function App() {
   return (
     <>
       {content}
+      {startupShortcutFailure && (
+        <aside
+          role="alert"
+          className="fixed top-4 right-4 z-50 max-w-md space-y-3 rounded-lg border bg-card p-4 text-sm font-medium text-error shadow-lg"
+        >
+          <p>{shortcutConflictMessage(t, startupShortcutFailure)}</p>
+          <Button
+            variant="ghost"
+            onClick={() => setStartupShortcutFailure(null)}
+          >
+            {t('tray.noticeOk')}
+          </Button>
+        </aside>
+      )}
       <UpdateNotice t={t} />
     </>
   )

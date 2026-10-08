@@ -132,8 +132,8 @@ The renderer has no Node access; a sandboxed, isolated preload exposes only the
 typed app, update, profile (including settings), account, category, transaction,
 transfer, balance adjustment, payee, tag, categorisation rule,
 transaction-template, recurring-transaction, and backup commands/queries. Every
-IPC input is validated in the main
-process, and every handler rejects calls not sent by the app's own renderer frame.
+IPC input is validated in the main process, and every handler rejects calls not
+sent by the main frame of either the main app window or the quick-add window.
 Production CSP permits only same-origin connections; localhost WebSockets are
 added only by the development server for hot reload. SQLite foreign-key
 enforcement and shared Unicode text functions are enabled when each profile
@@ -337,6 +337,63 @@ pause and resume it; delete it; use the Undo toast after each operation. Close
 and reopen the profile and verify definitions persist. Pending occurrences are
 not shown until the follow-up ticket; verify balances, Overview, Reports,
 Transactions totals and CSV remain unchanged when a definition becomes due.
+
+## Global quick add
+
+- **Ctrl+Alt+N** opens a compact, always-on-top quick-add window on the active
+  display. The tray's **Quick add** item uses the same window. The window targets
+  the open profile, or opens the last used profile when the main window is still
+  showing the profile picker.
+- Quick add supports expense/income (Alt+1/Alt+2), the amount calculator, the
+  last used active account, payee and alias suggestions, categorisation-rule and
+  last-used autofill, category, tags, note, and today's date. Enter saves, Esc
+  closes, and Ctrl+Enter saves and starts another transaction. Transfers, splits,
+  and templates stay in the full transaction drawer.
+- The shortcut is an app-level setting shared by all profiles on the Windows
+  account. Change it by pressing a new combination in **Settings**, or reset it to
+  Ctrl+Alt+N. If Windows or another program has reserved a combination, the app
+  keeps the previous working shortcut and shows a translated conflict message.
+
+### Manual global quick-add check
+
+Run `npm run dev` with synthetic data and complete every item below in HU/EN/DE
+and light/dark mode where applicable:
+
+1. Focus another program, press Ctrl+Alt+N, and verify the quick-add window opens
+   centered on the display containing the pointer, remains above ordinary
+   windows, and focuses the amount field. Open it again via tray **Quick add**;
+   an already open quick-add window must be focused rather than duplicated.
+2. Reserve Ctrl+Alt+N in another program before starting Financial Tracker.
+   Verify the main window reports “The shortcut Ctrl+Alt+N is used by another
+   program…” once and Settings shows the translated conflict. Release it and set
+   a new shortcut by pressing the combination in Settings. Verify it works from
+   another focused program, persists after restart, is shared after switching
+   profiles, and **Reset to Ctrl+Alt+N** works. While changing to another reserved
+   combination, verify the previous working shortcut remains active.
+3. Leave the profile picker open, invoke quick add, and verify the last used
+   profile opens before its form appears. With no profiles, verify quick add shows
+   a translated instruction to create one in the main window. With no accounts,
+   verify the corresponding translated instruction.
+4. Verify the default account is the last active account used for a transaction;
+   payee aliases appear as their canonical payee suggestions; rules and last-used
+   values autofill category/tags without overwriting manually changed values.
+   Check expense/income with Alt+1/Alt+2, amount expressions, category, multiple
+   tags, note, and today's date. Confirm transfers, splits, and templates are not
+   offered.
+5. Press Enter to save and verify a brief saved confirmation, window close, main
+   Overview/Transactions refresh, and (when the main window is visible) its Undo
+   toast reverses the quick-added transaction. Press Ctrl+Enter to save and add
+   another while retaining account, kind, and date. Press Esc to close without
+   saving.
+6. Enable privacy mode in the active profile. Verify an unfocused quick-add amount
+   is concealed and becomes editable only while focused. Check the compact window
+   at its minimum size and on a second display.
+7. Build the packaged artifact with
+   `npx electron-builder --win nsis --publish never`, run
+   `release/win-unpacked/Financial Tracker.exe`, and repeat shortcut, tray,
+   profile-picker, Enter/Esc, privacy, and conflict checks. Then run
+   `release/win-unpacked/Financial Tracker.exe --smoke-test`; it must print
+   `SQLite smoke test OK` and exit 0.
 
 ## Exchange rates and base-currency conversion
 

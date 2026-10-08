@@ -7,13 +7,26 @@ const bridge: AppBridge = {
       ipcRenderer.invoke(IPC_CHANNELS.desktopAutostartStatus),
     setAutostart: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.desktopSetAutostart, input),
-    takeQuickAddRequest: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.desktopTakeQuickAddRequest),
-    onQuickAdd: (listener) => {
-      const handler = () => listener()
-      ipcRenderer.on(IPC_CHANNELS.desktopQuickAdd, handler)
+    shortcutStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.desktopShortcutStatus),
+    setShortcut: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.desktopSetShortcut, input),
+    showMain: () => ipcRenderer.invoke(IPC_CHANNELS.desktopShowMain),
+    closeQuickAdd: () => ipcRenderer.invoke(IPC_CHANNELS.desktopCloseQuickAdd),
+    quickAddSaved: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.desktopQuickAddSaved, input),
+    onDataChanged: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, offerUndo: boolean) =>
+        listener(offerUndo)
+      ipcRenderer.on(IPC_CHANNELS.desktopDataChanged, handler)
       return () =>
-        ipcRenderer.removeListener(IPC_CHANNELS.desktopQuickAdd, handler)
+        ipcRenderer.removeListener(IPC_CHANNELS.desktopDataChanged, handler)
+    },
+    onProfileChanged: (listener) => {
+      const handler = () => listener()
+      ipcRenderer.on(IPC_CHANNELS.desktopProfileChanged, handler)
+      return () =>
+        ipcRenderer.removeListener(IPC_CHANNELS.desktopProfileChanged, handler)
     },
   },
   recurring: {

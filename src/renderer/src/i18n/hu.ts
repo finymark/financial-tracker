@@ -9,6 +9,13 @@ export const hu = {
   'privacy.hiddenAmount': 'Rejtett összeg',
   'privacy.shortcutScope':
     'A privát mód gépelés közben is bárhol működik (Ctrl+Shift+H).',
+  'quickAdd.title': 'Gyors rögzítés',
+  'quickAdd.noProfiles':
+    'Tranzakció rögzítése előtt hozz létre egy profilt a főablakban.',
+  'quickAdd.noAccounts':
+    'Tranzakció rögzítése előtt hozz létre egy számlát a főablakban.',
+  'quickAdd.saved': 'Elmentve.',
+  'quickAdd.loading': 'Gyors rögzítés előkészítése…',
 
   'shortcuts.closeHelp': 'Billentyűsúgó bezárása',
   'transactions.saveAndAddAnother': 'Mentés és újabb hozzáadása',

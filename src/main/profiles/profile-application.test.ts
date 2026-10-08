@@ -40,6 +40,42 @@ afterEach(() => {
 })
 
 describe('profile application API', () => {
+  test('quick-add opens the last used profile and creates a normal undoable transaction', async () => {
+    const { registry } = setup()
+    const controller = new ProfileController(registry, 'en', { clock })
+    const first = await controller.create('First')
+    const lastUsed = await controller.create('Last used')
+    await controller.open(first.id)
+    controller.close()
+    await controller.open(lastUsed.id)
+    const account = controller.getActiveApplication().commands.createAccount({
+      name: 'Quick account',
+      currency: 'HUF',
+      openingBalance: 0,
+      openingDate: '2026-01-01',
+    })
+    controller.close()
+
+    const opened = await controller.openLastUsed()
+    expect(opened?.id).toBe(lastUsed.id)
+    const application = controller.getActiveApplication()
+    const transaction = application.commands.createTransaction({
+      accountId: account.id,
+      kind: 'expense',
+      date: '2026-01-15',
+      totalMinor: 12345,
+      payeeName: 'Quick payee',
+      categoryId: null,
+      note: 'Quick add',
+      tagNames: ['Fast'],
+      excluded: false,
+    })
+    expect(application.queries.listTransactions().rows).toEqual([transaction])
+    expect(application.commands.undoLast()).toBe(true)
+    expect(application.queries.listTransactions().rows).toEqual([])
+    controller.close()
+  })
+
   test('opening a profile creates a startup backup separate from migration backups', async () => {
     const { registry } = setup()
     const profile = registry.createProfile('Startup backup')

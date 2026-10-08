@@ -1,6 +1,12 @@
 import type { App, IpcMain } from 'electron'
 import { IPC_CHANNELS } from '../shared/ipc'
 import type { AutostartStatus, SetAutostartInput } from '../shared/desktop'
+import type {
+  QuickAddSavedInput,
+  SetQuickAddShortcutInput,
+  ShortcutStatus,
+} from '../shared/desktop'
+import { normaliseAccelerator } from '../shared/accelerator'
 import { inputRecord, registerIpcHandler } from './ipc'
 
 export function parseAutostartInput(value: unknown): SetAutostartInput {
@@ -13,10 +19,38 @@ export function parseAutostartInput(value: unknown): SetAutostartInput {
   return { openAtLogin: input.openAtLogin }
 }
 
+export function parseShortcutInput(value: unknown): SetQuickAddShortcutInput {
+  const input = inputRecord(value)
+  if (
+    typeof input.accelerator !== 'string' ||
+    Object.keys(input).some((key) => key !== 'accelerator')
+  )
+    throw new TypeError('Invalid shortcut input')
+  return { accelerator: normaliseAccelerator(input.accelerator) }
+}
+
+function parseQuickAddSavedInput(value: unknown): QuickAddSavedInput {
+  const input = inputRecord(value)
+  if (
+    typeof input.keepOpen !== 'boolean' ||
+    Object.keys(input).some((key) => key !== 'keepOpen')
+  )
+    throw new TypeError('Invalid quick-add saved input')
+  return { keepOpen: input.keepOpen }
+}
+
+interface DesktopIpcOptions {
+  shortcutStatus(): ShortcutStatus
+  setShortcut(accelerator: string): ShortcutStatus
+  showMain(): void
+  closeQuickAdd(): void
+  quickAddSaved(input: QuickAddSavedInput): void
+}
+
 export function registerDesktopIpc(
   ipcMain: IpcMain,
   app: App,
-  takeQuickAddRequest: () => boolean,
+  options: DesktopIpcOptions,
 ): void {
   const supported = app.isPackaged && process.platform === 'win32'
   const args = ['--hidden']
@@ -41,7 +75,24 @@ export function registerDesktopIpc(
   )
   registerIpcHandler(
     ipcMain,
-    IPC_CHANNELS.desktopTakeQuickAddRequest,
-    takeQuickAddRequest,
+    IPC_CHANNELS.desktopShortcutStatus,
+    options.shortcutStatus,
+  )
+  registerIpcHandler(
+    ipcMain,
+    IPC_CHANNELS.desktopSetShortcut,
+    (_event, value) =>
+      options.setShortcut(parseShortcutInput(value).accelerator),
+  )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.desktopShowMain, options.showMain)
+  registerIpcHandler(
+    ipcMain,
+    IPC_CHANNELS.desktopCloseQuickAdd,
+    options.closeQuickAdd,
+  )
+  registerIpcHandler(
+    ipcMain,
+    IPC_CHANNELS.desktopQuickAddSaved,
+    (_event, value) => options.quickAddSaved(parseQuickAddSavedInput(value)),
   )
 }

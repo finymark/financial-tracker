@@ -1,4 +1,10 @@
-import type { AutostartStatus, SetAutostartInput } from './desktop'
+import type {
+  AutostartStatus,
+  QuickAddSavedInput,
+  SetAutostartInput,
+  SetQuickAddShortcutInput,
+  ShortcutStatus,
+} from './desktop'
 import type { TransactionCsvInput } from './transaction-csv'
 import type {
   CreateTemplateInput,
@@ -98,8 +104,13 @@ export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
   desktopAutostartStatus: 'desktop:autostart-status',
   desktopSetAutostart: 'desktop:set-autostart',
-  desktopQuickAdd: 'desktop:quick-add',
-  desktopTakeQuickAddRequest: 'desktop:take-quick-add-request',
+  desktopShortcutStatus: 'desktop:shortcut-status',
+  desktopSetShortcut: 'desktop:set-shortcut',
+  desktopShowMain: 'desktop:show-main',
+  desktopCloseQuickAdd: 'desktop:close-quick-add',
+  desktopQuickAddSaved: 'desktop:quick-add-saved',
+  desktopDataChanged: 'desktop:data-changed',
+  desktopProfileChanged: 'desktop:profile-changed',
   updatesIsReady: 'updates:is-ready',
   updatesReady: 'updates:ready',
   updatesRestart: 'updates:restart',
@@ -181,8 +192,13 @@ export interface AppBridge {
   desktop: {
     autostartStatus(): Promise<AutostartStatus>
     setAutostart(input: SetAutostartInput): Promise<AutostartStatus>
-    onQuickAdd(listener: () => void): () => void
-    takeQuickAddRequest(): Promise<boolean>
+    shortcutStatus(): Promise<ShortcutStatus>
+    setShortcut(input: SetQuickAddShortcutInput): Promise<ShortcutStatus>
+    showMain(): Promise<void>
+    closeQuickAdd(): Promise<void>
+    quickAddSaved(input: QuickAddSavedInput): Promise<void>
+    onDataChanged(listener: (offerUndo: boolean) => void): () => void
+    onProfileChanged(listener: () => void): () => void
   }
   recurring: {
     list(): Promise<RecurringTransaction[]>

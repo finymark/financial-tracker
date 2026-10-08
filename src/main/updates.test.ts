@@ -2,6 +2,7 @@ import type { BrowserWindow, IpcMain } from 'electron'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { IPC_CHANNELS } from '../shared/ipc'
 import { registerUpdates } from './updates'
+import { configureTrustedIpcWebContents } from './ipc'
 
 const updater = vi.hoisted(() => ({
   autoDownload: false,
@@ -28,9 +29,12 @@ function setup(
   const handle = vi.fn()
   const send = vi.fn()
   const isDestroyed = vi.fn(() => false)
+  const mainFrame = { url: 'http://localhost:5173/index.html' }
+  const webContents = { send, mainFrame }
+  configureTrustedIpcWebContents(() => [webContents])
   registerUpdates(
     { handle } as unknown as IpcMain,
-    { isDestroyed, webContents: { send } } as unknown as BrowserWindow,
+    { isDestroyed, webContents } as unknown as BrowserWindow,
     packaged,
     beforeInstall,
     recoverAfterFailure,
@@ -38,7 +42,7 @@ function setup(
   function invoke(channel: string): unknown {
     const handler = handle.mock.calls.find(([name]) => name === channel)?.[1]
     if (!handler) throw new Error('Missing IPC handler')
-    return handler({ senderFrame: { url: 'http://localhost:5173/index.html' } })
+    return handler({ sender: webContents, senderFrame: mainFrame })
   }
   function emit(event: string) {
     const handler = updater.on.mock.calls.find(([name]) => name === event)?.[1]

@@ -19,6 +19,7 @@ interface ProfileControllerOptions {
   exchangeRateSource?: ExchangeRateSource
   onRateStatusChanged?: () => void
   logger?: Pick<Console, 'error'>
+  clock?: () => Date
 }
 
 export class ProfileController {
@@ -120,6 +121,13 @@ export class ProfileController {
       this.#active = { id, application }
       return this.getActive() as ActiveProfileInfo
     })
+  }
+
+  async openLastUsed(): Promise<ActiveProfileInfo | null> {
+    const active = this.getActive()
+    if (active) return active
+    const id = this.#registry.getLastUsedProfileId()
+    return id ? this.open(id) : null
   }
 
   getActive(): ActiveProfileInfo | null {

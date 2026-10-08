@@ -7,10 +7,15 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { join } from 'node:path'
+import {
+  DEFAULT_QUICK_ADD_ACCELERATOR,
+  normaliseAccelerator,
+} from '../shared/accelerator'
 
 interface AppSettings {
   version: 1
   trayNoticeShown: boolean
+  quickAddAccelerator: string
 }
 
 function parseSettings(value: unknown): AppSettings {
@@ -21,13 +26,25 @@ function parseSettings(value: unknown): AppSettings {
   if (
     input.version !== 1 ||
     typeof input.trayNoticeShown !== 'boolean' ||
+    (input.quickAddAccelerator !== undefined &&
+      typeof input.quickAddAccelerator !== 'string') ||
     Object.keys(input).some(
-      (key) => key !== 'version' && key !== 'trayNoticeShown',
+      (key) =>
+        key !== 'version' &&
+        key !== 'trayNoticeShown' &&
+        key !== 'quickAddAccelerator',
     )
   ) {
     throw new Error('Unsupported or invalid app settings')
   }
-  return { version: 1, trayNoticeShown: input.trayNoticeShown }
+  return {
+    version: 1,
+    trayNoticeShown: input.trayNoticeShown,
+    quickAddAccelerator:
+      input.quickAddAccelerator === undefined
+        ? DEFAULT_QUICK_ADD_ACCELERATOR
+        : normaliseAccelerator(input.quickAddAccelerator),
+  }
 }
 
 // Autostart is read from Windows, avoiding a second, potentially stale preference.
@@ -57,7 +74,11 @@ export class AppSettingsFile {
         )
       })
     if (!existsSync(this.#path))
-      this.#write({ version: 1, trayNoticeShown: false })
+      this.#write({
+        version: 1,
+        trayNoticeShown: false,
+        quickAddAccelerator: DEFAULT_QUICK_ADD_ACCELERATOR,
+      })
     this.#read()
   }
 
@@ -67,6 +88,17 @@ export class AppSettingsFile {
 
   markTrayNoticeShown(): void {
     this.#write({ ...this.#read(), trayNoticeShown: true })
+  }
+
+  getQuickAddAccelerator(): string {
+    return this.#read().quickAddAccelerator
+  }
+
+  setQuickAddAccelerator(accelerator: string): void {
+    this.#write({
+      ...this.#read(),
+      quickAddAccelerator: normaliseAccelerator(accelerator),
+    })
   }
 
   #read(): AppSettings {
