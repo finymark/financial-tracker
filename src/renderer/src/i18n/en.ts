@@ -709,7 +709,7 @@ export const en = {
   'help.profilePicker.create':
     'Create a profile for another separate set of finances on this PC. Give it a recognizable name; you can change the name later.',
   'help.page.overview':
-    'See this month’s expenses, income and net amount compared with the full previous month. Amounts are converted to your base currency when an exchange rate is available.',
+    'See this month’s expenses, income and net amount compared with the full previous month; excluded transactions are left out. Amounts are converted to your base currency when an exchange rate is available.',
   'help.page.transactions':
     'Record and review expenses, income, transfers and balance adjustments. Use filters to narrow the list and its totals.',
   'help.page.receipts':
@@ -717,21 +717,21 @@ export const en = {
   'help.page.recurring':
     'Define expenses or income that repeat on a schedule. Due occurrences become pending and affect your finances only after you confirm them.',
   'help.page.reports':
-    'Explore included expenses and income converted to your base currency. Transactions without an exchange rate remain listed separately and do not enter converted charts or totals.',
+    'Explore expenses and income in your base currency; excluded transactions are left out. Amounts without an exchange rate remain listed separately and do not enter converted charts or totals.',
   'help.page.accounts':
     'An account is a place where money is held in one currency. Its balance combines the opening balance, dated movements and balance adjustments.',
   'help.page.settings':
-    'These settings apply to the current profile. Manage display choices, receipt intake, organization rules and local backups here.',
+    'Most settings apply to the current profile. The Quick add shortcut and Start with Windows setting apply to every profile on this Windows account.',
   'help.page.quickAdd':
     'Record an expense or income in the active profile without opening the main window. Choose the account, review the details, then save.',
   'help.overview.expenses':
-    'Included expenses from this month to date, compared with the full previous month. Select View transactions to inspect the matching transactions.',
+    'This month’s expenses so far, with excluded transactions left out, compared with the full previous month. Select View transactions to inspect the matching transactions.',
   'help.overview.incomes':
-    'Included income from this month to date, compared with the full previous month. Select View transactions to inspect the matching transactions.',
+    'This month’s income so far, with excluded transactions left out, compared with the full previous month. Select View transactions to inspect the matching transactions.',
   'help.overview.net':
     'Income minus expenses for each shown period. Transfers, balance adjustments and excluded transactions do not change this amount.',
   'help.overview.topCategories':
-    'The five expense categories with the largest converted totals this month. Choose a category to open its included transactions.',
+    'The five expense categories with the largest converted totals this month, with excluded transactions left out. Choose a category to open its transactions.',
   'help.transactions.filters':
     'Filters change the transactions shown and the totals above the list. Apply them before exporting; CSV export uses all matching transactions, not only the current page.',
   'help.transactions.excluded':
@@ -743,11 +743,11 @@ export const en = {
   'help.transactions.balanceAdjustment':
     'Record the real observed account balance at the end of a date. The app recalculates the difference from account history, without counting it as expense or income.',
   'help.transactions.csvExport':
-    'Export every transaction matching the applied filters. Split parts become separate rows; transfers and balance adjustments are not included.',
+    'Export expenses and income matching the applied filters. Split parts become separate rows; transfers and balance adjustments are not exported.',
   'help.transactions.csvSeparator':
     'Choose how decimal fractions are written for your spreadsheet. Dot uses comma-separated fields; comma uses semicolon-separated fields to avoid ambiguity.',
   'help.transactions.amountCalculator':
-    'You can enter a calculation with +, −, ×, ÷ or parentheses. Leaving the field or pressing Enter evaluates it and rounds the final result to hundredths.',
+    'You can enter a calculation with + - * / and parentheses. Leaving the field or pressing Enter evaluates it and rounds the final result to hundredths.',
   'help.transactions.split':
     'A split divides one transaction into parts with separate amounts, categories, tags and notes. Make the parts add up to the transaction total.',
   'help.transactions.transfer':
@@ -755,7 +755,7 @@ export const en = {
   'help.transactions.transferFee':
     'A transfer fee is recorded as a separate expense in the source account. Choose its category and exclude it only if it should stay out of reports.',
   'help.transactions.tags':
-    'Tags are free-form labels that group transactions across categories. Add existing or new tags, and use Manage tags to rename or delete them.',
+    'Tags group transactions independently of their categories. Add existing or new tags, and use Manage tags to rename or delete them.',
   'help.transactions.attachments':
     'Attachments are copied into this profile and kept with the transaction. Add receipt photos, images or PDFs; removing one deletes the profile copy.',
   'help.receipts.phoneUpload':
@@ -765,21 +765,21 @@ export const en = {
   'help.recurring.definitions':
     'Definitions hold the reusable details and schedule for recurring transactions. Pausing stops new pending occurrences; resuming skips dates that passed while paused.',
   'help.recurring.editor':
-    'Set the transaction details and schedule used for future occurrences. Occurrences before you save the definition are not generated.',
+    'Set the transaction details and schedule used for future occurrences. No occurrence is created for a date before the definition was created.',
   'help.recurring.schedule':
     'Choose how often the transaction repeats and its calendar day. An optional end date stops future occurrences after that date.',
   'help.reports.dateRange':
     'Choose the dates included in category, monthly trend and cash-flow reports. Spending pace always compares this month to the previous three calendar months.',
   'help.reports.category':
-    'Included expenses are grouped by main category in your base currency. Choose a main category, then a subcategory, to open the matching transactions.',
+    'Expenses are grouped by main category in your base currency; excluded transactions are left out. Choose a main category, then a subcategory, to open the matching transactions.',
   'help.reports.trend':
-    'Compare monthly included expenses, income and net amount. Partial months use only dates inside the selected range.',
+    'Compare monthly expenses, income and net amount; excluded transactions are left out. Partial months use only dates inside the selected range.',
   'help.reports.pace':
-    'Compare this month’s expenses so far with the average of the previous three calendar months up to the same day. Shorter months are compared through their last day.',
+    'Compare this month’s expenses so far, with excluded transactions left out, against the average of the previous three calendar months up to the same day. Shorter months are compared through their last day.',
   'help.reports.cashFlow':
-    'See converted income categories flow into expense categories. Savings or deficit balance the diagram; unconverted amounts stay separate.',
+    'See converted income categories flow into expense categories. The difference between income and expenses appears as savings or deficit; unconverted amounts stay separate.',
   'help.reports.breakdown':
-    'Choose a main category to see its subcategories. Choosing a subcategory opens the included expense transactions behind that total.',
+    'Choose a main category to see its subcategories. Choosing a subcategory opens the expense transactions behind that total; excluded transactions are left out.',
   'help.accounts.create':
     'Create an account for each place and currency where money is held. Set the balance and date from which its history should begin.',
   'help.accounts.currency':
@@ -799,15 +799,15 @@ export const en = {
   'help.settings.backups':
     'A local database backup is created when this profile opens, and the latest ten startup backups are kept. Restoring replaces current profile data with the selected backup.',
   'help.settings.watchedFolder':
-    'New receipt photos in this folder are moved into the receipt inbox. Successfully received files move to its feldolgozott subfolder; a synced local folder can accept photos from another device.',
+    'The app imports new receipt photos from this folder into the receipt inbox. After a successful intake, the original files move to the feldolgozott subfolder; a synced local folder can accept photos from another device.',
   'help.settings.shortcut':
-    'This system-wide shortcut opens Quick add, even when the main window is hidden. Focus the shortcut field and press the desired key combination.',
+    'This system-wide shortcut opens Quick add even when the main window is hidden, and applies to every profile on this Windows account. Focus the shortcut field and press the desired key combination.',
   'help.settings.autostart':
-    'Start Financial Tracker automatically after you sign in to Windows. The app remains available from the notification area when its window is closed.',
+    'This is off by default. When enabled, Financial Tracker starts hidden in the notification area when you sign in to Windows. This setting applies to every profile on this Windows account.',
   'help.settings.baseCurrency':
     'Reports convert other currencies into this currency using the exchange rate for each date. Changing it changes report display, not stored account amounts.',
   'help.settings.exchangeRates':
-    'Official MNB exchange rates are cached for report conversion. Missing or stale rates leave affected amounts separate until rates refresh.',
+    'The app downloads and stores official MNB exchange rates locally for report conversion. If a rate is missing or stale, affected amounts remain separate until rates refresh.',
   'help.settings.privacy':
     'Privacy mode hides displayed amounts and obscures chart values without changing stored data. Toggle it anywhere with Ctrl+Shift+H.',
   'help.settings.formattingPreview':
