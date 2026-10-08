@@ -214,6 +214,7 @@ import {
   copyAttachments,
   copyAttachmentForOpening,
   importAttachment,
+  importReceiptPhoto,
   listAttachments,
   sweepUnreferencedAttachments,
 } from './profile-attachments'
@@ -221,6 +222,25 @@ import {
   attachAttachmentUndoableCommand,
   removeAttachmentUndoableCommand,
 } from './attachment-undo'
+import type {
+  ConfirmReceiptInput,
+  ConfirmedReceipt,
+  Receipt,
+  ReceiptIntake,
+  ReceiptSource,
+} from '../../shared/receipts'
+import {
+  getReceiptInboxCount,
+  getReceiptDefaultAccountId,
+  insertReceipt,
+  listReceipts,
+  renderReceiptPreview,
+  validateReceiptSource,
+} from './profile-receipts'
+import {
+  confirmReceiptUndoableCommand,
+  discardReceiptUndoableCommand,
+} from './receipt-undo'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -275,10 +295,14 @@ export interface OpenProfileApplicationOptions {
   exchangeRateSource?: ExchangeRateSource
   onRateStatusChanged?: () => void
   onPendingTransactionsChanged?: () => void
+  onReceiptInboxChanged?: () => void
   logger?: Pick<Console, 'error'>
 }
 
 export interface ProfileQueries {
+  listReceipts(): Receipt[]
+  getReceiptInboxCount(): number
+  getReceiptDefaultAccountId(): string | null
   listAttachments(transactionId: string): Attachment[]
   getDuePendingTransactionCount(): number
   listPendingTransactions(): PendingTransaction[]
@@ -316,6 +340,10 @@ export interface ProfileQueries {
 }
 
 export interface ProfileCommands {
+  intakeReceipt(input: ReceiptIntake, source: ReceiptSource): Promise<Receipt>
+  confirmReceipt(input: ConfirmReceiptInput): ConfirmedReceipt
+  discardReceipt(id: string): Receipt
+  renderReceiptPreview(id: string, thumbnail?: boolean): Promise<string>
   importAttachment(path: string): Promise<StagedAttachment>
   attachAttachment(
     transactionId: string,
@@ -984,6 +1012,41 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
   ),
   defineSqlMigration(
     22,
+    'receipt inbox',
+    `
+    CREATE TABLE receipt_inbox_items (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      status TEXT NOT NULL CHECK (status IN ('received', 'read', 'confirmed', 'discarded')),
+      stored_name TEXT NOT NULL CHECK (length(stored_name) BETWEEN 68 AND 69),
+      original_file_name TEXT NOT NULL CHECK (length(original_file_name) BETWEEN 1 AND 255),
+      media_type TEXT NOT NULL CHECK (media_type IN ('image/jpeg', 'image/png', 'image/webp')),
+      byte_size INTEGER NOT NULL CHECK (typeof(byte_size) = 'integer' AND byte_size > 0),
+      source TEXT NOT NULL CHECK (source IN ('drop', 'folder', 'phone')),
+      received_at TEXT NOT NULL,
+      ocr_payee_name TEXT,
+      ocr_date TEXT,
+      ocr_total_minor INTEGER CHECK (
+        ocr_total_minor IS NULL OR
+        (typeof(ocr_total_minor) = 'integer' AND
+          ocr_total_minor BETWEEN 1 AND 9007199254740991)
+      ),
+      ocr_currency TEXT CHECK (ocr_currency IS NULL OR ocr_currency IN ('HUF', 'CHF')),
+      ocr_confidence REAL CHECK (
+        ocr_confidence IS NULL OR
+        (typeof(ocr_confidence) IN ('real', 'integer') AND
+          ocr_confidence BETWEEN 0 AND 1)
+      ),
+      created_transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL,
+      CHECK (status = 'confirmed' OR created_transaction_id IS NULL)
+    );
+    CREATE INDEX receipt_inbox_items_active_received
+      ON receipt_inbox_items(status, received_at, id);
+    CREATE INDEX receipt_inbox_items_stored_name
+      ON receipt_inbox_items(stored_name);
+  `,
+  ),
+  defineSqlMigration(
+    23,
     'profile watched folder',
     `
     ALTER TABLE profile_settings ADD COLUMN watched_folder TEXT
@@ -1133,6 +1196,50 @@ class OpenProfileApplication implements ProfileApplication {
     this.#clock = options.clock ?? (() => new Date())
     const attachmentsPath = attachmentDirectory(options.paths.dataDirectory)
     this.commands = {
+      intakeReceipt: async (input, source) => {
+        this.#assertAvailable()
+        const validatedSource = validateReceiptSource(source)
+        const attachment = await importReceiptPhoto(input, attachmentsPath)
+        let receipt!: Receipt
+        this.#executeBackgroundWrite(() => {
+          receipt = insertReceipt(
+            this.#database,
+            attachment,
+            validatedSource,
+            this.#clock,
+          )
+        })
+        this.#options.onReceiptInboxChanged?.()
+        return receipt
+      },
+      confirmReceipt: (input) => {
+        const result = this.#executeAndRefreshRates(
+          confirmReceiptUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+            attachmentsPath,
+          ),
+        )
+        this.#options.onReceiptInboxChanged?.()
+        return result
+      },
+      discardReceipt: (id) => {
+        const receipt = this.#executeUndoableCommand(
+          discardReceiptUndoableCommand(this.#database, id),
+        )
+        this.#options.onReceiptInboxChanged?.()
+        return receipt
+      },
+      renderReceiptPreview: async (id, thumbnail = false) => {
+        this.#assertAvailable()
+        return renderReceiptPreview(
+          this.#database,
+          id,
+          attachmentsPath,
+          thumbnail,
+        )
+      },
       importAttachment: async (path) => {
         this.#assertAvailable()
         return importAttachment(path, attachmentsPath)
@@ -1336,6 +1443,7 @@ class OpenProfileApplication implements ProfileApplication {
         if (undone) {
           this.#maybeRefreshExchangeRates()
           this.#options.onPendingTransactionsChanged?.()
+          this.#options.onReceiptInboxChanged?.()
         }
         return undone
       },
@@ -1391,7 +1499,10 @@ class OpenProfileApplication implements ProfileApplication {
             .listCategories()
             .find((category) => category.id === id)!
         })(),
-      restoreBackup: (input) => this.#restoreBackup(input),
+      restoreBackup: async (input) => {
+        await this.#restoreBackup(input)
+        this.#options.onReceiptInboxChanged?.()
+      },
       ensureProfileIdentity: () => this.#ensureProfileIdentity(),
       createAccount: (input) =>
         this.#executeAndRefreshRates(
@@ -1420,6 +1531,18 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      listReceipts: () => {
+        this.#assertAvailable()
+        return listReceipts(this.#database)
+      },
+      getReceiptInboxCount: () => {
+        this.#assertAvailable()
+        return getReceiptInboxCount(this.#database)
+      },
+      getReceiptDefaultAccountId: () => {
+        this.#assertAvailable()
+        return getReceiptDefaultAccountId(this.#database)
+      },
       listAttachments: (transactionId) => {
         this.#assertAvailable()
         return listAttachments(this.#database, transactionId)

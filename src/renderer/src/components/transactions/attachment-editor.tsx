@@ -51,13 +51,24 @@ export function AttachmentEditor({
         </Button>
       </div>
       <div
+        data-transaction-attachment-drop-zone
         className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground"
+        onDragEnter={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+        }}
         onDragOver={(event) => {
           event.preventDefault()
+          event.stopPropagation()
           event.dataTransfer.dropEffect = 'copy'
+        }}
+        onDragLeave={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
         }}
         onDrop={(event) => {
           event.preventDefault()
+          event.stopPropagation()
           if (busy) return
           onAdd(
             [...event.dataTransfer.files]

@@ -110,6 +110,14 @@ import type {
   RecurringTransactionIdInput,
   UpdateRecurringTransactionInput,
 } from './recurring'
+import type {
+  ConfirmReceiptInput,
+  ConfirmedReceipt,
+  IntakeReceiptInput,
+  Receipt,
+  ReceiptIdInput,
+  ReceiptPreviewInput,
+} from './receipts'
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
@@ -211,6 +219,14 @@ export const IPC_CHANNELS = {
   pendingConfirm: 'pending:confirm',
   pendingSkip: 'pending:skip',
   pendingChanged: 'pending:changed',
+  receiptsIntake: 'receipts:intake',
+  receiptsList: 'receipts:list',
+  receiptsCount: 'receipts:count',
+  receiptsDefaultAccount: 'receipts:default-account',
+  receiptsConfirm: 'receipts:confirm',
+  receiptsDiscard: 'receipts:discard',
+  receiptsPreview: 'receipts:preview',
+  receiptsChanged: 'receipts:changed',
 } as const
 
 export interface AppBridge {
@@ -225,6 +241,16 @@ export interface AppBridge {
     attach(input: AttachAttachmentInput): Promise<Attachment>
     remove(input: AttachmentIdInput): Promise<void>
     open(input: OpenAttachmentInput): Promise<void>
+  }
+  receipts: {
+    intake(input: IntakeReceiptInput): Promise<Receipt>
+    list(): Promise<Receipt[]>
+    count(): Promise<number>
+    defaultAccountId(): Promise<string | null>
+    confirm(input: ConfirmReceiptInput): Promise<ConfirmedReceipt>
+    discard(input: ReceiptIdInput): Promise<Receipt>
+    preview(input: ReceiptPreviewInput): Promise<string>
+    onChanged(listener: () => void): () => void
   }
   desktop: {
     autostartStatus(): Promise<AutostartStatus>
