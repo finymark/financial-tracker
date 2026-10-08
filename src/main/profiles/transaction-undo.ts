@@ -5,6 +5,8 @@ import type {
   UpdateTransactionInput,
 } from '../../shared/transactions'
 import { normalizePayeeKey } from '../db'
+import type { Tag } from '../../shared/tags'
+import { hasTagSchema, getLineTags } from './profile-tags'
 import {
   createTransaction,
   deleteTransaction,
@@ -44,6 +46,8 @@ interface TransactionAggregateImage {
   transaction: StoredTransactionImage | null
   lines: StoredTransactionLineImage[]
   payees: StoredPayeeImage[]
+  tags: Tag[]
+  lineTags: { lineId: string; tagId: string }[]
 }
 
 function hasNormalizedPayeeNames(database: Database.Database): boolean {
@@ -71,10 +75,25 @@ function findExistingPayeeId(
   return row?.id ?? null
 }
 
+function existingInputTagIds(
+  database: Database.Database,
+  names: unknown,
+): string[] {
+  if (!hasTagSchema(database) || !Array.isArray(names)) return []
+  return names.flatMap((name) => {
+    if (typeof name !== 'string') return []
+    const tag = database
+      .prepare('SELECT id FROM tags WHERE normalized_name = ?')
+      .get(normalizePayeeKey(name.trim())) as { id: string } | undefined
+    return tag ? [tag.id] : []
+  })
+}
+
 function captureAggregate(
   database: Database.Database,
   transactionId: string | null,
   additionalPayeeIds: readonly (string | null)[] = [],
+  additionalTagIds: readonly string[] = [],
 ): TransactionAggregateImage {
   const transaction = transactionId
     ? ((database
@@ -112,7 +131,27 @@ function captureAggregate(
     if (!payee) throw new Error('transactions.error.notFound')
     return payee
   })
-  return { transaction, lines, payees }
+  const lineTags = lines.flatMap((line) =>
+    getLineTags(database, line.id).map((tag) => ({
+      lineId: line.id,
+      tagId: tag.id,
+    })),
+  )
+  const tagIds = [
+    ...new Set([
+      ...lineTags.map((association) => association.tagId),
+      ...additionalTagIds,
+    ]),
+  ]
+  const tags = tagIds.map(
+    (id) =>
+      database
+        .prepare(
+          'SELECT id, name, created_at AS createdAt FROM tags WHERE id = ?',
+        )
+        .get(id) as Tag,
+  )
+  return { transaction, lines, payees, tags, lineTags }
 }
 
 function restoreAggregate(
@@ -145,6 +184,14 @@ function restoreAggregate(
         )
         .run(payee.id, payee.name, payee.createdAt)
     }
+  }
+  for (const tag of before.tags) {
+    database
+      .prepare(
+        `INSERT INTO tags (id, name, normalized_name, created_at) VALUES (?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET name = excluded.name, normalized_name = excluded.normalized_name, created_at = excluded.created_at`,
+      )
+      .run(tag.id, tag.name, normalizePayeeKey(tag.name), tag.createdAt)
   }
   if (before.transaction) {
     const transaction = before.transaction
@@ -183,6 +230,23 @@ function restoreAggregate(
       )
     }
   }
+  for (const association of before.lineTags) {
+    database
+      .prepare(
+        'INSERT INTO transaction_line_tags (line_id, tag_id) VALUES (?, ?)',
+      )
+      .run(association.lineId, association.tagId)
+  }
+  const beforeTagIds = new Set(before.tags.map((tag) => tag.id))
+  for (const tag of after.tags) {
+    if (!beforeTagIds.has(tag.id)) {
+      database
+        .prepare(
+          `DELETE FROM tags WHERE id = ? AND NOT EXISTS (SELECT 1 FROM transaction_line_tags WHERE tag_id = ?)`,
+        )
+        .run(tag.id, tag.id)
+    }
+  }
   const beforePayeeIds = new Set(before.payees.map((payee) => payee.id))
   for (const payee of after.payees) {
     if (!beforePayeeIds.has(payee.id)) {
@@ -211,12 +275,20 @@ export function createTransactionUndoableCommand(
 > {
   return {
     captureBefore: () =>
-      captureAggregate(database, null, [
-        findExistingPayeeId(database, input.payeeName),
-      ]),
+      captureAggregate(
+        database,
+        null,
+        [findExistingPayeeId(database, input.payeeName)],
+        existingInputTagIds(database, input.tagNames),
+      ),
     execute: () => createTransaction(database, input, clock),
     captureAfter: (result, before) =>
-      captureAggregate(database, result.id, affectedPayeeIds(before)),
+      captureAggregate(
+        database,
+        result.id,
+        affectedPayeeIds(before),
+        before.tags.map((tag) => tag.id),
+      ),
     restoreBefore: (before, after) => restoreAggregate(database, before, after),
   }
 }
@@ -233,14 +305,27 @@ export function updateTransactionUndoableCommand(
   return {
     captureBefore: () => {
       const current = captureAggregate(database, input.id)
-      return captureAggregate(database, input.id, [
-        ...affectedPayeeIds(current),
-        findExistingPayeeId(database, input.payeeName),
-      ])
+      return captureAggregate(
+        database,
+        input.id,
+        [
+          ...affectedPayeeIds(current),
+          findExistingPayeeId(database, input.payeeName),
+        ],
+        [
+          ...current.tags.map((tag) => tag.id),
+          ...existingInputTagIds(database, input.tagNames),
+        ],
+      )
     },
     execute: () => updateTransaction(database, input, clock),
     captureAfter: (result, before) =>
-      captureAggregate(database, result.id, affectedPayeeIds(before)),
+      captureAggregate(
+        database,
+        result.id,
+        affectedPayeeIds(before),
+        before.tags.map((tag) => tag.id),
+      ),
     restoreBefore: (before, after) => restoreAggregate(database, before, after),
   }
 }
@@ -253,7 +338,12 @@ export function deleteTransactionUndoableCommand(
     captureBefore: () => captureAggregate(database, id),
     execute: () => deleteTransaction(database, id),
     captureAfter: (_result, before) =>
-      captureAggregate(database, null, affectedPayeeIds(before)),
+      captureAggregate(
+        database,
+        null,
+        affectedPayeeIds(before),
+        before.tags.map((tag) => tag.id),
+      ),
     restoreBefore: (before, after) => restoreAggregate(database, before, after),
   }
 }

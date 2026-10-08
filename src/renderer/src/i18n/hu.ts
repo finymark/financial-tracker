@@ -116,7 +116,29 @@ export const hu = {
   'transactions.description':
     'Rögzítsd kiadásaidat, bevételeidet és átvezetéseidet, hogy a számlaegyenlegek naprakészek legyenek.',
   'transactions.listDescription':
-    'Szűrd a tranzakciókat időszak, számla, kategória, partner vagy megjegyzés szerint.',
+    'Szűrd a tranzakciókat időszak, számla, kategória, partner, címke vagy megjegyzés szerint.',
+  'adjustments.setRealBalance': 'Valós egyenleg beállítása',
+  'adjustments.edit': 'Egyenlegkorrekció szerkesztése',
+  'adjustments.save': 'Egyenlegkorrekció mentése',
+  'adjustments.deleteConfirmation':
+    'Végleg törlöd ezt az egyenlegkorrekciót? A számlaegyenleg frissülni fog.',
+  'adjustments.confirmDelete': 'Egyenlegkorrekció törlése',
+  'adjustments.rowType': 'Egyenlegkorrekció',
+  'adjustments.observedBalance': 'Megfigyelt egyenleg',
+  'adjustments.difference': 'Aktuális eltérés',
+  'adjustments.zeroDifference': 'Nincs szükség korrekcióra',
+  'adjustments.zeroDifferenceHint':
+    'Ez a korrekció már semmit sem korrigál, ezért törölhető.',
+  'adjustments.error.account': 'Válassz aktív számlát.',
+  'adjustments.error.date': 'Adj meg érvényes naptári dátumot.',
+  'adjustments.error.futureDate':
+    'Az egyenleg megfigyelésének dátuma nem lehet jövőbeli.',
+  'adjustments.error.balance':
+    'Adj meg érvényes egyenleget ±90 071 992 547 409,91 határon belül.',
+  'adjustments.error.note':
+    'Legfeljebb 1000 karakter hosszú megjegyzést adj meg.',
+  'adjustments.error.notFound':
+    'Az egyenlegkorrekció nem található. Frissítsd a listát.',
   'transactions.excluded': 'Kizárt',
   'transactions.excludedHint':
     'A számla egyenlegébe beleszámít, de a kiadások és bevételek összesítéséből kimarad.',
@@ -208,18 +230,35 @@ export const hu = {
     'A tranzakció nem található. Frissítsd a listát.',
   'transactions.error.lines':
     'A tranzakció sorainak összege nem egyezik a végösszeggel.',
+  'tags.title': 'Címkék',
+  'tags.all': 'Minden címke',
+  'tags.manage': 'Címkék kezelése',
+  'tags.empty': 'Címkéket a tranzakció űrlapján hozhatsz létre.',
+  'tags.name': 'Címke neve',
+  'tags.rename': 'Átnevezés',
+  'tags.delete': 'Címke törlése',
+  'tags.save': 'Címke mentése',
+  'tags.add': 'Címke hozzáadása',
+  'tags.remove': 'Címke eltávolítása',
+  'tags.hint':
+    'Válassz meglévő címkét, vagy írj be újat. Nyomj Entert vagy kattints a hozzáadásra; az új címkék mentéskor jönnek létre.',
+  'tags.deleteConfirmation':
+    'Törlöd ezt a címkét, és eltávolítod minden tranzakcióról?',
+  'tags.error.name': 'A címkék neve 1–100 karakter hosszú lehet.',
+  'tags.error.notFound': 'A címke nem található. Frissítsd a listát.',
+  'tags.error.duplicate': 'Már létezik ilyen nevű címke.',
+  'undo.available': 'Módosítás mentve.',
   'transfers.error.accountsDiffer': 'Válassz két különböző számlát.',
   'transfers.error.equalAmounts':
     'Azonos pénznemű számláknál a két összegnek egyeznie kell.',
   'transfers.error.notFound': 'Az átvezetés nem található. Frissítsd a listát.',
   'transfers.error.linkedFee':
     'Ezt a díjat a hozzá tartozó átvezetésen keresztül módosítsd vagy töröld.',
-  'undo.available': 'A tranzakció módosult.',
   'undo.action': 'Visszavonás',
   'undo.error': 'A módosítást nem sikerült visszavonni.',
   'accounts.title': 'Minden számlának saját hely',
   'accounts.description':
-    'Minden egyenleg a nyitó egyenleget, valamint a számla pénznemében rögzített bevételeket és kiadásokat összesíti.',
+    'Minden egyenleg a számla pénznemében rögzített, dátumozott pénzmozgásokat és egyenlegkorrekciókat összesíti.',
   'accounts.create': 'Számla létrehozása',
   'accounts.name': 'Számla neve',
   'accounts.currency': 'Pénznem',

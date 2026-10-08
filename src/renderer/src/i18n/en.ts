@@ -115,7 +115,28 @@ export const en = {
   'transactions.description':
     'Record expenses, income and transfers, then keep account balances up to date.',
   'transactions.listDescription':
-    'Filter transactions by period, account, category, payee or note.',
+    'Filter transactions by period, account, category, payee, tag or note.',
+  'adjustments.setRealBalance': 'Set real balance',
+  'adjustments.edit': 'Edit balance adjustment',
+  'adjustments.save': 'Save balance adjustment',
+  'adjustments.deleteConfirmation':
+    'Permanently delete this balance adjustment? The account balance will update.',
+  'adjustments.confirmDelete': 'Delete balance adjustment',
+  'adjustments.rowType': 'Balance adjustment',
+  'adjustments.observedBalance': 'Observed balance',
+  'adjustments.difference': 'Current difference',
+  'adjustments.zeroDifference': 'No correction needed',
+  'adjustments.zeroDifferenceHint':
+    'This adjustment no longer corrects anything and can be deleted.',
+  'adjustments.error.account': 'Choose an active account.',
+  'adjustments.error.date': 'Enter a valid calendar date.',
+  'adjustments.error.futureDate':
+    'The balance observation date cannot be in the future.',
+  'adjustments.error.balance':
+    'Enter a valid balance within ±90,071,992,547,409.91.',
+  'adjustments.error.note': 'Enter a note of at most 1,000 characters.',
+  'adjustments.error.notFound':
+    'The balance adjustment could not be found. Refresh the list.',
   'transactions.excluded': 'Excluded',
   'transactions.excludedHint':
     'Included in the account balance, but left out of expense and income totals.',
@@ -205,18 +226,35 @@ export const en = {
   'transactions.error.notFound':
     'The transaction could not be found. Refresh the list.',
   'transactions.error.lines': 'The transaction lines do not match its total.',
+  'tags.title': 'Tags',
+  'tags.all': 'All tags',
+  'tags.manage': 'Manage tags',
+  'tags.empty': 'Create tags in the transaction drawer.',
+  'tags.name': 'Tag name',
+  'tags.rename': 'Rename',
+  'tags.delete': 'Delete tag',
+  'tags.save': 'Save tag',
+  'tags.add': 'Add tag',
+  'tags.remove': 'Remove tag',
+  'tags.hint':
+    'Choose an existing tag or type a new one. Press Enter or Add tag; new tags are created when you save.',
+  'tags.deleteConfirmation':
+    'Delete this tag and remove it from all transactions?',
+  'tags.error.name': 'Enter tag names between 1 and 100 characters.',
+  'tags.error.notFound': 'The tag could not be found. Refresh the list.',
+  'tags.error.duplicate': 'A tag with this name already exists.',
+  'undo.available': 'Change saved.',
   'transfers.error.accountsDiffer': 'Choose two different accounts.',
   'transfers.error.equalAmounts':
     'Amounts must be equal when both accounts use the same currency.',
   'transfers.error.notFound':
     'The transfer could not be found. Refresh the list.',
   'transfers.error.linkedFee': 'Edit or delete this fee through its transfer.',
-  'undo.available': 'Transaction changed.',
   'undo.action': 'Undo',
   'undo.error': 'The change could not be undone.',
   'accounts.title': 'A place for each account',
   'accounts.description':
-    'Each balance combines its opening balance with income and expenses in the account currency.',
+    'Each balance combines its dated movements and observed balance adjustments in the account currency.',
   'accounts.create': 'Create account',
   'accounts.name': 'Account name',
   'accounts.currency': 'Currency',

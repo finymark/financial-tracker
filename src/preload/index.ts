@@ -27,8 +27,21 @@ const bridge: AppBridge = {
     update: (input) => ipcRenderer.invoke(IPC_CHANNELS.transfersUpdate, input),
     delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.transfersDelete, input),
   },
+  adjustments: {
+    create: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.adjustmentsCreate, input),
+    update: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.adjustmentsUpdate, input),
+    delete: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.adjustmentsDelete, input),
+  },
   undo: {
     last: () => ipcRenderer.invoke(IPC_CHANNELS.undoLast),
+  },
+  tags: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.tagsList),
+    rename: (input) => ipcRenderer.invoke(IPC_CHANNELS.tagsRename, input),
+    delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.tagsDelete, input),
   },
   payees: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.payeesList),

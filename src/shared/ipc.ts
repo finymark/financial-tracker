@@ -1,3 +1,4 @@
+import type { Tag, TagIdInput, RenameTagInput } from './tags'
 import type {
   Category,
   CategoryIdInput,
@@ -42,6 +43,12 @@ import type {
   TransferIdInput,
   UpdateTransferInput,
 } from './transfers'
+import type {
+  BalanceAdjustment,
+  BalanceAdjustmentIdInput,
+  CreateBalanceAdjustmentInput,
+  UpdateBalanceAdjustmentInput,
+} from './adjustments'
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
@@ -80,8 +87,14 @@ export const IPC_CHANNELS = {
   transfersCreate: 'transfers:create',
   transfersUpdate: 'transfers:update',
   transfersDelete: 'transfers:delete',
+  adjustmentsCreate: 'adjustments:create',
+  adjustmentsUpdate: 'adjustments:update',
+  adjustmentsDelete: 'adjustments:delete',
   undoLast: 'undo:last',
   payeesList: 'payees:list',
+  tagsList: 'tags:list',
+  tagsRename: 'tags:rename',
+  tagsDelete: 'tags:delete',
 } as const
 
 export interface AppBridge {
@@ -102,8 +115,18 @@ export interface AppBridge {
     update(input: UpdateTransferInput): Promise<Transfer>
     delete(input: TransferIdInput): Promise<void>
   }
+  adjustments: {
+    create(input: CreateBalanceAdjustmentInput): Promise<BalanceAdjustment>
+    update(input: UpdateBalanceAdjustmentInput): Promise<BalanceAdjustment>
+    delete(input: BalanceAdjustmentIdInput): Promise<void>
+  }
   undo: {
     last(): Promise<boolean>
+  }
+  tags: {
+    list(): Promise<Tag[]>
+    rename(input: RenameTagInput): Promise<Tag>
+    delete(input: TagIdInput): Promise<void>
   }
   payees: {
     list(): Promise<Payee[]>

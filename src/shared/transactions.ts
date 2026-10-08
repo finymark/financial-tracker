@@ -1,6 +1,8 @@
 import type { CategoryKind } from './categories'
 import type { Currency } from './accounts'
+import type { Tag } from './tags'
 import type { Transfer } from './transfers'
+import type { BalanceAdjustment } from './adjustments'
 
 export type TransactionKind = CategoryKind
 
@@ -14,6 +16,7 @@ export interface TransactionLine {
   id: string
   amountMinor: number
   categoryId: string | null
+  tags: Tag[]
 }
 
 export interface Transaction {
@@ -33,6 +36,8 @@ export interface Transaction {
 }
 
 export interface CreateTransactionInput {
+  // Omitted names mean no tags on create; supplied names replace the single line's tags.
+  tagNames?: string[]
   accountId: string
   kind: TransactionKind
   date: string
@@ -44,6 +49,7 @@ export interface CreateTransactionInput {
   excluded?: boolean
 }
 
+// On update, omitted tagNames preserve existing tags; an explicit [] removes them.
 export interface UpdateTransactionInput extends CreateTransactionInput {
   id: string
 }
@@ -55,6 +61,8 @@ export interface TransactionIdInput {
 export type TransactionPeriod =
   'all' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'custom'
 
+// Transfers and balance adjustments have no exclusion flag: onlyExcluded hides
+// both, while hideExcluded retains both. Tag filters hide both (neither has tags).
 export type TransactionExclusionFilter = 'all' | 'onlyExcluded' | 'hideExcluded'
 
 // Dates are inclusive and valid only with the custom period. Defaults: all
@@ -68,6 +76,7 @@ export interface TransactionListInput {
   accountId?: string
   categoryId?: string
   payeeId?: string
+  tagId?: string
   search?: string
   offset?: number
   limit?: number
@@ -85,7 +94,7 @@ export interface TransactionDayTotals {
 }
 
 export interface TransactionPage {
-  rows: (Transaction | Transfer)[]
+  rows: (Transaction | Transfer | BalanceAdjustment)[]
   totalCount: number
   // Aggregates cover the entire filtered set, independent of offset/limit,
   // and always omit excluded amounts.
