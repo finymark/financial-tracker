@@ -199,6 +199,19 @@ export const hu = {
   'overview.title': 'Pénzügyeid átláthatóan',
   'overview.description':
     'A pénzügyek összesített áttekintése később lesz itt elérhető.',
+  'reports.trend.title': 'Havi trend',
+  'reports.trend.description':
+    'Kiadások, bevételek és egyenleg az alapdevizában.',
+  'reports.trend.partial': 'részleges',
+  'reports.trend.partialHint':
+    'A részleges hónapok csak a kiválasztott tartomány napjait tartalmazzák.',
+  'reports.trend.unconvertedHint':
+    'Az árfolyam nélküli összegek nem szerepelnek a diagramon. Az alábbi táblázat havonta külön mutatja őket.',
+  'reports.trend.chartLabel': 'Havi kiadások és bevételek egyenlegvonallal',
+  'reports.trend.month': 'Hónap',
+  'reports.trend.expenses': 'Kiadások',
+  'reports.trend.incomes': 'Bevételek',
+  'reports.trend.net': 'Egyenleg',
   'reports.title': 'Kiadások kategóriánként',
   'reports.description':
     'Hasonlítsa össze a kategóriák összegeit az alapdevizában, és tekintse meg a mögöttes tranzakciókat.',

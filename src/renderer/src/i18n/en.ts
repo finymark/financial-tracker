@@ -197,6 +197,19 @@ export const en = {
   'overview.title': 'A clear view of your finances',
   'overview.description':
     'A summarized financial overview will be available here later.',
+  'reports.trend.title': 'Monthly trend',
+  'reports.trend.description':
+    'Expenses, incomes and net in your base currency.',
+  'reports.trend.partial': 'partial',
+  'reports.trend.partialHint':
+    'Partial months include only days within the selected range.',
+  'reports.trend.unconvertedHint':
+    'Amounts without a rate are not in the chart. Each month lists them separately below.',
+  'reports.trend.chartLabel': 'Monthly expenses and incomes with a net line',
+  'reports.trend.month': 'Month',
+  'reports.trend.expenses': 'Expenses',
+  'reports.trend.incomes': 'Incomes',
+  'reports.trend.net': 'Net',
   'reports.title': 'Expenses by category',
   'reports.description':
     'Compare category totals in your base currency and drill down to the transactions behind them.',
