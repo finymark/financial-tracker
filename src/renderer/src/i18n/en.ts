@@ -1,6 +1,46 @@
 import { categoryNames } from '../../../shared/category-translations'
 export const en = {
+  'shortcuts.closeHelp': 'Close shortcut help',
+  'transactions.saveAndAddAnother': 'Save and add another',
+  'shortcuts.scope':
+    'With an open profile: new transaction and undo work outside text editing controls. Type and save shortcuts work in the transaction drawer.',
+  'shortcuts.navigation':
+    'Tab / Shift+Tab move between fields and stay inside the open dialog.',
+  'shortcuts.undo':
+    'Undo latest transaction command (outside text editing controls)',
+  'shortcuts.close': 'Cancel / close drawer or shortcut help',
+  'shortcuts.help': 'Keyboard shortcuts',
+  'shortcuts.save':
+    'Save (except in multiline notes; buttons keep their own action)',
+  'shortcuts.saveAndAddAnother':
+    'Save and add another (keep date, accounts and type)',
+  'shortcuts.newTransaction': 'New transaction (outside text editing controls)',
   ...categoryNames.en,
+  'payees.title': 'Payees',
+  'payees.description':
+    'Aliases map raw names to one payee. Matching ignores case and diacritics. Merging moves transactions and aliases to the chosen survivor.',
+  'payees.loading': 'Loading payees…',
+  'payees.empty': 'Payees appear here after you record a transaction.',
+  'payees.aliases': 'Aliases',
+  'payees.noAliases': 'No aliases.',
+  'payees.aliasName': 'Raw payee name',
+  'payees.addAlias': 'Add alias',
+  'payees.removeAlias': 'Remove',
+  'payees.mergeInto': 'Merge this payee into',
+  'payees.chooseSurvivor': 'Choose the surviving payee',
+  'payees.merge': 'Merge payees',
+  'payees.mergeHint':
+    'All transactions and aliases move to the surviving payee. You can undo this change.',
+  'payees.refresh': 'Refresh',
+  'payees.error': 'The payee operation could not be completed. Try again.',
+  'payees.error.notFound': 'The payee could not be found. Refresh the list.',
+  'payees.error.aliasNotFound':
+    'The alias could not be found. Refresh the list.',
+  'payees.error.aliasName': 'Enter an alias between 1 and 100 characters.',
+  'payees.error.aliasConflict':
+    'That raw name already belongs to a payee or alias.',
+  'payees.error.samePayee': 'Choose a different surviving payee.',
+  'payees.error.query': 'The payee search is invalid.',
   'categories.title': 'Categories',
   'categories.description':
     'Expense and income categories have at most two levels. Default names follow your language; custom names stay unchanged. Archiving a main category also hides its subcategories from pickers.',
@@ -101,6 +141,27 @@ export const en = {
     'Record expenses, income and transfers, then keep account balances up to date.',
   'transactions.listDescription':
     'Filter transactions by period, account, category, payee, tag or note.',
+  'adjustments.setRealBalance': 'Set real balance',
+  'adjustments.edit': 'Edit balance adjustment',
+  'adjustments.save': 'Save balance adjustment',
+  'adjustments.deleteConfirmation':
+    'Permanently delete this balance adjustment? The account balance will update.',
+  'adjustments.confirmDelete': 'Delete balance adjustment',
+  'adjustments.rowType': 'Balance adjustment',
+  'adjustments.observedBalance': 'Observed balance',
+  'adjustments.difference': 'Current difference',
+  'adjustments.zeroDifference': 'No correction needed',
+  'adjustments.zeroDifferenceHint':
+    'This adjustment no longer corrects anything and can be deleted.',
+  'adjustments.error.account': 'Choose an active account.',
+  'adjustments.error.date': 'Enter a valid calendar date.',
+  'adjustments.error.futureDate':
+    'The balance observation date cannot be in the future.',
+  'adjustments.error.balance':
+    'Enter a valid balance within ±90,071,992,547,409.91.',
+  'adjustments.error.note': 'Enter a note of at most 1,000 characters.',
+  'adjustments.error.notFound':
+    'The balance adjustment could not be found. Refresh the list.',
   'transactions.excluded': 'Excluded',
   'transactions.excludedHint':
     'Included in the account balance, but left out of expense and income totals.',
@@ -225,7 +286,7 @@ export const en = {
   'undo.error': 'The change could not be undone.',
   'accounts.title': 'A place for each account',
   'accounts.description':
-    'Each balance combines its opening balance with income and expenses in the account currency.',
+    'Each balance combines its dated movements and observed balance adjustments in the account currency.',
   'accounts.create': 'Create account',
   'accounts.name': 'Account name',
   'accounts.currency': 'Currency',

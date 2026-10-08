@@ -193,6 +193,7 @@ test('renames tags everywhere and undo restores the original identity and spelli
       .rows.every(
         (transaction) =>
           transaction.kind !== 'transfer' &&
+          transaction.kind !== 'adjustment' &&
           transaction.line.tags[0].name === 'Vacation',
       ),
   ).toBe(true)
@@ -226,7 +227,7 @@ test('deleting a tag removes all associations and undo restores them without cha
   const deleted = application.queries.listTransactions()
   expect(deleted.rows).toEqual(
     before.rows.map((transaction) =>
-      transaction.kind === 'transfer'
+      transaction.kind === 'transfer' || transaction.kind === 'adjustment'
         ? transaction
         : {
             ...transaction,

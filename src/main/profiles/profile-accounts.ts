@@ -13,6 +13,7 @@ import {
   validateOpeningBalance,
   validateOpeningDate,
 } from './account-validation'
+import { calculateAccountHistory } from './profile-account-movements'
 
 interface StoredAccount extends CreateAccountInput {
   id: string
@@ -41,6 +42,16 @@ function hasTransfersTable(database: Database.Database): boolean {
   )
 }
 
+function hasAdjustmentsTable(database: Database.Database): boolean {
+  return Boolean(
+    database
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'balance_adjustments'",
+      )
+      .get(),
+  )
+}
+
 export function hasAccountTransactions(
   database: Database.Database,
   id: string,
@@ -52,13 +63,19 @@ export function hasAccountTransactions(
       .get(account.id),
   )
   if (transaction || !hasTransfersTable(database)) return transaction
-  return Boolean(
+  const transfer = Boolean(
     database
       .prepare(
         `SELECT 1 FROM transfers
          WHERE from_account_id = ? OR to_account_id = ? LIMIT 1`,
       )
       .get(account.id, account.id),
+  )
+  if (transfer || !hasAdjustmentsTable(database)) return transfer
+  return Boolean(
+    database
+      .prepare('SELECT 1 FROM balance_adjustments WHERE account_id = ? LIMIT 1')
+      .get(account.id),
   )
 }
 
@@ -67,30 +84,7 @@ export function getAccountBalance(
   id: string,
 ): number {
   const account = getAccount(database, id)
-  const totals = database
-    .prepare(
-      `SELECT COALESCE(SUM(
-        CASE kind WHEN 'income' THEN total_minor ELSE -total_minor END
-      ), 0) AS total FROM transactions WHERE account_id = ?`,
-    )
-    .get(account.id) as { total: number }
-  const transferTotals = hasTransfersTable(database)
-    ? (database
-        .prepare(
-          `SELECT COALESCE(SUM(
-            CASE
-              WHEN from_account_id = ? THEN -from_amount_minor
-              ELSE to_amount_minor
-            END
-          ), 0) AS total
-          FROM transfers
-          WHERE from_account_id = ? OR to_account_id = ?`,
-        )
-        .get(account.id, account.id, account.id) as { total: number })
-    : { total: 0 }
-  const balance = account.openingBalance + totals.total + transferTotals.total
-  if (!Number.isSafeInteger(balance)) throw new Error('accounts.error.balance')
-  return balance
+  return calculateAccountHistory(database, account.id).balance
 }
 
 function accountView(

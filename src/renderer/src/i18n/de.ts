@@ -2,7 +2,52 @@ import { categoryNames } from '../../../shared/category-translations'
 import type { MessageCatalog } from './en'
 
 export const de = {
+  'shortcuts.closeHelp': 'Tastaturhilfe schließen',
+  'transactions.saveAndAddAnother': 'Speichern und weitere hinzufügen',
+  'shortcuts.scope':
+    'Bei geöffnetem Profil: Neue Transaktion und Rückgängig funktionieren außerhalb von Eingabefeldern. Typ- und Speicherkürzel gelten im Transaktionsfenster.',
+  'shortcuts.navigation':
+    'Tab / Shift+Tab wechseln zwischen Feldern und bleiben im geöffneten Dialog.',
+  'shortcuts.undo':
+    'Letzte Transaktionsänderung rückgängig machen (außerhalb von Eingabefeldern)',
+  'shortcuts.close':
+    'Abbrechen / Transaktionsfenster oder Tastaturhilfe schließen',
+  'shortcuts.help': 'Tastenkürzel',
+  'shortcuts.save':
+    'Speichern (nicht in mehrzeiligen Notizen; Schaltflächen behalten ihre eigene Aktion)',
+  'shortcuts.saveAndAddAnother':
+    'Speichern und weitere hinzufügen (Datum, Konten und Typ behalten)',
+  'shortcuts.newTransaction': 'Neue Transaktion (außerhalb von Eingabefeldern)',
   ...categoryNames.de,
+  'payees.title': 'Zahlungspartner',
+  'payees.description':
+    'Aliasse ordnen Rohbezeichnungen einem Zahlungspartner zu. Groß-/Kleinschreibung und Akzente werden beim Abgleich ignoriert. Beim Zusammenführen wechseln Transaktionen und Aliasse zum ausgewählten verbleibenden Zahlungspartner.',
+  'payees.loading': 'Zahlungspartner werden geladen…',
+  'payees.empty':
+    'Zahlungspartner erscheinen hier nach dem Erfassen einer Transaktion.',
+  'payees.aliases': 'Aliasse',
+  'payees.noAliases': 'Keine Aliasse.',
+  'payees.aliasName': 'Rohe Zahlungspartnerbezeichnung',
+  'payees.addAlias': 'Alias hinzufügen',
+  'payees.removeAlias': 'Entfernen',
+  'payees.mergeInto': 'Diesen Zahlungspartner zusammenführen mit',
+  'payees.chooseSurvivor': 'Verbleibenden Zahlungspartner auswählen',
+  'payees.merge': 'Zahlungspartner zusammenführen',
+  'payees.mergeHint':
+    'Alle Transaktionen und Aliasse wechseln zum verbleibenden Zahlungspartner. Diese Änderung kann rückgängig gemacht werden.',
+  'payees.refresh': 'Aktualisieren',
+  'payees.error':
+    'Der Zahlungspartnervorgang konnte nicht abgeschlossen werden. Versuche es erneut.',
+  'payees.error.notFound':
+    'Der Zahlungspartner wurde nicht gefunden. Aktualisiere die Liste.',
+  'payees.error.aliasNotFound':
+    'Der Alias wurde nicht gefunden. Aktualisiere die Liste.',
+  'payees.error.aliasName': 'Gib einen Alias mit 1 bis 100 Zeichen ein.',
+  'payees.error.aliasConflict':
+    'Diese Rohbezeichnung gehört bereits zu einem Zahlungspartner oder Alias.',
+  'payees.error.samePayee':
+    'Wähle einen anderen verbleibenden Zahlungspartner.',
+  'payees.error.query': 'Die Zahlungspartnersuche ist ungültig.',
   'categories.title': 'Kategorien',
   'categories.description':
     'Ausgaben- und Einnahmenkategorien haben höchstens zwei Ebenen. Standardnamen folgen der Sprache; eigene Namen bleiben unverändert. Das Archivieren einer Hauptkategorie blendet auch ihre Unterkategorien in Auswahllisten aus.',
@@ -108,6 +153,27 @@ export const de = {
     'Erfasse Ausgaben, Einnahmen und Umbuchungen, damit deine Kontosalden aktuell bleiben.',
   'transactions.listDescription':
     'Transaktionen nach Zeitraum, Konto, Kategorie, Zahlungspartner, Tag oder Notiz filtern.',
+  'adjustments.setRealBalance': 'Tatsächlichen Saldo setzen',
+  'adjustments.edit': 'Saldoabgleich bearbeiten',
+  'adjustments.save': 'Saldoabgleich speichern',
+  'adjustments.deleteConfirmation':
+    'Diesen Saldoabgleich dauerhaft löschen? Der Kontosaldo wird aktualisiert.',
+  'adjustments.confirmDelete': 'Saldoabgleich löschen',
+  'adjustments.rowType': 'Saldoabgleich',
+  'adjustments.observedBalance': 'Beobachteter Saldo',
+  'adjustments.difference': 'Aktuelle Differenz',
+  'adjustments.zeroDifference': 'Keine Korrektur nötig',
+  'adjustments.zeroDifferenceHint':
+    'Dieser Abgleich korrigiert nichts mehr und kann gelöscht werden.',
+  'adjustments.error.account': 'Wähle ein aktives Konto.',
+  'adjustments.error.date': 'Gib ein gültiges Kalenderdatum ein.',
+  'adjustments.error.futureDate':
+    'Das Datum der Saldo-Beobachtung darf nicht in der Zukunft liegen.',
+  'adjustments.error.balance':
+    'Gib einen gültigen Saldo innerhalb von ±90.071.992.547.409,91 ein.',
+  'adjustments.error.note': 'Gib eine Notiz mit höchstens 1.000 Zeichen ein.',
+  'adjustments.error.notFound':
+    'Der Saldoabgleich wurde nicht gefunden. Aktualisiere die Liste.',
   'transactions.excluded': 'Ausgeschlossen',
   'transactions.excludedHint':
     'Im Kontostand enthalten, aber nicht in den Ausgaben- und Einnahmensummen.',
@@ -237,7 +303,7 @@ export const de = {
   'undo.error': 'Die Änderung konnte nicht rückgängig gemacht werden.',
   'accounts.title': 'Ein Platz für jedes Konto',
   'accounts.description':
-    'Jeder Saldo kombiniert Eröffnungssaldo, Einnahmen und Ausgaben in der Kontowährung.',
+    'Jeder Saldo kombiniert datierte Kontobewegungen und beobachtete Saldoabgleiche in der Kontowährung.',
   'accounts.create': 'Konto erstellen',
   'accounts.name': 'Kontoname',
   'accounts.currency': 'Währung',

@@ -30,7 +30,6 @@ import type {
 import type { ProfileSettings } from './settings'
 import type {
   CreateTransactionInput,
-  Payee,
   TransactionListInput,
   TransactionPage,
   Transaction,
@@ -43,6 +42,22 @@ import type {
   TransferIdInput,
   UpdateTransferInput,
 } from './transfers'
+import type {
+  AddPayeeAliasInput,
+  MergePayeesInput,
+  Payee,
+  PayeeAlias,
+  PayeeAliasIdInput,
+  PayeeAliasesInput,
+  PayeeSuggestion,
+  PayeeSuggestionInput,
+} from './payees'
+import type {
+  BalanceAdjustment,
+  BalanceAdjustmentIdInput,
+  CreateBalanceAdjustmentInput,
+  UpdateBalanceAdjustmentInput,
+} from './adjustments'
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
@@ -81,8 +96,16 @@ export const IPC_CHANNELS = {
   transfersCreate: 'transfers:create',
   transfersUpdate: 'transfers:update',
   transfersDelete: 'transfers:delete',
+  adjustmentsCreate: 'adjustments:create',
+  adjustmentsUpdate: 'adjustments:update',
+  adjustmentsDelete: 'adjustments:delete',
   undoLast: 'undo:last',
   payeesList: 'payees:list',
+  payeesSuggest: 'payees:suggest',
+  payeeAliasesList: 'payee-aliases:list',
+  payeeAliasesAdd: 'payee-aliases:add',
+  payeeAliasesRemove: 'payee-aliases:remove',
+  payeesMerge: 'payees:merge',
   tagsList: 'tags:list',
   tagsRename: 'tags:rename',
   tagsDelete: 'tags:delete',
@@ -106,6 +129,11 @@ export interface AppBridge {
     update(input: UpdateTransferInput): Promise<Transfer>
     delete(input: TransferIdInput): Promise<void>
   }
+  adjustments: {
+    create(input: CreateBalanceAdjustmentInput): Promise<BalanceAdjustment>
+    update(input: UpdateBalanceAdjustmentInput): Promise<BalanceAdjustment>
+    delete(input: BalanceAdjustmentIdInput): Promise<void>
+  }
   undo: {
     last(): Promise<boolean>
   }
@@ -116,6 +144,11 @@ export interface AppBridge {
   }
   payees: {
     list(): Promise<Payee[]>
+    suggest(input: PayeeSuggestionInput): Promise<PayeeSuggestion[]>
+    listAliases(input: PayeeAliasesInput): Promise<PayeeAlias[]>
+    addAlias(input: AddPayeeAliasInput): Promise<PayeeAlias>
+    removeAlias(input: PayeeAliasIdInput): Promise<void>
+    merge(input: MergePayeesInput): Promise<Payee>
   }
   backups: {
     list(): Promise<ProfileBackup[]>

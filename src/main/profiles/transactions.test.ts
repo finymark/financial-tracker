@@ -1294,7 +1294,9 @@ test('payee-key migration merges Unicode case duplicates and repoints their tran
   expect(
     upgraded.queries
       .listTransactions()
-      .rows.map((row) => (row.kind === 'transfer' ? null : row.payeeId)),
+      .rows.map((row) =>
+        row.kind === 'expense' || row.kind === 'income' ? row.payeeId : null,
+      ),
   ).toEqual([oldest.payeeId, oldest.payeeId])
 })
 

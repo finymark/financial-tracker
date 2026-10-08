@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   Pencil,
+  Scale,
   Trash2,
 } from 'lucide-react'
 import type { Account } from '../../../shared/accounts'
@@ -17,6 +18,7 @@ import type {
   TransactionTotals,
 } from '../../../shared/transactions'
 import type { Transfer } from '../../../shared/transfers'
+import type { BalanceAdjustment } from '../../../shared/adjustments'
 import { createFormatters, type Language, type MessageKey } from '../i18n'
 import { Button } from './ui/button'
 
@@ -27,8 +29,8 @@ interface Props {
   language: Language
   t(key: MessageKey): string
   busy: boolean
-  onEdit(transaction: Transaction | Transfer): void
-  onDelete(transaction: Transaction | Transfer): void
+  onEdit(transaction: Transaction | Transfer | BalanceAdjustment): void
+  onDelete(transaction: Transaction | Transfer | BalanceAdjustment): void
 }
 
 export function Totals({
@@ -77,7 +79,7 @@ export function TransactionTable({
   const format = createFormatters(language)
   const items: (
     | { day: string }
-    | { transaction: Transaction | Transfer }
+    | { transaction: Transaction | Transfer | BalanceAdjustment }
     | { part: TransactionLine; parent: Transaction; partIndex: number }
   )[] = []
   let day = ''
@@ -88,7 +90,7 @@ export function TransactionTable({
     }
     items.push({ transaction })
     if (
-      transaction.kind !== 'transfer' &&
+      (transaction.kind === 'expense' || transaction.kind === 'income') &&
       transaction.lines.length > 1 &&
       expandedSplits.has(transaction.id)
     ) {
@@ -275,6 +277,69 @@ export function TransactionTable({
                 </tr>
               )
             }
+            if (transaction.kind === 'adjustment') {
+              const account = accounts.find(
+                (account) => account.id === transaction.accountId,
+              )
+              const sign = transaction.differenceMinor < 0 ? '−' : '+'
+              const absoluteDifference = Math.abs(transaction.differenceMinor)
+              return (
+                <tr
+                  key={transaction.id}
+                  aria-rowindex={start + index + 2}
+                  className="border-b bg-primary/5"
+                  style={{ height: ROW_HEIGHT }}
+                >
+                  <td className="truncate px-3 font-medium">
+                    <span className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1">
+                        <Scale aria-hidden="true" className="size-3" />
+                        {t('adjustments.rowType')}
+                      </span>
+                      {transaction.noLongerCorrectsAnything && (
+                        <span
+                          className="shrink-0 rounded border px-1 text-xs text-muted-foreground"
+                          title={t('adjustments.zeroDifferenceHint')}
+                        >
+                          {t('adjustments.zeroDifference')}
+                        </span>
+                      )}
+                    </span>
+                  </td>
+                  <td className="truncate px-3" title={account?.name}>
+                    {account?.name ?? t('transactions.unknownAccount')}
+                  </td>
+                  <td className="truncate px-3">
+                    {t('adjustments.observedBalance')}
+                  </td>
+                  <td />
+                  <td className="truncate px-3" title={transaction.note}>
+                    {transaction.note}
+                  </td>
+                  <td
+                    className="truncate px-3 text-right font-medium tabular-nums"
+                    title={t('adjustments.difference')}
+                  >
+                    <span className="whitespace-nowrap">
+                      {sign}
+                      {format.money(
+                        absoluteDifference,
+                        account?.currency ?? 'HUF',
+                      )}
+                    </span>
+                  </td>
+                  <td className="px-1">
+                    <RowActions
+                      transaction={transaction}
+                      busy={busy}
+                      t={t}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                    />
+                  </td>
+                </tr>
+              )
+            }
             const account = accounts.find(
               (account) => account.id === transaction.accountId,
             )
@@ -435,7 +500,7 @@ function RowActions({
   onEdit,
   onDelete,
 }: Pick<Props, 'busy' | 't' | 'onEdit' | 'onDelete'> & {
-  transaction: Transaction | Transfer
+  transaction: Transaction | Transfer | BalanceAdjustment
 }) {
   return (
     <div className="flex gap-1">
