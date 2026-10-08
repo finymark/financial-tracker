@@ -9,6 +9,7 @@ import { ProfileController } from './profiles/profile-controller'
 import { registerCategoryIpc } from './profiles/category-ipc'
 import { registerAccountIpc } from './profiles/account-ipc'
 import { registerProfileIpc } from './profiles/profile-ipc'
+import { registerTransactionIpc } from './profiles/transaction-ipc'
 import { ProfileRegistry } from './profiles/profile-registry'
 
 const APP_ID = 'com.finymark.financial-tracker'
@@ -84,6 +85,7 @@ void app.whenReady().then(() => {
   registerProfileIpc(ipcMain, profiles)
   registerAccountIpc(ipcMain, profiles)
   registerCategoryIpc(ipcMain, profiles)
+  registerTransactionIpc(ipcMain, profiles)
 
   let shutdownPromise: Promise<void> | null = null
   let shutdownComplete = false

@@ -319,7 +319,9 @@ test('the category migration seeds existing profiles in their saved language and
   application.close()
   const upgraded = await openProfileApplication({ profile, paths, clock })
   applications.push(upgraded)
-  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(4)
+  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(
+    CURRENT_MIGRATIONS.length,
+  )
   const food = upgraded.queries
     .listCategories()
     .find((category) => category.seedKey === 'expense.food')!

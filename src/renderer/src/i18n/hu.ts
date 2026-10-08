@@ -43,9 +43,6 @@ export const hu = {
     'Ehhez a kategóriához tranzakciók tartoznak. Válassz helyettesítőt a megőrzésükhöz.',
   'categories.error.replacement':
     'Válassz másik, azonos típusú, aktív helyettesítő kategóriát.',
-  'categories.error.transactionIntegration':
-    'A tranzakciók átsorolása ebben a verzióban még nem érhető el. A kategória nem lett törölve.',
-
   'updates.ready':
     'A frissítés letöltődött. A telepítéshez indítsa újra az alkalmazást.',
   'updates.restart': 'Újraindítás és frissítés',
@@ -84,13 +81,64 @@ export const hu = {
   'profile.error': 'A profilműveletet nem sikerült végrehajtani.',
   'overview.title': 'Pénzügyeid átláthatóan',
   'overview.description':
-    'A pénzügyi áttekintés itt jelenik majd meg, amikor a számlák és a tranzakciók elérhetővé válnak.',
+    'A pénzügyek összesített áttekintése később lesz itt elérhető.',
   'transactions.title': 'Tranzakcióid egy helyen',
   'transactions.description':
-    'A kiadások és bevételek rögzítése és áttekintése később itt lesz elérhető.',
+    'Rögzítsd kiadásaidat és bevételeidet, hogy a számlaegyenlegek naprakészek legyenek.',
+  'transactions.listDescription':
+    'Itt láthatók a legutóbbi tranzakciók. A szűrés és a keresés később érkezik.',
+  'transactions.create': 'Tranzakció rögzítése',
+  'transactions.edit': 'Tranzakció szerkesztése',
+  'transactions.delete': 'Törlés',
+  'transactions.deleteConfirmation':
+    'Végleg törlöd ezt a tranzakciót? A számla egyenlege frissülni fog.',
+  'transactions.confirmDelete': 'Tranzakció törlése',
+  'transactions.cancel': 'Mégse',
+  'transactions.close': 'Tranzakciós panel bezárása',
+  'transactions.save': 'Tranzakció mentése',
+  'transactions.loading': 'Tranzakciók betöltése…',
+  'transactions.empty': 'Még nincs rögzített tranzakció.',
+  'transactions.noAccounts':
+    'Tranzakció rögzítése előtt hozz létre egy aktív számlát.',
+  'transactions.refresh': 'Frissítés',
+  'transactions.kind': 'Kiadás vagy bevétel',
+  'transactions.expense': 'Kiadás',
+  'transactions.income': 'Bevétel',
+  'transactions.date': 'Dátum',
+  'transactions.amount': 'Összeg',
+  'transactions.amountHint':
+    'Adj meg pozitív összeget ponttal vagy vesszővel és legfeljebb két tizedesjeggyel.',
+  'transactions.account': 'Számla',
+  'transactions.chooseAccount': 'Válassz aktív számlát',
+  'transactions.payee': 'Kedvezményezett',
+  'transactions.payeeHint':
+    'Válassz meglévő nevet, vagy új kedvezményezett létrehozásához írj be egy újat.',
+  'transactions.category': 'Kategória',
+  'transactions.note': 'Megjegyzés',
+  'transactions.noPayee': 'Nincs kedvezményezett',
+  'transactions.noCategory': 'Nincs kategória',
+  'transactions.unknownAccount': 'Ismeretlen számla',
+  'transactions.error':
+    'A tranzakciós művelet nem sikerült. Frissíts, és próbáld újra.',
+  'transactions.error.account': 'Válassz aktív számlát.',
+  'transactions.error.kind': 'Válassz kiadást vagy bevételt.',
+  'transactions.error.date': 'Adj meg érvényes naptári dátumot.',
+  'transactions.error.futureDate': 'A tranzakció dátuma nem lehet jövőbeli.',
+  'transactions.error.amount':
+    'Adj meg pozitív összeget legfeljebb két tizedesjeggyel.',
+  'transactions.error.payee':
+    'Adj meg legfeljebb 100 karakter hosszú kedvezményezettnevet.',
+  'transactions.error.category':
+    'Válassz a kiadásnak vagy bevételnek megfelelő aktív kategóriát.',
+  'transactions.error.note':
+    'Adj meg legfeljebb 1000 karakter hosszú megjegyzést.',
+  'transactions.error.notFound':
+    'A tranzakció nem található. Frissítsd a listát.',
+  'transactions.error.lines':
+    'A tranzakció sorainak összege nem egyezik a végösszeggel.',
   'accounts.title': 'Minden számlának saját hely',
   'accounts.description':
-    'Minden egyenleg a számla pénznemében látható. Az egyenlegek jelenleg a nyitó egyenlegekkel egyeznek meg.',
+    'Minden egyenleg a nyitó egyenleget, valamint a számla pénznemében rögzített bevételeket és kiadásokat összesíti.',
   'accounts.create': 'Számla létrehozása',
   'accounts.name': 'Számla neve',
   'accounts.currency': 'Pénznem',

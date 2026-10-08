@@ -14,6 +14,18 @@ const bridge: AppBridge = {
   },
   getVersion: () => ipcRenderer.invoke(IPC_CHANNELS.getVersion),
   dbPing: () => ipcRenderer.invoke(IPC_CHANNELS.dbPing),
+  transactions: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.transactionsList),
+    create: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.transactionsCreate, input),
+    update: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.transactionsUpdate, input),
+    delete: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.transactionsDelete, input),
+  },
+  payees: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.payeesList),
+  },
   backups: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.backupsList),
     restore: (input) => ipcRenderer.invoke(IPC_CHANNELS.backupsRestore, input),

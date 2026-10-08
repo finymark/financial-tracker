@@ -42,9 +42,6 @@ export const en = {
     'This category has transactions. Choose a replacement to preserve them.',
   'categories.error.replacement':
     'Choose a different, active replacement of the same kind.',
-  'categories.error.transactionIntegration':
-    'Transaction reassignment is not available in this version. The category was not deleted.',
-
   'updates.ready': 'An update is downloaded. Restart to install it.',
   'updates.restart': 'Restart and update',
   'updates.error': 'Could not restart for the update. Please try again.',
@@ -82,13 +79,62 @@ export const en = {
   'profile.error': 'The profile operation could not be completed.',
   'overview.title': 'A clear view of your finances',
   'overview.description':
-    'Your financial overview will appear here once accounts and transactions are available.',
+    'A summarized financial overview will be available here later.',
   'transactions.title': 'Your transactions in one place',
   'transactions.description':
-    'Recording and reviewing expenses and incomes will be available here later.',
+    'Record expenses and income, then keep account balances up to date.',
+  'transactions.listDescription':
+    'Recent transactions are shown here. Filtering and search are coming later.',
+  'transactions.create': 'Record transaction',
+  'transactions.edit': 'Edit transaction',
+  'transactions.delete': 'Delete',
+  'transactions.deleteConfirmation':
+    'Permanently delete this transaction? Its account balance will update.',
+  'transactions.confirmDelete': 'Delete transaction',
+  'transactions.cancel': 'Cancel',
+  'transactions.close': 'Close transaction drawer',
+  'transactions.save': 'Save transaction',
+  'transactions.loading': 'Loading transactions…',
+  'transactions.empty': 'No transactions recorded yet.',
+  'transactions.noAccounts':
+    'Create an active account before recording a transaction.',
+  'transactions.refresh': 'Refresh',
+  'transactions.kind': 'Expense or income',
+  'transactions.expense': 'Expense',
+  'transactions.income': 'Income',
+  'transactions.date': 'Date',
+  'transactions.amount': 'Amount',
+  'transactions.amountHint':
+    'Enter a positive amount with a dot or comma and up to two decimal places.',
+  'transactions.account': 'Account',
+  'transactions.chooseAccount': 'Choose an active account',
+  'transactions.payee': 'Payee',
+  'transactions.payeeHint':
+    'Choose an existing name or type a new payee to create it.',
+  'transactions.category': 'Category',
+  'transactions.note': 'Note',
+  'transactions.noPayee': 'No payee',
+  'transactions.noCategory': 'No category',
+  'transactions.unknownAccount': 'Unknown account',
+  'transactions.error':
+    'The transaction operation could not be completed. Refresh and try again.',
+  'transactions.error.account': 'Choose an active account.',
+  'transactions.error.kind': 'Choose expense or income.',
+  'transactions.error.date': 'Enter a valid calendar date.',
+  'transactions.error.futureDate':
+    'The transaction date cannot be in the future.',
+  'transactions.error.amount':
+    'Enter a positive amount with up to two decimal places.',
+  'transactions.error.payee': 'Enter a payee name of at most 100 characters.',
+  'transactions.error.category':
+    'Choose an active category matching expense or income.',
+  'transactions.error.note': 'Enter a note of at most 1,000 characters.',
+  'transactions.error.notFound':
+    'The transaction could not be found. Refresh the list.',
+  'transactions.error.lines': 'The transaction lines do not match its total.',
   'accounts.title': 'A place for each account',
   'accounts.description':
-    'Each balance is shown in the account currency. Balances currently equal opening balances.',
+    'Each balance combines its opening balance with income and expenses in the account currency.',
   'accounts.create': 'Create account',
   'accounts.name': 'Account name',
   'accounts.currency': 'Currency',

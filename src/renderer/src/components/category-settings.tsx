@@ -26,7 +26,6 @@ const errorKeys = [
   'categories.error.children',
   'categories.error.replacementRequired',
   'categories.error.replacement',
-  'categories.error.transactionIntegration',
 ] as const satisfies readonly MessageKey[]
 
 interface CategorySettingsProps {

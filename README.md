@@ -4,8 +4,8 @@ A local-first personal expense tracker for Windows, built with Electron, React,
 TypeScript, and SQLite. The app opens to a collapsible sidebar with Overview,
 Transactions, Accounts, and Settings pages. On start you pick or create a
 profile; each profile has its own SQLite database and data folder. Financial
-data stays local. Accounts now track opening balances; transactions are not
-implemented yet. Settings includes two-level expense/income category management.
+data stays local. Accounts track opening balances and signed expense/income
+transactions. Settings includes two-level expense/income category management.
 
 ## Requirements
 
@@ -122,10 +122,10 @@ net, not a substitute for review or CI: Git's `--no-verify` and `HUSKY=0` can by
 them, and pattern matching cannot detect every possible form of sensitive data.
 
 The renderer has no Node access; a sandboxed, isolated preload exposes only the
-typed app, update, profile (including settings), account, category, and backup commands/queries.
-Every IPC input is validated
-in the main process. Account and category writes use the profile application API, with each
-command executed in one SQLite transaction. SQLite is used only in the main
+typed app, update, profile (including settings), account, category, transaction,
+payee, and backup commands/queries. Every IPC input is validated in the main
+process. Financial writes use the profile application API, with each command
+executed in one SQLite transaction. SQLite is used only in the main
 process. Profiles are listed in `profiles.json` under the app's user-data folder; each
 profile lives in `profiles/<id>/` (database, data folder, and backups). Registry
 writes replace the file atomically and briefly retry transient Windows file locks
@@ -277,7 +277,8 @@ not off-device copies or backups of the separate data folder.
   language fails; TypeScript also checks Hungarian and German against English.
 - The profile area at the bottom of the sidebar shows the active profile and
   switches profiles. Accounts lists active and archived accounts with balances in
-  their own currency; Overview and Transactions are still placeholders.
+  their own currency. Transactions provides a minimal ledger list and a
+  right-side create/edit drawer; Overview remains a placeholder.
 
 ## Accounts
 
@@ -293,11 +294,9 @@ not off-device copies or backups of the separate data folder.
   accounts remain visible on Accounts with their balance and opening date.
 - Delete an account after confirming in the page. An opening balance alone does
   not prevent deletion: "empty" means no transactions.
-- Balances currently equal opening balances. The profile application's
-  `getAccountBalance` and `hasAccountTransactions` queries are the integration
-  points for #56, which will add signed transaction totals and transaction
-  existence checks. Deletion and currency-change guards already use the same
-  existence check; its positive cases will be tested when transactions arrive.
+- Balances equal opening balances plus income and minus expenses. Accounts with
+  transactions cannot be deleted or have their currency changed; archive them
+  instead.
 
 ## Categories
 
@@ -321,11 +320,41 @@ not off-device copies or backups of the separate data folder.
 - Deletion requires confirmation. Delete subcategories before their main category;
   deletion does not cascade. A replacement must be a different active category
   of the same kind, not hidden by an archived parent.
-- `hasCategoryTransactions` is the #56 integration point, matching accounts:
-  until transactions exist, categories are unused. The delete command already
-  requires a replacement when used, but actual transaction-line reassignment and
-  its positive-case tests belong to #56. Until that integration is complete, the
-  command fails closed if the existence query reports usage, preserving data.
+- Categories used by transaction lines require an active same-kind replacement
+  when deleted. Reassignment and deletion happen atomically, so transaction
+  lines are never orphaned.
+
+## Transactions
+
+- **Transactions → Record transaction** opens a right-side drawer for an expense
+  or income. Choose a non-archived account, a calendar date no later than today,
+  a positive amount, an optional payee and category, and a note.
+- Amount entry accepts a dot or comma with up to two decimal places and no
+  thousands separators. Amounts are persisted as exact integer hundredths. HUF
+  is displayed without decimals; CHF is displayed with two decimals.
+- Typing a new payee creates it in the active profile. An existing payee with the
+  same name ignoring case is reused. Category choices are limited to active
+  expense or income categories matching the transaction kind and preserve the
+  two-level hierarchy.
+- Each transaction currently has exactly one line whose amount equals its total.
+  This is the unsplit ledger shape; split transactions are not included yet.
+- Edit any listed transaction from the same drawer, or delete it after
+  confirmation. Create, edit, delete, category reassignment, and balance updates
+  run through the profile application command boundary in one SQLite transaction.
+- The page intentionally shows only a small transaction list. Search, filters,
+  and the full transaction list experience are not included yet.
+
+### Manual Transactions check
+
+Run `npm run dev`, open a profile with active HUF and CHF accounts, and navigate
+to Transactions. Record expenses and income using dot and comma decimals, a new
+payee, and main/subcategories; verify the list and account balances update and
+HUF is shown without decimals. Reuse the payee with different casing and confirm
+it appears with its original spelling. Try tomorrow's date and mismatched category
+kinds, then edit the date, account, kind, amount, payee, category, and note. Delete
+after first cancelling the confirmation. Archive an account and category and
+confirm neither appears in its drawer picker. Repeat in Hungarian, English, and
+German and check translated validation, keyboard focus, and light/dark themes.
 
 ### Manual Categories check
 
