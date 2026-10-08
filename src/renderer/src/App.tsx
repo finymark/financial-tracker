@@ -4,6 +4,7 @@ import {
   EyeOff,
   ArrowLeftRight,
   ChartPie,
+  CalendarClock,
   LayoutDashboard,
   PanelLeftClose,
   PanelLeftOpen,
@@ -20,6 +21,11 @@ import { ShortcutHelp } from './components/shortcut-help'
 import { matchShortcut, shortcuts } from './lib/shortcuts'
 import { PrivacyProvider } from './lib/privacy'
 import { shortcutTargetContext } from './lib/shortcut-context'
+import { AutostartSettings } from './components/autostart-settings'
+import {
+  ShortcutSettings,
+  shortcutConflictMessage,
+} from './components/shortcut-settings'
 import { UpdateNotice } from './components/update-notice'
 import { BackupSettings } from './components/backup-settings'
 import { CategorySettings } from './components/category-settings'
@@ -49,10 +55,13 @@ import type { RateStatus } from '../../shared/exchange-rates'
 import { ReportsPage } from './ReportsPage'
 import { OverviewPage } from './OverviewPage'
 import type { TransactionListInput } from '../../shared/transactions'
+import { RecurringPage } from './RecurringPage'
+import type { RecurringPrefill } from './lib/recurring-prefill'
 
 const pages = [
   { id: 'overview', icon: LayoutDashboard },
   { id: 'transactions', icon: ArrowLeftRight },
+  { id: 'recurring', icon: CalendarClock },
   { id: 'reports', icon: ChartPie },
   { id: 'accounts', icon: Wallet },
   { id: 'settings', icon: Settings },
@@ -369,6 +378,9 @@ function Shell({
   const [reportTransactionFilter, setReportTransactionFilter] =
     useState<TransactionListInput | null>(null)
   const [newTransactionRequested, setNewTransactionRequested] = useState(false)
+  const [recurringPrefill, setRecurringPrefill] =
+    useState<RecurringPrefill | null>(null)
+  const [duePendingCount, setDuePendingCount] = useState(0)
   const [showShortcutHelp, setShowShortcutHelp] = useState(false)
   const transactionRequestHandled = useCallback(
     () => setNewTransactionRequested(false),
@@ -411,6 +423,19 @@ function Shell({
     active.settings.privacyMode,
   ])
 
+  useEffect(
+    () =>
+      window.app.desktop.onDataChanged((offerUndo) => {
+        setUndoRevision((revision) => revision + 1)
+        setCategoryRevision((revision) => revision + 1)
+        if (offerUndo) {
+          setUndoError(false)
+          setUndoOffered(true)
+        }
+      }),
+    [],
+  )
+
   useEffect(() => {
     let ignore = false
     const load = () => {
@@ -431,6 +456,26 @@ function Shell({
     }
     load()
     const unsubscribe = window.app.rates.onStatusChanged(load)
+    return () => {
+      ignore = true
+      unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    let ignore = false
+    const load = () => {
+      void window.app.recurring
+        .dueCount()
+        .then((count) => {
+          if (!ignore) setDuePendingCount(count)
+        })
+        .catch(() => {
+          if (!ignore) setDuePendingCount(0)
+        })
+    }
+    load()
+    const unsubscribe = window.app.recurring.onPendingChanged(load)
     return () => {
       ignore = true
       unsubscribe()
@@ -573,7 +618,7 @@ function Shell({
               variant="ghost"
               size={collapsed ? 'icon' : 'default'}
               className={cn(
-                'w-full',
+                'relative w-full',
                 !collapsed && 'justify-start',
                 page === id && 'bg-accent text-accent-foreground',
               )}
@@ -594,6 +639,18 @@ function Shell({
             >
               <Icon aria-hidden="true" />
               {!collapsed && t(`navigation.${id}`)}
+              {id === 'recurring' && duePendingCount > 0 && (
+                <span
+                  className={cn(
+                    'rounded-full bg-error px-2 py-0.5 text-xs text-white',
+                    !collapsed && 'ml-auto',
+                    collapsed && 'absolute -top-1 -right-1',
+                  )}
+                  aria-label={`${t('pending.dueCount')}: ${duePendingCount}`}
+                >
+                  {duePendingCount}
+                </span>
+              )}
             </Button>
           ))}
         </nav>
@@ -724,6 +781,10 @@ function Shell({
                   setUndoError(false)
                   setUndoOffered(true)
                 }}
+                onCreateRecurring={(prefill) => {
+                  setRecurringPrefill(prefill)
+                  setPage('recurring')
+                }}
                 initialReportFilter={reportTransactionFilter}
               />
             )}
@@ -737,6 +798,20 @@ function Shell({
                   setReportTransactionFilter(input)
                   setPage('transactions')
                 }}
+              />
+            )}
+            {page === 'recurring' && (
+              <RecurringPage
+                key={`${active.id}:${undoRevision}`}
+                language={language}
+                t={t}
+                undoRevision={undoRevision}
+                onChanged={() => {
+                  setUndoError(false)
+                  setUndoOffered(true)
+                }}
+                initialPrefill={recurringPrefill}
+                onPrefillHandled={() => setRecurringPrefill(null)}
               />
             )}
             {page === 'reports' && (
@@ -843,6 +918,8 @@ function Shell({
                     </NativeSelect>
                   </div>
                 </div>
+                <AutostartSettings t={t} />
+                <ShortcutSettings t={t} />
                 <p className="text-sm text-muted-foreground">
                   {t('settings.version')}: {version}
                 </p>
@@ -979,6 +1056,9 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [showPicker, setShowPicker] = useState(true)
   const [version, setVersion] = useState('')
+  const [startupShortcutFailure, setStartupShortcutFailure] = useState<
+    string | null
+  >(null)
   const { language, theme } = active?.settings ?? DEFAULT_PROFILE_SETTINGS
   const t: Translate = (key) => translate(language, key)
   useTheme(theme)
@@ -993,13 +1073,31 @@ export default function App() {
       window.app.profiles.list(),
       window.app.profiles.getActive(),
       window.app.getVersion(),
+      window.app.desktop.shortcutStatus(),
     ])
-      .then(([registry, current, appVersion]) => {
+      .then(([registry, current, appVersion, shortcut]) => {
         setSnapshot(registry)
         setActive(current)
         setVersion(appVersion)
+        setStartupShortcutFailure(shortcut.failureAccelerator)
       })
       .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    const unsubscribeProfile = window.app.desktop.onProfileChanged(() => {
+      void Promise.all([
+        window.app.profiles.list(),
+        window.app.profiles.getActive(),
+      ]).then(([registry, current]) => {
+        setSnapshot(registry)
+        setActive(current)
+        if (current) setShowPicker(false)
+      })
+    })
+    return () => {
+      unsubscribeProfile()
+    }
   }, [])
 
   let content
@@ -1055,6 +1153,20 @@ export default function App() {
   return (
     <>
       {content}
+      {startupShortcutFailure && (
+        <aside
+          role="alert"
+          className="fixed top-4 right-4 z-50 max-w-md space-y-3 rounded-lg border bg-card p-4 text-sm font-medium text-error shadow-lg"
+        >
+          <p>{shortcutConflictMessage(t, startupShortcutFailure)}</p>
+          <Button
+            variant="ghost"
+            onClick={() => setStartupShortcutFailure(null)}
+          >
+            {t('tray.noticeOk')}
+          </Button>
+        </aside>
+      )}
       <UpdateNotice t={t} />
     </>
   )

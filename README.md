@@ -2,12 +2,12 @@
 
 A local-first personal expense tracker for Windows, built with Electron, React,
 TypeScript, and SQLite. The app opens to a collapsible sidebar with Overview,
-Transactions, Reports, Accounts, and Settings pages. On start you pick or create
-a profile; each profile has its own SQLite database and data folder. Financial
-data stays local. Accounts track opening balances, signed expense/income
-transactions, both legs of transfers, and target-based balance adjustments.
-Settings includes payee alias/merge management, ordered categorisation rules,
-and two-level expense/income category management.
+Transactions, Recurring, Reports, Accounts, and Settings pages. On start you
+pick or create a profile; each profile has its own SQLite database and data
+folder. Financial data stays local. Accounts track opening balances, signed
+expense/income transactions, both legs of transfers, and target-based balance
+adjustments. Settings includes payee alias/merge management, ordered
+categorisation rules, and two-level expense/income category management.
 
 ## Requirements
 
@@ -130,9 +130,10 @@ them, and pattern matching cannot detect every possible form of sensitive data.
 
 The renderer has no Node access; a sandboxed, isolated preload exposes only the
 typed app, update, profile (including settings), account, category, transaction,
-transfer, balance adjustment, payee, tag, categorisation rule, transaction-template,
-and backup commands/queries. Every IPC input is validated in the main
-process, and every handler rejects calls not sent by the app's own renderer frame.
+transfer, balance adjustment, payee, tag, categorisation rule,
+transaction-template, recurring-transaction, and backup commands/queries. Every
+IPC input is validated in the main process, and every handler rejects calls not
+sent by the main frame of either the main app window or the quick-add window.
 Production CSP permits only same-origin connections; localhost WebSockets are
 added only by the development server for hot reload. SQLite foreign-key
 enforcement and shared Unicode text functions are enabled when each profile
@@ -305,6 +306,110 @@ not off-device copies or backups of the separate data folder.
   main category and subcategory, monthly trends, spending pace, and cash flow.
   Overview shows this month's expenses, income, net, and top five expense
   categories compared with the full last month.
+
+## Recurring transactions
+
+- **Recurring** defines profile-scoped expense or income estimates with an
+  account, positive amount, optional payee/category/tags/note, start date,
+  optional end date, and a monthly, weekly, or yearly schedule. Monthly and
+  yearly dates clamp to the last day of shorter months (including leap years),
+  and monthly/weekly intervals are anchored to the start date.
+- Due occurrences become separate pending snapshots. They are generated on
+  profile open and hourly while the app runs, exactly once per recurring
+  transaction and due date. Occurrences before a definition's creation date are
+  intentionally not generated. Pending snapshots do not affect balances,
+  transaction-list totals, reports, CSV exports, or exchange-rate needs.
+- The **Pending** tab lists snapshots oldest first and marks overdue items. The
+  Recurring sidebar badge counts pending occurrences due today or earlier.
+  Confirming posts the snapshotted payee, account, category, tags, and note as a
+  normal transaction; its amount and non-future date can be adjusted first.
+  Skipping consumes only that occurrence. Confirm and skip are undoable. If a
+  pending snapshot's account is archived, unarchive the account or skip that
+  occurrence.
+- Editing changes only occurrences not yet created. Pausing stops generation;
+  resuming starts from yesterday, so dates passed during the pause are skipped.
+  Deleting removes still-pending occurrences. Create, edit, pause, resume and
+  delete are undoable. An unsplit expense/income transaction or a transaction
+  template can prefill a new monthly recurring definition; the first occurrence
+  defaults to the next matching date.
+
+### Manual recurring-transactions check
+
+Run `npm run dev`, create synthetic HUF/CHF accounts, tags, and expense/income
+categories, then open **Recurring**. In HU/EN/DE, create monthly (including day
+31 and every two months), weekly (including every two weeks), and yearly
+(including February 29) definitions. Verify translated schedule text, next due
+dates, the amount calculator, nullable category/tags/payee/note, start/end dates,
+and narrow-window/light/dark layouts. Edit a definition and check its list row;
+pause and resume it; delete it; use the Undo toast after each operation. Close
+and reopen the profile and verify definitions persist. In **Pending**, verify
+oldest-first ordering, overdue highlighting, the due sidebar badge, one-click
+confirm, calculator/date editing before confirm, skip, keyboard navigation, and
+Undo for both decisions. Confirmed amounts must appear in the account balance,
+Transactions, Overview and Reports; skipped and still-pending amounts must not.
+Archive a pending item's account and verify confirmation explains that the
+recurring definition needs an active account. Reopen the profile and verify
+confirmed/skipped occurrences do not return. From an unsplit expense/income and
+from a template, open the prefilled recurring form and verify its monthly date;
+the action on a split transaction must be disabled with an explanatory hint.
+
+## Global quick add
+
+- **Ctrl+Alt+N** opens a compact, always-on-top quick-add window on the active
+  display. The tray's **Quick add** item uses the same window. The window targets
+  the open profile, or opens the last used profile when the main window is still
+  showing the profile picker.
+- Quick add supports expense/income (Alt+1/Alt+2), the amount calculator, the
+  last used active account, payee and alias suggestions, categorisation-rule and
+  last-used autofill, category, tags, note, and today's date. Enter saves, Esc
+  closes, and Ctrl+Enter saves and starts another transaction. Transfers, splits,
+  templates, and the post-save **Create rule** offer stay in the full transaction
+  drawer.
+- The shortcut is an app-level setting shared by all profiles on the Windows
+  account. Change it by pressing a new combination in **Settings**, or reset it to
+  Ctrl+Alt+N. If Windows or another program has reserved a combination, the app
+  keeps the previous working shortcut and shows a translated conflict message.
+
+### Manual global quick-add check
+
+Run `npm run dev` with synthetic data and complete every item below in HU/EN/DE
+and light/dark mode where applicable:
+
+1. Focus another program, press Ctrl+Alt+N, and verify the quick-add window opens
+   centered on the display containing the pointer, remains above ordinary
+   windows, and focuses the amount field. Open it again via tray **Quick add**;
+   an already open quick-add window must be focused rather than duplicated.
+2. Reserve Ctrl+Alt+N in another program before starting Financial Tracker.
+   Verify the main window reports “The shortcut Ctrl+Alt+N is used by another
+   program…” once and Settings shows the translated conflict. Release it and set
+   a new shortcut by pressing the combination in Settings. Verify it works from
+   another focused program, persists after restart, is shared after switching
+   profiles, and **Reset to Ctrl+Alt+N** works. While changing to another reserved
+   combination, verify the previous working shortcut remains active.
+3. Leave the profile picker open, invoke quick add, and verify the last used
+   profile opens before its form appears. With no profiles, verify quick add shows
+   a translated instruction to create one in the main window. With no accounts,
+   verify the corresponding translated instruction.
+4. Verify the default account is the last active account used for a transaction;
+   payee aliases appear as their canonical payee suggestions; rules and last-used
+   values autofill category/tags without overwriting manually changed values.
+   Check expense/income with Alt+1/Alt+2, amount expressions, category, multiple
+   tags, note, and today's date. Confirm transfers, splits, and templates are not
+   offered.
+5. Press Enter to save and verify a brief saved confirmation, window close, main
+   Overview/Transactions refresh, and (when the main window is visible) its Undo
+   toast reverses the quick-added transaction. Press Ctrl+Enter to save and add
+   another while retaining account, kind, and date. Press Esc to close without
+   saving.
+6. Enable privacy mode in the active profile. Verify an unfocused quick-add amount
+   is concealed and becomes editable only while focused. Check the compact window
+   at its minimum size and on a second display.
+7. Build the packaged artifact with
+   `npx electron-builder --win nsis --publish never`, run
+   `release/win-unpacked/Financial Tracker.exe`, and repeat shortcut, tray,
+   profile-picker, Enter/Esc, privacy, and conflict checks. Then run
+   `release/win-unpacked/Financial Tracker.exe --smoke-test`; it must print
+   `SQLite smoke test OK` and exit 0.
 
 ## Exchange rates and base-currency conversion
 
@@ -1243,3 +1348,95 @@ after completion Undo should revert only that command. Try deleting an account,
 cancel, then confirm deletion. Switch profiles and check that accounts remain
 separate. Repeat with Hungarian/German and light/dark themes; check keyboard
 navigation, focus indicators, and validation errors. UI checks are manual.
+
+### Tray, close-to-tray and Windows startup
+
+Closing the main window always hides it to the tray; it does **not** quit.
+Left-click or double-click the tray icon, or choose **Open**, to restore and focus
+it. **Quick add** opens the separate compact quick-add window and opens the last
+used profile when necessary. Without a profile or active account, that window
+shows the corresponding guidance. An already open main-window drawer/dialog and
+its unsaved input are preserved. **Quit** stops the scheduler and closes the
+profile through the existing shutdown path. Starting the app again normally
+restores/focuses the existing window; a second launch with `--hidden` leaves its
+current visibility unchanged. It never opens a second app instance. A standalone
+`--hidden` launch creates only the tray icon and keeps the main window hidden
+until requested.
+
+The tooltip, menu, and first-close native notice use the active profile language,
+falling back to the Windows locale and then English. Changing language, switching
+profiles, or restoring a backup refreshes the tray labels. The notice is shown
+once per app-data installation, not once per profile: its shown flag is
+stored in validated, atomically replaced `app-settings.json` beside
+`profiles.json` in the app's user-data folder. As with profiles, uninstall keeps
+app data, so reinstalling with preserved data does not repeat the notice.
+
+**Settings → Start with Windows** is off by default and shared by all profiles
+on this Windows account. The preference is stored only in Windows' login-item
+setting (no duplicate JSON preference that could become stale), using
+`setLoginItemSettings({ openAtLogin, args: ['--hidden'] })` and reading back with
+`getLoginItemSettings({ args: ['--hidden'] })`. Signing in starts the app hidden
+in the tray. The toggle is disabled with an explanation in development mode and
+on non-Windows platforms. OS shutdown/logoff and the updater's **Restart** bypass
+close-to-tray; the updater closes the profile before launching installation.
+
+### Manual tray and autostart check (installed NSIS build)
+
+Use synthetic profiles and data only. Tray interaction, login items and native
+window lifecycle are manual checks, not covered by the unit suite.
+
+1. Run `npm run build`, then `npx electron-builder --win nsis --publish never`.
+   Run `"release/win-unpacked/Financial Tracker.exe" --smoke-test` and also with
+   `--hidden --smoke-test`: both must print **SQLite smoke test OK** and exit with
+   code 0 without a tray icon or window. Repeat the smoke test while a normal
+   instance is running to check it does not acquire/block the single-instance
+   lock or steal focus. Install the generated NSIS installer from `release/`.
+2. On a fresh app-data installation, open Settings: **Start with Windows** must
+   be unchecked. Open/create a synthetic profile and close the window using X
+   and Alt+F4. Verify the window/taskbar entry disappears, the tray icon remains,
+   and the small native keep-running notice appears on the first close only.
+   Acknowledge it, restore, close again, switch profiles, quit/relaunch and close:
+   the notice must not repeat. Check the Task Manager process is still running.
+3. Restore via tray left-click, double-click and **Open**; each must show/focus
+   the same window. Minimize and repeat. Choose **Quick add** from the tray while
+   the main window is on Overview and Settings: verify the separate compact window
+   opens with Amount focused. Save a synthetic transaction and check its account
+   balance and Undo. Repeat without an open profile (the last used profile opens),
+   without any profiles or accounts (translated guidance), and while a main-window
+   drawer/dialog has unsaved input (it must remain intact). Switch profiles while
+   quick add is open and verify its profile settings, accounts, categories, payees,
+   tags, and saves all change to the newly active profile.
+4. Change the active profile language through HU/EN/DE. Check tray tooltip,
+   **Open**, **Quick add**, and **Quit** immediately update. Switch to a profile
+   with another language and restore a backup with another language. Before
+   opening a profile, verify the Windows-locale fallback (unsupported locale →
+   English). Check the first-close notice in each language using separate clean
+   synthetic app-data installations. Verify light/dark Settings and keyboard
+   access to the startup toggle. In `npm run dev`, verify the toggle is disabled
+   and the explanatory text appears.
+5. Hide to tray or minimize, then launch the installed app again from its shortcut.
+   Verify the same window restores/focuses and there is still one tray icon and
+   one main application instance. Launch again with `--hidden` and verify it does
+   not show a hidden window or change a visible window. Also test a rapid ordinary
+   second launch during initial startup; it must show the existing window.
+6. Enable **Start with Windows**, switch profiles and restart normally: verify
+   the shared toggle remains on. Quit, sign out and sign in to Windows: verify
+   exactly one tray icon starts automatically, with **no main window**. Open it
+   from the tray, disable startup, quit and sign out/in again: no process/tray
+   icon may autostart. Relaunch manually and verify the toggle is still off.
+7. With a profile open and a scheduler active, choose tray **Quit**. Verify all
+   app processes stop and no tray icon remains; relaunch and verify the database
+   opens normally with saved data. Repeat Windows logoff/shutdown with the window
+   both visible and hidden: there must be no close-to-tray notice or shutdown
+   veto, and the profile must reopen cleanly afterward.
+8. With an update downloaded in an installed build, choose the updater's
+   **Restart** while the window is visible, and repeat after restoring from tray.
+   Verify the old process exits, installation proceeds (close-to-tray must not
+   block it), and the updated app starts and opens the profile cleanly. If an
+   installation attempt fails synchronously, verify the profile and scheduler
+   recover and subsequent window closes hide to tray again.
+
+Automated pure tests cover temporary-folder app-settings defaults, persistence,
+validation, atomic replace/retries/failure preservation, translated menu templates
+and language fallback/rebuilds, strict autostart input, and exact `--hidden`
+argument parsing. No ledger schema change is required.

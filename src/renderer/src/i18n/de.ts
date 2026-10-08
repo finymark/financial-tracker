@@ -1,12 +1,21 @@
+import { desktopMessages } from '../../../shared/desktop-translations'
 import { csvMessages } from '../../../shared/csv-translations'
 import { categoryNames } from '../../../shared/category-translations'
 import type { MessageCatalog } from './en'
 
 export const de = {
+  ...desktopMessages.de,
   'privacy.toggle': 'Privatmodus',
   'privacy.hiddenAmount': 'Verborgener Betrag',
   'privacy.shortcutScope':
     'Der Privatmodus funktioniert überall, auch beim Tippen (Ctrl+Shift+H).',
+  'quickAdd.title': 'Schnellerfassung',
+  'quickAdd.noProfiles':
+    'Erstelle im Hauptfenster ein Profil, bevor du eine Transaktion erfasst.',
+  'quickAdd.noAccounts':
+    'Erstelle im Hauptfenster ein Konto, bevor du eine Transaktion erfasst.',
+  'quickAdd.saved': 'Gespeichert.',
+  'quickAdd.loading': 'Schnellerfassung wird vorbereitet…',
 
   'shortcuts.closeHelp': 'Tastaturhilfe schließen',
   'transactions.saveAndAddAnother': 'Speichern und weitere hinzufügen',
@@ -169,9 +178,66 @@ export const de = {
   'navigation.label': 'Hauptnavigation',
   'navigation.overview': 'Übersicht',
   'navigation.transactions': 'Transaktionen',
+  'navigation.recurring': 'Wiederkehrend',
   'navigation.reports': 'Berichte',
   'navigation.accounts': 'Konten',
   'navigation.settings': 'Einstellungen',
+  'recurring.title': 'Wiederkehrende Transaktionen',
+  'recurring.definitions': 'Definitionen',
+  'recurring.sections': 'Bereiche für wiederkehrende Transaktionen',
+  'recurring.fromTransaction': 'Wiederkehrende Transaktion erstellen',
+  'recurring.fromTemplate': 'Wiederkehrende Transaktion aus Vorlage',
+  'recurring.fromSplitHint':
+    'Geteilte Transaktionen können nicht als wiederkehrende Transaktion verwendet werden.',
+  'pending.title': 'Ausstehend',
+  'pending.empty': 'Keine ausstehenden Transaktionen.',
+  'pending.confirm': 'Bestätigen',
+  'pending.editAndConfirm': 'Bearbeiten & bestätigen',
+  'pending.skip': 'Überspringen',
+  'pending.overdue': 'Überfällig',
+  'pending.dueCount': 'Fällige ausstehende Transaktionen',
+  'pending.error.notFound':
+    'Die ausstehende Transaktion wurde nicht gefunden. Aktualisiere die Liste.',
+  'pending.error.accountArchived':
+    'Dieses Konto ist archiviert. Hebe die Archivierung des Kontos auf oder überspringe dieses Vorkommen.',
+  'recurring.description':
+    'Regelmäßige Ausgaben und Einnahmen als Schätzung anlegen. Fällige Vorkommen bleiben ausstehend und wirken sich noch nicht auf die Finanzen aus.',
+  'recurring.create': 'Wiederkehrende Transaktion erstellen',
+  'recurring.edit': 'Wiederkehrende Transaktion bearbeiten',
+  'recurring.save': 'Wiederkehrende Transaktion speichern',
+  'recurring.empty': 'Noch keine wiederkehrenden Transaktionen.',
+  'recurring.pause': 'Pausieren',
+  'recurring.resume': 'Fortsetzen',
+  'recurring.paused': 'Pausiert',
+  'recurring.delete': 'Löschen',
+  'recurring.deleteConfirmation':
+    'Diese wiederkehrende Transaktion und alle ausstehenden Vorkommen löschen?',
+  'recurring.nextDue': 'Nächste Fälligkeit',
+  'recurring.noNextDue': 'Kein zukünftiger Fälligkeitstermin',
+  'recurring.creationHint':
+    'Vorkommen vor der Erstellung werden nicht erzeugt. Beim Fortsetzen werden Termine während der Pause übersprungen.',
+  'recurring.schedule.label': 'Zeitplan',
+  'recurring.schedule.monthly': 'Monatlich',
+  'recurring.schedule.weekly': 'Wöchentlich',
+  'recurring.schedule.yearly': 'Jährlich',
+  'recurring.every': 'alle',
+  'recurring.months': 'Monat(e)',
+  'recurring.weeks': 'Woche(n)',
+  'recurring.month': 'Monat',
+  'recurring.day': 'Tag',
+  'recurring.weekday': 'Wochentag',
+  'recurring.interval': 'Wiederholungsintervall',
+  'recurring.startDate': 'Startdatum',
+  'recurring.endDate': 'Enddatum (optional)',
+  'recurring.weekday.0': 'Sonntag',
+  'recurring.weekday.1': 'Montag',
+  'recurring.weekday.2': 'Dienstag',
+  'recurring.weekday.3': 'Mittwoch',
+  'recurring.weekday.4': 'Donnerstag',
+  'recurring.weekday.5': 'Freitag',
+  'recurring.weekday.6': 'Samstag',
+  'recurring.error':
+    'Die wiederkehrende Transaktion konnte nicht gespeichert werden. Prüfen Sie alle Felder und versuchen Sie es erneut.',
   'sidebar.collapse': 'Seitenleiste einklappen',
   'sidebar.expand': 'Seitenleiste ausklappen',
   'sidebar.profile': 'Profile',

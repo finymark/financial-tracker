@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Pencil,
   Copy,
+  CalendarPlus,
   Scale,
   Trash2,
 } from 'lucide-react'
@@ -33,6 +34,7 @@ interface Props {
   t(key: MessageKey): string
   busy: boolean
   onDuplicate(transaction: Transaction): void
+  onCreateRecurring(transaction: Transaction): void
   onEdit(transaction: Transaction | Transfer | BalanceAdjustment): void
   onDelete(transaction: Transaction | Transfer | BalanceAdjustment): void
 }
@@ -110,6 +112,7 @@ export function TransactionTable({
   onEdit,
   onDelete,
   onDuplicate,
+  onCreateRecurring,
 }: Props) {
   const [scrollTop, setScrollTop] = useState(0)
   const [expandedSplits, setExpandedSplits] = useState<Set<string>>(new Set())
@@ -310,6 +313,7 @@ export function TransactionTable({
                       onEdit={onEdit}
                       onDelete={onDelete}
                       onDuplicate={onDuplicate}
+                      onCreateRecurring={onCreateRecurring}
                     />
                   </td>
                 </tr>
@@ -374,6 +378,7 @@ export function TransactionTable({
                       onEdit={onEdit}
                       onDelete={onDelete}
                       onDuplicate={onDuplicate}
+                      onCreateRecurring={onCreateRecurring}
                     />
                   </td>
                 </tr>
@@ -494,6 +499,7 @@ export function TransactionTable({
                       onEdit={onEdit}
                       onDelete={onDelete}
                       onDuplicate={onDuplicate}
+                      onCreateRecurring={onCreateRecurring}
                     />
                   )}
                 </td>
@@ -540,11 +546,32 @@ function RowActions({
   onEdit,
   onDelete,
   onDuplicate,
-}: Pick<Props, 'busy' | 't' | 'onEdit' | 'onDelete' | 'onDuplicate'> & {
+  onCreateRecurring,
+}: Pick<
+  Props,
+  'busy' | 't' | 'onEdit' | 'onDelete' | 'onDuplicate' | 'onCreateRecurring'
+> & {
   transaction: Transaction | Transfer | BalanceAdjustment
 }) {
   return (
     <div className="flex gap-1">
+      {(transaction.kind === 'expense' || transaction.kind === 'income') && (
+        <Button
+          className="size-7"
+          size="icon"
+          variant="ghost"
+          disabled={busy || transaction.lines.length > 1}
+          onClick={() => onCreateRecurring(transaction)}
+          aria-label={t('recurring.fromTransaction')}
+          title={
+            transaction.lines.length > 1
+              ? t('recurring.fromSplitHint')
+              : t('recurring.fromTransaction')
+          }
+        >
+          <CalendarPlus aria-hidden="true" className="size-3" />
+        </Button>
+      )}
       {(transaction.kind === 'expense' || transaction.kind === 'income') && (
         <Button
           className="size-7"

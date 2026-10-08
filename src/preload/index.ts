@@ -2,6 +2,50 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 
 const bridge: AppBridge = {
+  desktop: {
+    autostartStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.desktopAutostartStatus),
+    setAutostart: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.desktopSetAutostart, input),
+    shortcutStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.desktopShortcutStatus),
+    setShortcut: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.desktopSetShortcut, input),
+    showMain: () => ipcRenderer.invoke(IPC_CHANNELS.desktopShowMain),
+    closeQuickAdd: () => ipcRenderer.invoke(IPC_CHANNELS.desktopCloseQuickAdd),
+    quickAddSaved: () => ipcRenderer.invoke(IPC_CHANNELS.desktopQuickAddSaved),
+    onDataChanged: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, offerUndo: boolean) =>
+        listener(offerUndo)
+      ipcRenderer.on(IPC_CHANNELS.desktopDataChanged, handler)
+      return () =>
+        ipcRenderer.removeListener(IPC_CHANNELS.desktopDataChanged, handler)
+    },
+    onProfileChanged: (listener) => {
+      const handler = () => listener()
+      ipcRenderer.on(IPC_CHANNELS.desktopProfileChanged, handler)
+      return () =>
+        ipcRenderer.removeListener(IPC_CHANNELS.desktopProfileChanged, handler)
+    },
+  },
+  recurring: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.recurringList),
+    create: (input) => ipcRenderer.invoke(IPC_CHANNELS.recurringCreate, input),
+    update: (input) => ipcRenderer.invoke(IPC_CHANNELS.recurringUpdate, input),
+    pause: (input) => ipcRenderer.invoke(IPC_CHANNELS.recurringPause, input),
+    resume: (input) => ipcRenderer.invoke(IPC_CHANNELS.recurringResume, input),
+    delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.recurringDelete, input),
+    pending: () => ipcRenderer.invoke(IPC_CHANNELS.pendingList),
+    dueCount: () => ipcRenderer.invoke(IPC_CHANNELS.pendingDueCount),
+    confirm: (input) => ipcRenderer.invoke(IPC_CHANNELS.pendingConfirm, input),
+    skip: (input) => ipcRenderer.invoke(IPC_CHANNELS.pendingSkip, input),
+    onPendingChanged: (listener) => {
+      const handler = () => listener()
+      ipcRenderer.on(IPC_CHANNELS.pendingChanged, handler)
+      return () =>
+        ipcRenderer.removeListener(IPC_CHANNELS.pendingChanged, handler)
+    },
+  },
   reports: {
     cashFlow: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.reportsCashFlow, input),

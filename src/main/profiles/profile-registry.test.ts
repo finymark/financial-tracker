@@ -68,6 +68,7 @@ describe('profile registry', () => {
       const original = readFileSync(registryPath, 'utf8')
       const lock = Object.assign(new Error('Synthetic lock'), { code })
       rename.mockClear()
+      wait.mockClear()
       rename
         .mockImplementationOnce(() => {
           throw lock

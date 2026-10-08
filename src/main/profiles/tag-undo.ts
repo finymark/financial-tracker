@@ -48,6 +48,8 @@ interface DeletedTagImage {
   tag: Tag
   lineIds: string[]
   templateIds: string[]
+  recurringIds: string[]
+  pendingIds: string[]
   rules: CategorisationRulesImage | null
 }
 
@@ -74,6 +76,24 @@ export function deleteTagUndoableCommand(
           )
           .all(id) as { templateId: string }[]
       ).map((association) => association.templateId),
+      recurringIds: (
+        database
+          .prepare(
+            `SELECT recurring_id AS recurringId
+             FROM recurring_transaction_tags WHERE tag_id = ?
+             ORDER BY recurring_id`,
+          )
+          .all(id) as { recurringId: string }[]
+      ).map((association) => association.recurringId),
+      pendingIds: (
+        database
+          .prepare(
+            `SELECT pending_id AS pendingId
+             FROM pending_transaction_tags WHERE tag_id = ?
+             ORDER BY pending_id`,
+          )
+          .all(id) as { pendingId: string }[]
+      ).map((association) => association.pendingId),
       rules: captureCategorisationRules(database),
     }),
     execute: () => {
@@ -98,7 +118,14 @@ export function deleteTagUndoableCommand(
           'SELECT id, name, created_at AS createdAt FROM tags WHERE id = ?',
         )
         .get(id) as Tag | undefined) ?? null,
-    restoreBefore: ({ tag, lineIds, templateIds, rules }) => {
+    restoreBefore: ({
+      tag,
+      lineIds,
+      templateIds,
+      recurringIds,
+      pendingIds,
+      rules,
+    }) => {
       database
         .prepare(
           'INSERT INTO tags (id, name, normalized_name, created_at) VALUES (?, ?, ?, ?)',
@@ -114,6 +141,17 @@ export function deleteTagUndoableCommand(
       )
       for (const templateId of templateIds)
         insertTemplate.run(templateId, tag.id)
+      const insertRecurring = database.prepare(
+        `INSERT INTO recurring_transaction_tags (recurring_id, tag_id)
+         VALUES (?, ?)`,
+      )
+      for (const recurringId of recurringIds)
+        insertRecurring.run(recurringId, tag.id)
+      const insertPending = database.prepare(
+        `INSERT INTO pending_transaction_tags (pending_id, tag_id)
+         VALUES (?, ?)`,
+      )
+      for (const pendingId of pendingIds) insertPending.run(pendingId, tag.id)
       restoreCategorisationRules(database, rules)
     },
   }

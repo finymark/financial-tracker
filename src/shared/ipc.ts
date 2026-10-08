@@ -1,3 +1,9 @@
+import type {
+  AutostartStatus,
+  SetAutostartInput,
+  SetQuickAddShortcutInput,
+  ShortcutStatus,
+} from './desktop'
 import type { TransactionCsvInput } from './transaction-csv'
 import type {
   CreateTemplateInput,
@@ -86,9 +92,26 @@ import type {
   ReportDateRangeInput,
   SpendingPaceReport,
 } from './reports'
+import type {
+  CreateRecurringTransactionInput,
+  ConfirmPendingTransactionInput,
+  PendingTransaction,
+  RecurringTransaction,
+  RecurringTransactionIdInput,
+  UpdateRecurringTransactionInput,
+} from './recurring'
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
+  desktopAutostartStatus: 'desktop:autostart-status',
+  desktopSetAutostart: 'desktop:set-autostart',
+  desktopShortcutStatus: 'desktop:shortcut-status',
+  desktopSetShortcut: 'desktop:set-shortcut',
+  desktopShowMain: 'desktop:show-main',
+  desktopCloseQuickAdd: 'desktop:close-quick-add',
+  desktopQuickAddSaved: 'desktop:quick-add-saved',
+  desktopDataChanged: 'desktop:data-changed',
+  desktopProfileChanged: 'desktop:profile-changed',
   updatesIsReady: 'updates:is-ready',
   updatesReady: 'updates:ready',
   updatesRestart: 'updates:restart',
@@ -158,9 +181,48 @@ export const IPC_CHANNELS = {
   reportsSpendingPace: 'reports:spending-pace',
   reportsOverviewDashboard: 'reports:overview-dashboard',
   reportsMonthlyTrend: 'reports:monthly-trend',
+  recurringList: 'recurring:list',
+  recurringCreate: 'recurring:create',
+  recurringUpdate: 'recurring:update',
+  recurringPause: 'recurring:pause',
+  recurringResume: 'recurring:resume',
+  recurringDelete: 'recurring:delete',
+  pendingList: 'pending:list',
+  pendingDueCount: 'pending:due-count',
+  pendingConfirm: 'pending:confirm',
+  pendingSkip: 'pending:skip',
+  pendingChanged: 'pending:changed',
 } as const
 
 export interface AppBridge {
+  desktop: {
+    autostartStatus(): Promise<AutostartStatus>
+    setAutostart(input: SetAutostartInput): Promise<AutostartStatus>
+    shortcutStatus(): Promise<ShortcutStatus>
+    setShortcut(input: SetQuickAddShortcutInput): Promise<ShortcutStatus>
+    showMain(): Promise<void>
+    closeQuickAdd(): Promise<void>
+    quickAddSaved(): Promise<void>
+    onDataChanged(listener: (offerUndo: boolean) => void): () => void
+    onProfileChanged(listener: () => void): () => void
+  }
+  recurring: {
+    list(): Promise<RecurringTransaction[]>
+    create(
+      input: CreateRecurringTransactionInput,
+    ): Promise<RecurringTransaction>
+    update(
+      input: UpdateRecurringTransactionInput,
+    ): Promise<RecurringTransaction>
+    pause(input: RecurringTransactionIdInput): Promise<void>
+    resume(input: RecurringTransactionIdInput): Promise<void>
+    delete(input: RecurringTransactionIdInput): Promise<void>
+    pending(): Promise<PendingTransaction[]>
+    dueCount(): Promise<number>
+    confirm(input: ConfirmPendingTransactionInput): Promise<Transaction>
+    skip(input: RecurringTransactionIdInput): Promise<void>
+    onPendingChanged(listener: () => void): () => void
+  }
   reports: {
     cashFlow(input: ReportDateRangeInput): Promise<CashFlowReport>
     spendingPace(): Promise<SpendingPaceReport>

@@ -20,6 +20,8 @@ interface TemplatePickerProps {
   t(key: MessageKey): string
   applyTemplate(template: TransactionTemplate): void
   run: RunCommand
+  onCreateRecurring(template: TransactionTemplate): void
+  onCreateRecurringFromTransaction(transaction: Transaction): void
 }
 
 export function TemplatePicker({
@@ -33,6 +35,8 @@ export function TemplatePicker({
   t,
   applyTemplate,
   run,
+  onCreateRecurring,
+  onCreateRecurringFromTransaction,
 }: TemplatePickerProps) {
   const [deletingTemplate, setDeletingTemplate] =
     useState<TransactionTemplate | null>(null)
@@ -121,6 +125,18 @@ export function TemplatePicker({
           >
             {t('templates.delete')}
           </Button>
+          <Button
+            variant="ghost"
+            disabled={busy || !selectedTemplateId}
+            onClick={() => {
+              const template = templates.find(
+                ({ id }) => id === selectedTemplateId,
+              )
+              if (template) onCreateRecurring(template)
+            }}
+          >
+            {t('recurring.fromTemplate')}
+          </Button>
         </div>
         {savedTransaction && (
           <div className="flex flex-wrap gap-2">
@@ -149,6 +165,18 @@ export function TemplatePicker({
               }
             >
               {t('transactions.duplicate')}
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={busy || savedTransaction.lines.length > 1}
+              title={
+                savedTransaction.lines.length > 1
+                  ? t('recurring.fromSplitHint')
+                  : undefined
+              }
+              onClick={() => onCreateRecurringFromTransaction(savedTransaction)}
+            >
+              {t('recurring.fromTransaction')}
             </Button>
           </div>
         )}

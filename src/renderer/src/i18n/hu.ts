@@ -1,12 +1,21 @@
+import { desktopMessages } from '../../../shared/desktop-translations'
 import { csvMessages } from '../../../shared/csv-translations'
 import { categoryNames } from '../../../shared/category-translations'
 import type { MessageCatalog } from './en'
 
 export const hu = {
+  ...desktopMessages.hu,
   'privacy.toggle': 'Privát mód',
   'privacy.hiddenAmount': 'Rejtett összeg',
   'privacy.shortcutScope':
     'A privát mód gépelés közben is bárhol működik (Ctrl+Shift+H).',
+  'quickAdd.title': 'Gyors rögzítés',
+  'quickAdd.noProfiles':
+    'Tranzakció rögzítése előtt hozz létre egy profilt a főablakban.',
+  'quickAdd.noAccounts':
+    'Tranzakció rögzítése előtt hozz létre egy számlát a főablakban.',
+  'quickAdd.saved': 'Elmentve.',
+  'quickAdd.loading': 'Gyors rögzítés előkészítése…',
 
   'shortcuts.closeHelp': 'Billentyűsúgó bezárása',
   'transactions.saveAndAddAnother': 'Mentés és újabb hozzáadása',
@@ -159,9 +168,66 @@ export const hu = {
   'navigation.label': 'Fő navigáció',
   'navigation.overview': 'Áttekintés',
   'navigation.transactions': 'Tranzakciók',
+  'navigation.recurring': 'Ismétlődő',
   'navigation.reports': 'Kimutatások',
   'navigation.accounts': 'Számlák',
   'navigation.settings': 'Beállítások',
+  'recurring.title': 'Ismétlődő tranzakciók',
+  'recurring.definitions': 'Beállítások',
+  'recurring.sections': 'Ismétlődő tranzakciók szakaszai',
+  'recurring.fromTransaction': 'Ismétlődő tranzakció létrehozása',
+  'recurring.fromTemplate': 'Ismétlődő létrehozása sablonból',
+  'recurring.fromSplitHint':
+    'Felosztott tranzakcióból nem hozható létre ismétlődő tranzakció.',
+  'pending.title': 'Függőben',
+  'pending.empty': 'Nincs függőben lévő tranzakció.',
+  'pending.confirm': 'Megerősítés',
+  'pending.editAndConfirm': 'Módosítás és megerősítés',
+  'pending.skip': 'Kihagyás',
+  'pending.overdue': 'Lejárt',
+  'pending.dueCount': 'Esedékes függő tranzakciók',
+  'pending.error.notFound':
+    'A függő tranzakció nem található. Frissítsd a listát.',
+  'pending.error.accountArchived':
+    'Ez a számla archivált. Állítsd vissza a számlát az archívumból, vagy hagyd ki ezt az előfordulást.',
+  'recurring.description':
+    'Rendszeres kiadások és bevételek becslései. Az esedékes alkalmak függőben maradnak, és még nem módosítják a pénzügyi adatokat.',
+  'recurring.create': 'Ismétlődő tranzakció létrehozása',
+  'recurring.edit': 'Ismétlődő tranzakció szerkesztése',
+  'recurring.save': 'Ismétlődő tranzakció mentése',
+  'recurring.empty': 'Még nincs ismétlődő tranzakció.',
+  'recurring.pause': 'Szüneteltetés',
+  'recurring.resume': 'Folytatás',
+  'recurring.paused': 'Szüneteltetve',
+  'recurring.delete': 'Törlés',
+  'recurring.deleteConfirmation':
+    'Törli ezt az ismétlődő tranzakciót és minden függőben lévő alkalmát?',
+  'recurring.nextDue': 'Következő esedékesség',
+  'recurring.noNextDue': 'Nincs jövőbeli esedékesség',
+  'recurring.creationHint':
+    'A létrehozás előtti alkalmak nem jönnek létre. A folytatás kihagyja a szüneteltetés alatt elmúlt dátumokat.',
+  'recurring.schedule.label': 'Ütemezés',
+  'recurring.schedule.monthly': 'Havonta',
+  'recurring.schedule.weekly': 'Hetente',
+  'recurring.schedule.yearly': 'Évente',
+  'recurring.every': 'minden',
+  'recurring.months': 'hónap',
+  'recurring.weeks': 'hét',
+  'recurring.month': 'Hónap',
+  'recurring.day': 'Nap',
+  'recurring.weekday': 'A hét napja',
+  'recurring.interval': 'Ismétlődési időköz',
+  'recurring.startDate': 'Kezdő dátum',
+  'recurring.endDate': 'Befejező dátum (nem kötelező)',
+  'recurring.weekday.0': 'Vasárnap',
+  'recurring.weekday.1': 'Hétfő',
+  'recurring.weekday.2': 'Kedd',
+  'recurring.weekday.3': 'Szerda',
+  'recurring.weekday.4': 'Csütörtök',
+  'recurring.weekday.5': 'Péntek',
+  'recurring.weekday.6': 'Szombat',
+  'recurring.error':
+    'Az ismétlődő tranzakció nem menthető. Ellenőrizze az összes mezőt, majd próbálja újra.',
   'sidebar.collapse': 'Oldalsáv összecsukása',
   'sidebar.expand': 'Oldalsáv kinyitása',
   'sidebar.profile': 'Profilok',

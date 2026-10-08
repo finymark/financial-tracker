@@ -71,6 +71,7 @@ export function registerProfileIpc(
   controller: ProfileController,
   onProfileNeedsRateRefresh: () => void = () => {},
   onProfileClosed: () => void = () => {},
+  onProfileLanguageChanged: () => void = () => {},
 ): void {
   registerIpcHandler(
     ipcMain,
@@ -84,8 +85,13 @@ export function registerProfileIpc(
     async (
       _event,
       value: unknown,
-    ): Promise<Awaited<ReturnType<AppBridge['backups']['restore']>>> =>
-      controller.restoreBackup(parseRestoreBackupInput(value)),
+    ): Promise<Awaited<ReturnType<AppBridge['backups']['restore']>>> => {
+      const restored = await controller.restoreBackup(
+        parseRestoreBackupInput(value),
+      )
+      onProfileLanguageChanged()
+      return restored
+    },
   )
   registerIpcHandler(
     ipcMain,
@@ -121,7 +127,10 @@ export function registerProfileIpc(
       const input = parseDeleteProfileInput(value)
       const deletesActiveProfile = controller.getActive()?.id === input.id
       await controller.delete(input.id, input.confirmation)
-      if (deletesActiveProfile) onProfileClosed()
+      if (deletesActiveProfile) {
+        onProfileClosed()
+        onProfileLanguageChanged()
+      }
     },
   )
   registerIpcHandler(
@@ -134,6 +143,7 @@ export function registerProfileIpc(
       const input = parseProfileIdInput(value)
       const opened = await controller.open(input.id)
       onProfileNeedsRateRefresh()
+      onProfileLanguageChanged()
       return opened
     },
   )
@@ -152,6 +162,7 @@ export function registerProfileIpc(
     ): Awaited<ReturnType<AppBridge['profiles']['updateSettings']>> => {
       const input = parseUpdateSettingsInput(value)
       const settings = controller.updateSettings(input)
+      if (input.settings.language) onProfileLanguageChanged()
       if (input.settings.baseCurrency) onProfileNeedsRateRefresh()
       return settings
     },
@@ -159,6 +170,7 @@ export function registerProfileIpc(
   registerIpcHandler(ipcMain, IPC_CHANNELS.profilesClose, (): Promise<void> => {
     controller.close()
     onProfileClosed()
+    onProfileLanguageChanged()
     return Promise.resolve()
   })
 }

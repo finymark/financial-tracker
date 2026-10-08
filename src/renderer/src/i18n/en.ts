@@ -1,10 +1,19 @@
+import { desktopMessages } from '../../../shared/desktop-translations'
 import { csvMessages } from '../../../shared/csv-translations'
 import { categoryNames } from '../../../shared/category-translations'
 export const en = {
+  ...desktopMessages.en,
   'privacy.toggle': 'Privacy mode',
   'privacy.hiddenAmount': 'Hidden amount',
   'privacy.shortcutScope':
     'Privacy mode works everywhere, including while typing (Ctrl+Shift+H).',
+  'quickAdd.title': 'Quick add',
+  'quickAdd.noProfiles':
+    'Create a profile in the main window before adding a transaction.',
+  'quickAdd.noAccounts':
+    'Create an account in the main window before adding a transaction.',
+  'quickAdd.saved': 'Saved.',
+  'quickAdd.loading': 'Preparing quick add…',
 
   'shortcuts.closeHelp': 'Close shortcut help',
   'transactions.saveAndAddAnother': 'Save and add another',
@@ -156,9 +165,66 @@ export const en = {
   'navigation.label': 'Main navigation',
   'navigation.overview': 'Overview',
   'navigation.transactions': 'Transactions',
+  'navigation.recurring': 'Recurring',
   'navigation.reports': 'Reports',
   'navigation.accounts': 'Accounts',
   'navigation.settings': 'Settings',
+  'recurring.title': 'Recurring transactions',
+  'recurring.definitions': 'Definitions',
+  'recurring.sections': 'Recurring transaction sections',
+  'recurring.fromTransaction': 'Create recurring transaction',
+  'recurring.fromTemplate': 'Create recurring from template',
+  'recurring.fromSplitHint':
+    'Split transactions cannot be used to create a recurring transaction.',
+  'pending.title': 'Pending',
+  'pending.empty': 'No pending transactions.',
+  'pending.confirm': 'Confirm',
+  'pending.editAndConfirm': 'Edit & confirm',
+  'pending.skip': 'Skip',
+  'pending.overdue': 'Overdue',
+  'pending.dueCount': 'Due pending transactions',
+  'pending.error.notFound':
+    'The pending transaction could not be found. Refresh the list.',
+  'pending.error.accountArchived':
+    'This account is archived. Unarchive the account or skip this occurrence.',
+  'recurring.description':
+    'Create regular expense and income estimates. Due occurrences stay pending and do not affect your finances yet.',
+  'recurring.create': 'Create recurring transaction',
+  'recurring.edit': 'Edit recurring transaction',
+  'recurring.save': 'Save recurring transaction',
+  'recurring.empty': 'No recurring transactions yet.',
+  'recurring.pause': 'Pause',
+  'recurring.resume': 'Resume',
+  'recurring.paused': 'Paused',
+  'recurring.delete': 'Delete',
+  'recurring.deleteConfirmation':
+    'Delete this recurring transaction and all its pending occurrences?',
+  'recurring.nextDue': 'Next due',
+  'recurring.noNextDue': 'No future due date',
+  'recurring.creationHint':
+    'Occurrences before this recurring transaction is created are not generated. Resuming skips dates that passed while paused.',
+  'recurring.schedule.label': 'Schedule',
+  'recurring.schedule.monthly': 'Monthly',
+  'recurring.schedule.weekly': 'Weekly',
+  'recurring.schedule.yearly': 'Yearly',
+  'recurring.every': 'every',
+  'recurring.months': 'month(s)',
+  'recurring.weeks': 'week(s)',
+  'recurring.month': 'Month',
+  'recurring.day': 'Day',
+  'recurring.weekday': 'Weekday',
+  'recurring.interval': 'Repeat interval',
+  'recurring.startDate': 'Start date',
+  'recurring.endDate': 'End date (optional)',
+  'recurring.weekday.0': 'Sunday',
+  'recurring.weekday.1': 'Monday',
+  'recurring.weekday.2': 'Tuesday',
+  'recurring.weekday.3': 'Wednesday',
+  'recurring.weekday.4': 'Thursday',
+  'recurring.weekday.5': 'Friday',
+  'recurring.weekday.6': 'Saturday',
+  'recurring.error':
+    'The recurring transaction could not be saved. Check every field and try again.',
   'sidebar.collapse': 'Collapse sidebar',
   'sidebar.expand': 'Expand sidebar',
   'sidebar.profile': 'Profiles',

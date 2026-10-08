@@ -1,6 +1,16 @@
 import type { IpcMain, IpcMainInvokeEvent } from 'electron'
-import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+
+interface TrustedWebContents {
+  readonly mainFrame: unknown
+}
+
+let trustedWebContents: () => readonly TrustedWebContents[] = () => []
+
+export function configureTrustedIpcWebContents(
+  getWebContents: () => readonly TrustedWebContents[],
+): void {
+  trustedWebContents = getWebContents
+}
 
 export function inputRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -10,20 +20,13 @@ export function inputRecord(value: unknown): Record<string, unknown> {
 }
 
 export function assertTrustedIpcSender(event: IpcMainInvokeEvent): void {
-  const senderUrl = event.senderFrame?.url
-  if (!senderUrl) throw new Error('IPC sender is not the application window')
-  const expectedDevUrl = process.env.ELECTRON_RENDERER_URL
-  if (expectedDevUrl) {
-    if (new URL(senderUrl).origin === new URL(expectedDevUrl).origin) return
-  } else {
-    const expectedFile = pathToFileURL(
-      join(import.meta.dirname, '../renderer/index.html'),
+  if (
+    trustedWebContents().some(
+      (contents) =>
+        contents === event.sender && contents.mainFrame === event.senderFrame,
     )
-    const actual = new URL(senderUrl)
-    actual.hash = ''
-    actual.search = ''
-    if (actual.href === expectedFile.href) return
-  }
+  )
+    return
   throw new Error('IPC sender is not the application window')
 }
 
