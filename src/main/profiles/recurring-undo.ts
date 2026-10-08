@@ -12,7 +12,9 @@ import {
   confirmPendingTransaction,
   createRecurringTransaction,
   deleteRecurringTransaction,
+  generateRecurringTransaction,
   getPendingTransaction,
+  getRecurringTransaction,
   listRecurringTransactionOccurrences,
   listRecurringTransactions,
   setRecurringPaused,
@@ -65,8 +67,17 @@ function command<Result>(
             .prepare('DELETE FROM recurring_transactions WHERE id = ?')
             .run(id)
       } else if (after.recurring) {
-        // Editing and pause/resume never mutate existing pending snapshots.
-        // A background generation between command and undo must survive.
+        const previousPendingIds = new Set(
+          before.pending.map((pending) => pending.id),
+        )
+        const removeCommandPending = database.prepare(
+          "DELETE FROM pending_transactions WHERE id = ? AND status = 'pending'",
+        )
+        for (const pending of after.pending)
+          if (!previousPendingIds.has(pending.id))
+            removeCommandPending.run(pending.id)
+        // Occurrences generated after the command are absent from its after
+        // image and therefore survive undo.
         storeRecurringTransaction(database, before.recurring)
       } else {
         storeRecurringTransaction(database, before.recurring)
@@ -85,7 +96,11 @@ export const createRecurringUndoableCommand = (
   command(
     database,
     null,
-    () => createRecurringTransaction(database, input, clock),
+    () => {
+      const recurring = createRecurringTransaction(database, input, clock)
+      generateRecurringTransaction(database, recurring.id, clock)
+      return getRecurringTransaction(database, recurring.id)
+    },
     (item) => item.id,
   )
 
@@ -97,7 +112,11 @@ export const updateRecurringUndoableCommand = (
   command(
     database,
     input.id,
-    () => updateRecurringTransaction(database, input, clock),
+    () => {
+      const recurring = updateRecurringTransaction(database, input, clock)
+      generateRecurringTransaction(database, recurring.id, clock)
+      return getRecurringTransaction(database, recurring.id)
+    },
     (item) => item.id,
   )
 
@@ -110,7 +129,15 @@ export const pauseRecurringUndoableCommand = (
   command(
     database,
     id,
-    () => setRecurringPaused(database, id, paused, clock),
+    () => {
+      if (paused) {
+        generateRecurringTransaction(database, id, clock)
+        setRecurringPaused(database, id, true, clock)
+      } else {
+        setRecurringPaused(database, id, false, clock)
+        generateRecurringTransaction(database, id, clock)
+      }
+    },
     () => id,
   )
 

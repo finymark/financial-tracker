@@ -27,13 +27,15 @@ type Translate = (key: MessageKey) => string
 
 function QuickAddForm({
   active,
+  revision,
   t,
 }: {
   active: ActiveProfileInfo
+  revision: number
   t: Translate
 }) {
   const { language } = active.settings
-  const references = useTransactionReferenceData(0, language, 0)
+  const references = useTransactionReferenceData(revision, language, 0)
   const { accounts, accountOptions, categoryOptions, tags } = references
   const [form, setForm] = useState<TransactionForm>(() => emptyForm())
   const [payeeSuggestions, setPayeeSuggestions] = useState<PayeeSuggestion[]>(
@@ -422,6 +424,9 @@ function QuickAddForm({
 
 export default function QuickAddApp() {
   const [active, setActive] = useState<ActiveProfileInfo | null | undefined>()
+  const [activeRevision, setActiveRevision] = useState(0)
+  const activeId = useRef<string | null | undefined>(undefined)
+  const activeRequest = useRef(0)
   const systemLanguage = navigator.language.toLowerCase().split(/[-_]/)[0]
   const settings =
     active?.settings ??
@@ -442,14 +447,30 @@ export default function QuickAddApp() {
 
   useEffect(() => {
     const refreshActive = () => {
-      setActive(undefined)
+      const request = ++activeRequest.current
       void window.app.profiles
         .getActive()
-        .then(setActive)
-        .catch(() => setActive(null))
+        .then((next) => {
+          if (request !== activeRequest.current) return
+          if (activeId.current !== undefined && activeId.current === next?.id)
+            setActiveRevision((revision) => revision + 1)
+          else setActiveRevision(0)
+          activeId.current = next?.id ?? null
+          setActive(next)
+        })
+        .catch(() => {
+          if (request !== activeRequest.current) return
+          activeId.current = null
+          setActiveRevision(0)
+          setActive(null)
+        })
     }
     refreshActive()
-    return window.app.desktop.onProfileChanged(refreshActive)
+    const unsubscribe = window.app.desktop.onProfileChanged(refreshActive)
+    return () => {
+      activeRequest.current += 1
+      unsubscribe()
+    }
   }, [])
 
   return (
@@ -481,7 +502,12 @@ export default function QuickAddApp() {
             </Button>
           </div>
         ) : (
-          <QuickAddForm key={active.id} active={active} t={t} />
+          <QuickAddForm
+            key={active.id}
+            active={active}
+            revision={activeRevision}
+            t={t}
+          />
         )}
       </main>
     </PrivacyProvider>

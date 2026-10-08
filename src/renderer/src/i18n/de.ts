@@ -196,6 +196,8 @@ export const de = {
   'pending.skip': 'Überspringen',
   'pending.overdue': 'Überfällig',
   'pending.dueCount': 'Fällige ausstehende Transaktionen',
+  'pending.error.notFound':
+    'Die ausstehende Transaktion wurde nicht gefunden. Aktualisiere die Liste.',
   'pending.error.accountArchived':
     'Dieses Konto ist archiviert. Hebe die Archivierung des Kontos auf oder überspringe dieses Vorkommen.',
   'recurring.description':

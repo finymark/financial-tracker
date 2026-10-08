@@ -453,18 +453,11 @@ export function skipPendingTransaction(
   if (changed.changes !== 1) throw new Error('pending.error.notPending')
 }
 
-export function generateRecurringTransactions(
+function generateRecurringTransactionRows(
   database: Database.Database,
   clock: () => Date,
+  recurringTransactions: readonly RecurringTransaction[],
 ): void {
-  if (
-    !database
-      .prepare(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'recurring_transactions'",
-      )
-      .get()
-  )
-    return
   const to = today(clock)
   const insertPending =
     database.prepare(`INSERT OR IGNORE INTO pending_transactions
@@ -476,7 +469,7 @@ export function generateRecurringTransactions(
   const advance = database.prepare(
     'UPDATE recurring_transactions SET generated_through = ? WHERE id = ?',
   )
-  for (const recurring of listRecurringTransactions(database)) {
+  for (const recurring of recurringTransactions) {
     if (recurring.paused || recurring.generatedThrough >= to) continue
     for (const dueDate of dueDates(
       recurring.schedule,
@@ -503,6 +496,35 @@ export function generateRecurringTransactions(
     }
     advance.run(to, recurring.id)
   }
+}
+
+export function generateRecurringTransaction(
+  database: Database.Database,
+  id: string,
+  clock: () => Date,
+): void {
+  generateRecurringTransactionRows(database, clock, [
+    getRecurringTransaction(database, id),
+  ])
+}
+
+export function generateRecurringTransactions(
+  database: Database.Database,
+  clock: () => Date,
+): void {
+  if (
+    !database
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'recurring_transactions'",
+      )
+      .get()
+  )
+    return
+  generateRecurringTransactionRows(
+    database,
+    clock,
+    listRecurringTransactions(database),
+  )
 }
 
 export function storeRecurringTransaction(

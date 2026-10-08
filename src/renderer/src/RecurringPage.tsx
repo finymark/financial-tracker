@@ -29,6 +29,12 @@ interface Props {
   onPrefillHandled?(): void
 }
 
+const errorKeys = [
+  'pending.error.notFound',
+  'pending.error.accountArchived',
+  'transactions.error.futureDate',
+] as const satisfies readonly MessageKey[]
+
 function futureLimit(from: string): string {
   const date = new Date(`${from}T00:00:00`)
   date.setFullYear(date.getFullYear() + 100)
@@ -578,11 +584,8 @@ export function RecurringPage({
       onChanged()
     } catch (caught) {
       setError(
-        String(caught).includes('pending.error.accountArchived')
-          ? 'pending.error.accountArchived'
-          : String(caught).includes('transactions.error.futureDate')
-            ? 'transactions.error.futureDate'
-            : 'recurring.error',
+        errorKeys.find((key) => String(caught).includes(key)) ??
+          'recurring.error',
       )
     } finally {
       setBusy(false)
