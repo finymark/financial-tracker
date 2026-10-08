@@ -38,6 +38,7 @@ interface StoredFeeImage {
   lineId: string
   amountMinor: number
   categoryId: string | null
+  lineNote?: string
 }
 
 interface TransferAggregateImage {
@@ -61,6 +62,9 @@ function captureAggregate(
         )
         .get(transferId) as StoredTransferImage | undefined) ?? null)
     : null
+  const hasLineNotes = (
+    database.pragma('table_info(transaction_lines)') as { name: string }[]
+  ).some((column) => column.name === 'note')
   const fee = transfer?.feeTransactionId
     ? ((database
         .prepare(
@@ -73,6 +77,7 @@ function captureAggregate(
             transaction_lines.id AS lineId,
             transaction_lines.amount_minor AS amountMinor,
             transaction_lines.category_id AS categoryId
+            ${hasLineNotes ? ', transaction_lines.note AS lineNote' : ''}
           FROM transactions
           JOIN transaction_lines
             ON transaction_lines.transaction_id = transactions.id
@@ -119,13 +124,25 @@ function restoreAggregate(
         fee.createdAt,
         fee.updatedAt,
       )
-    database
-      .prepare(
-        `INSERT INTO transaction_lines
-          (id, transaction_id, amount_minor, category_id)
-         VALUES (?, ?, ?, ?)`,
-      )
-      .run(fee.lineId, fee.id, fee.amountMinor, fee.categoryId)
+    const hasLineNotes = (
+      database.pragma('table_info(transaction_lines)') as { name: string }[]
+    ).some((column) => column.name === 'note')
+    if (hasLineNotes)
+      database
+        .prepare(
+          `INSERT INTO transaction_lines
+            (id, transaction_id, amount_minor, category_id, note)
+           VALUES (?, ?, ?, ?, ?)`,
+        )
+        .run(fee.lineId, fee.id, fee.amountMinor, fee.categoryId, fee.lineNote)
+    else
+      database
+        .prepare(
+          `INSERT INTO transaction_lines
+            (id, transaction_id, amount_minor, category_id)
+           VALUES (?, ?, ?, ?)`,
+        )
+        .run(fee.lineId, fee.id, fee.amountMinor, fee.categoryId)
   }
   if (before.transfer) {
     const transfer = before.transfer

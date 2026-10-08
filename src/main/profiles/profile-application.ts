@@ -399,6 +399,19 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
     CREATE INDEX transaction_line_tags_tag_id ON transaction_line_tags(tag_id, line_id);
   `,
   ),
+  defineSqlMigration(
+    11,
+    'notes on transaction lines for splits',
+    `
+    ALTER TABLE transaction_lines
+      ADD COLUMN note TEXT NOT NULL DEFAULT '' CHECK (length(note) <= 1000);
+    UPDATE transaction_lines
+    SET note = (
+      SELECT transactions.note FROM transactions
+      WHERE transactions.id = transaction_lines.transaction_id
+    );
+  `,
+  ),
 ]
 
 function validateMigrations(

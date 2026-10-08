@@ -15,7 +15,15 @@ export interface TransactionLine {
   id: string
   amountMinor: number
   categoryId: string | null
+  note: string
   tags: Tag[]
+}
+
+export interface TransactionLineInput {
+  amountMinor: number
+  categoryId: string | null
+  note: string
+  tagNames?: string[]
 }
 
 export interface Transaction {
@@ -30,13 +38,18 @@ export interface Transaction {
   excluded: boolean
   createdAt: string
   updatedAt: string
+  lines: TransactionLine[]
+  // Kept as the first line for compatibility with commands that only support
+  // ordinary one-line transactions (notably linked transfer fees).
   line: TransactionLine
   linkedTransferId?: string
 }
 
 export interface CreateTransactionInput {
-  // Omitted names mean no tags on create; supplied names replace the single line's tags.
+  // When lines is omitted these fields describe one ordinary transaction line.
+  // Supplying lines enables a split and each line owns its category, note, and tags.
   tagNames?: string[]
+  lines?: TransactionLineInput[]
   accountId: string
   kind: TransactionKind
   date: string

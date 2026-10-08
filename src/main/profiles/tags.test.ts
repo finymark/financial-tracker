@@ -230,6 +230,10 @@ test('deleting a tag removes all associations and undo restores them without cha
         ? transaction
         : {
             ...transaction,
+            lines: transaction.lines.map((line) => ({
+              ...line,
+              tags: line.tags.filter((candidate) => candidate.id !== tag.id),
+            })),
             line: {
               ...transaction.line,
               tags: transaction.line.tags.filter(
@@ -323,7 +327,7 @@ test('tags stay isolated by profile', async () => {
   expect(first.application.queries.listTags()).toEqual(tagged.line.tags)
 })
 
-test('appending tags migration 10 preserves the version 9 ledger and tags persist on reopen while undo history does not', async () => {
+test('appending tags and split-line migrations preserves the version 9 ledger and tags persist on reopen while undo history does not', async () => {
   const {
     application: previous,
     input,
@@ -355,7 +359,9 @@ test('appending tags migration 10 preserves the version 9 ledger and tags persis
   previous.close()
   const upgraded = await openProfileApplication({ profile, paths, clock })
   applications.push(upgraded)
-  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(10)
+  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(
+    CURRENT_MIGRATIONS.length,
+  )
   expect(upgraded.queries.getAccountBalance(input.accountId)).toBe(balance)
   expect(upgraded.queries.listTransactions()).toEqual(before)
   expect(upgraded.queries.listTags()).toEqual([])

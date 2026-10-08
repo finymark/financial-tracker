@@ -193,6 +193,13 @@ export const hu = {
     'A tranzakció nem található. Frissítsd a listát.',
   'transactions.error.lines':
     'A tranzakció sorainak összege nem egyezik a végösszeggel.',
+  'splits.split': 'Felosztás',
+  'splits.unsplit': 'Vissza egy részre',
+  'splits.remaining': 'Fennmaradó összeg',
+  'splits.part': 'Rész',
+  'splits.remove': 'Rész eltávolítása',
+  'splits.addPart': 'Rész hozzáadása',
+  'splits.indicator': 'Felosztott',
   'tags.title': 'Címkék',
   'tags.all': 'Minden címke',
   'tags.manage': 'Címkék kezelése',

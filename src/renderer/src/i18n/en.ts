@@ -190,6 +190,13 @@ export const en = {
   'transactions.error.notFound':
     'The transaction could not be found. Refresh the list.',
   'transactions.error.lines': 'The transaction lines do not match its total.',
+  'splits.split': 'Split',
+  'splits.unsplit': 'Return to one part',
+  'splits.remaining': 'Remaining amount',
+  'splits.part': 'Part',
+  'splits.remove': 'Remove part',
+  'splits.addPart': 'Add part',
+  'splits.indicator': 'Split',
   'tags.title': 'Tags',
   'tags.all': 'All tags',
   'tags.manage': 'Manage tags',

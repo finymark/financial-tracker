@@ -364,10 +364,15 @@ not off-device copies or backups of the separate data folder.
   same Unicode-normalized name ignoring case is reused. Category choices are limited to active
   expense or income categories matching the transaction kind and preserve the
   two-level hierarchy.
-- Each transaction currently has exactly one line whose amount equals its total.
-  Tags are many-to-many associations on that line (`transaction_line_tags`), not
-  duplicated on the header, so #66 can give each split part its own tags without
-  migrating existing associations. Split transactions are not included yet.
+- Every transaction has one or more lines. Use **Split** in the drawer to add
+  parts with their own positive calculator amount, nullable category, note, and
+  tags; the remaining-amount indicator must reach zero before saving. Returning
+  to one part is supported. Saving validates inside the write transaction that
+  at least one line exists and the exact integer-hundredth line sum equals the
+  header total. The transaction table marks splits and expands their parts.
+  Category and tag filters include a split when one part matches and totals count
+  only matching parts. The Excluded flag remains on the transaction header and
+  therefore excludes every part from totals.
 - Edit any listed transaction or transfer from the same drawer, or delete it after
   confirmation. Create, edit, delete, category reassignment, and balance updates
   run through the profile application command boundary in one SQLite transaction.
@@ -419,6 +424,18 @@ not off-device copies or backups of the separate data folder.
   test times a filtered first page plus all aggregates with a generous 500 ms
   bound, arranging the 20 000 transactions through application commands in one
   fixture transaction (outside the measured query).
+
+### Manual Split check
+
+Run `npm run dev`, create an expense, choose **Split**, and enter two calculator
+amounts whose sum equals the total. Give the parts different categories, notes,
+and tags; add and remove another part, then return to one part and split again.
+Verify the remaining amount reaches zero, a nonzero remainder is rejected on
+save, and reopening preserves every part. In the table, expand the Split
+indicator and check each part. Apply each part's category and tag filters in
+turn: the transaction remains one list row while filtered and daily totals show
+only the matching part. Mark the transaction Excluded and verify every part is
+omitted from totals. Edit/delete/undo and repeat in HU/EN/DE.
 
 ### Amount calculator
 
