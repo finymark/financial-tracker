@@ -99,9 +99,17 @@ export const hu = {
     'A pénzügyek összesített áttekintése később lesz itt elérhető.',
   'transactions.title': 'Tranzakcióid egy helyen',
   'transactions.description':
-    'Rögzítsd kiadásaidat és bevételeidet, hogy a számlaegyenlegek naprakészek legyenek.',
+    'Rögzítsd kiadásaidat, bevételeidet és átvezetéseidet, hogy a számlaegyenlegek naprakészek legyenek.',
   'transactions.listDescription':
     'Szűrd a tranzakciókat időszak, számla, kategória, partner, címke vagy megjegyzés szerint.',
+  'transactions.excluded': 'Kizárt',
+  'transactions.excludedHint':
+    'A számla egyenlegébe beleszámít, de a kiadások és bevételek összesítéséből kimarad.',
+  'transactions.exclusion': 'Kizárt tranzakciók',
+  'transactions.exclusion.all': 'Minden tranzakció',
+  'transactions.exclusion.onlyExcluded': 'Csak a kizártak',
+  'transactions.exclusion.hideExcluded': 'Kizártak elrejtése',
+  'transactions.error.excluded': 'Válaszd ki, hogy a tranzakció kizárt-e.',
   'transactions.filters': 'Tranzakciószűrők',
   'transactions.period': 'Időszak',
   'transactions.period.all': 'Összes dátum',
@@ -140,14 +148,24 @@ export const hu = {
   'transactions.noAccounts':
     'Tranzakció rögzítése előtt hozz létre egy aktív számlát.',
   'transactions.refresh': 'Frissítés',
-  'transactions.kind': 'Kiadás vagy bevétel',
+  'transactions.kind': 'Tranzakció típusa',
   'transactions.expense': 'Kiadás',
   'transactions.income': 'Bevétel',
+  'transactions.transfer': 'Átvezetés',
   'transactions.date': 'Dátum',
   'transactions.amount': 'Összeg',
+  'amount.result': 'Kiszámított összeg',
   'transactions.amountHint':
-    'Adj meg pozitív összeget ponttal vagy vesszővel és legfeljebb két tizedesjeggyel.',
+    'Használhatsz + - * / műveleteket, zárójeleket, pontot vagy vesszőt tizedesjelként és ezres tagolást (pl. 1 234,50). A mező elhagyása vagy Enter kiszámítja a századokra kerekített végeredményt.',
   'transactions.account': 'Számla',
+  'transactions.fromAccount': 'Forrásszámla',
+  'transactions.toAccount': 'Célszámla',
+  'transactions.fromAmount': 'Küldött összeg',
+  'transactions.toAmount': 'Fogadott összeg',
+  'transactions.actualRate': 'Tényleges árfolyam',
+  'transactions.fee': 'Díj összege',
+  'transactions.feeCategory': 'Díj kategóriája',
+  'transactions.optional': 'Nem kötelező',
   'transactions.chooseAccount': 'Válassz aktív számlát',
   'transactions.payee': 'Kedvezményezett',
   'transactions.payeeHint':
@@ -164,7 +182,7 @@ export const hu = {
   'transactions.error.date': 'Adj meg érvényes naptári dátumot.',
   'transactions.error.futureDate': 'A tranzakció dátuma nem lehet jövőbeli.',
   'transactions.error.amount':
-    'Adj meg pozitív összeget legfeljebb két tizedesjeggyel.',
+    'Adj meg érvényes kifejezést, amely pozitív összeget ad, legfeljebb 90 071 992 547 409,91 értékig. Nullával nem lehet osztani.',
   'transactions.error.payee':
     'Adj meg legfeljebb 100 karakter hosszú kedvezményezettnevet.',
   'transactions.error.category':
@@ -193,6 +211,12 @@ export const hu = {
   'tags.error.notFound': 'A címke nem található. Frissítsd a listát.',
   'tags.error.duplicate': 'Már létezik ilyen nevű címke.',
   'undo.available': 'Módosítás mentve.',
+  'transfers.error.accountsDiffer': 'Válassz két különböző számlát.',
+  'transfers.error.equalAmounts':
+    'Azonos pénznemű számláknál a két összegnek egyeznie kell.',
+  'transfers.error.notFound': 'Az átvezetés nem található. Frissítsd a listát.',
+  'transfers.error.linkedFee':
+    'Ezt a díjat a hozzá tartozó átvezetésen keresztül módosítsd vagy töröld.',
   'undo.action': 'Visszavonás',
   'undo.error': 'A módosítást nem sikerült visszavonni.',
   'accounts.title': 'Minden számlának saját hely',
@@ -205,7 +229,7 @@ export const hu = {
   'accounts.openingDate': 'Nyitás dátuma',
   'accounts.balance': 'Egyenleg',
   'accounts.balanceHint':
-    'Pontot vagy vesszőt és legfeljebb két tizedesjegyet használj, ezres tagolás nélkül. Negatív egyenleg is megadható.',
+    'Használhatsz + - * / műveleteket, zárójeleket, pontot vagy vesszőt tizedesjelként és ezres tagolást. A mező elhagyása vagy Enter századokra kerekíti a végeredményt. Negatív és nulla egyenleg is megadható.',
   'accounts.empty': 'Hozz létre egy számlát az egyenleg követéséhez.',
   'accounts.loading': 'Számlák betöltése…',
   'accounts.rename': 'Átnevezés',
@@ -225,7 +249,7 @@ export const hu = {
   'accounts.error.name': 'Adj meg egy 1–100 karakter hosszú számlanevet.',
   'accounts.error.currency': 'Válaszd a HUF vagy CHF pénznemet.',
   'accounts.error.balance':
-    'Adj meg érvényes egyenleget legfeljebb két tizedesjeggyel, tagolás nélkül, ±90 071 992 547 409,91 határon belül.',
+    'Adj meg érvényes kifejezést, amely ±90 071 992 547 409,91 határon belüli egyenleget ad. Nullával nem lehet osztani.',
   'accounts.error.date': 'Adj meg érvényes nyitási dátumot.',
   'accounts.error.notFound': 'A számla nem található. Frissítsd a listát.',
   'accounts.error.currencyLocked':

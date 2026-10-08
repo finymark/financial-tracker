@@ -20,12 +20,14 @@ import {
   validateTransactionPayeeName,
   validateTransactionTotal,
   validateTransactionId,
+  validateTransactionExcluded,
 } from './transaction-validation'
 import { today } from '../../shared/date'
 import { normalizePayeeKey } from '../db'
 import { validateTagNames } from './tag-validation'
 import { getLineTags, getLinesTags, setLineTags } from './profile-tags'
 import type { Tag } from '../../shared/tags'
+import { getTransfer } from './profile-transfers'
 
 interface StoredTransaction {
   id: string
@@ -36,6 +38,8 @@ interface StoredTransaction {
   payeeId: string | null
   payeeName: string | null
   note: string
+  // Absent in pre-exclusion migration fixtures.
+  excluded?: number
   createdAt: string
   updatedAt: string
   lineId: string
@@ -46,14 +50,11 @@ interface StoredTransaction {
 }
 
 const TRANSACTION_SELECT = `
-  SELECT transactions.id,
+  SELECT transactions.*,
     transactions.account_id AS accountId,
-    transactions.kind,
-    transactions.date,
     transactions.total_minor AS totalMinor,
     transactions.payee_id AS payeeId,
     payees.name AS payeeName,
-    transactions.note,
     transactions.created_at AS createdAt,
     transactions.updated_at AS updatedAt,
     transaction_lines.id AS lineId,
@@ -83,6 +84,7 @@ function transactionView(
     payeeId: row.payeeId,
     payeeName: row.payeeName,
     note: row.note,
+    excluded: row.excluded === 1,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     line: {
@@ -193,6 +195,7 @@ export function createTransaction(
   const categoryId = validateTransactionCategoryId(input.categoryId)
   const note = validateTransactionNote(input.note)
   const tagNames = validateTagNames(input.tagNames)
+  const excluded = validateTransactionExcluded(input.excluded)
   validateReferences(database, accountId, kind, categoryId)
   const timestamp = clock().toISOString()
   const payeeId = resolvePayee(database, payeeName, timestamp)
@@ -222,6 +225,11 @@ export function createTransaction(
     )
     .run(lineId, id, totalMinor, categoryId)
   setLineTags(database, lineId, tagNames, timestamp)
+  if (excluded !== undefined) {
+    database
+      .prepare('UPDATE transactions SET excluded = ? WHERE id = ?')
+      .run(Number(excluded), id)
+  }
   return getTransaction(database, id)
 }
 
@@ -229,8 +237,10 @@ export function updateTransaction(
   database: Database.Database,
   input: UpdateTransactionInput,
   clock: () => Date,
+  allowLinkedFee = false,
 ): Transaction {
   const current = getTransaction(database, validateTransactionId(input.id))
+  assertNotLinkedFee(database, current.id, allowLinkedFee)
   const accountId = validateTransactionAccountId(input.accountId)
   const kind = validateTransactionKind(input.kind)
   const date = validateTransactionDate(input.date, clock)
@@ -242,6 +252,7 @@ export function updateTransaction(
     input.tagNames === undefined
       ? current.line.tags.map((tag) => tag.name)
       : validateTagNames(input.tagNames)
+  const excluded = validateTransactionExcluded(input.excluded)
   validateReferences(database, accountId, kind, categoryId, current)
   const timestamp = clock().toISOString()
   const payeeId = resolvePayee(database, payeeName, timestamp)
@@ -268,22 +279,49 @@ export function updateTransaction(
     )
     .run(totalMinor, categoryId, current.line.id)
   setLineTags(database, current.line.id, tagNames, timestamp)
+  if (excluded !== undefined) {
+    database
+      .prepare('UPDATE transactions SET excluded = ? WHERE id = ?')
+      .run(Number(excluded), current.id)
+  }
   return getTransaction(database, current.id)
 }
 
 export function deleteTransaction(
   database: Database.Database,
   id: string,
+  allowLinkedFee = false,
 ): void {
   const current = getTransaction(database, validateTransactionId(id))
+  assertNotLinkedFee(database, current.id, allowLinkedFee)
   database
     .prepare('DELETE FROM transaction_lines WHERE transaction_id = ?')
     .run(current.id)
   database.prepare('DELETE FROM transactions WHERE id = ?').run(current.id)
 }
 
-const LIST_ORDER =
-  'transactions.date DESC, transactions.created_at DESC, transactions.id DESC'
+function assertNotLinkedFee(
+  database: Database.Database,
+  transactionId: string,
+  allowLinkedFee: boolean,
+): void {
+  if (allowLinkedFee) return
+  const hasTransfers = Boolean(
+    database
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'transfers'",
+      )
+      .get(),
+  )
+  if (
+    hasTransfers &&
+    database
+      .prepare('SELECT 1 FROM transfers WHERE fee_transaction_id = ?')
+      .get(transactionId)
+  ) {
+    throw new Error('transfers.error.linkedFee')
+  }
+}
 
 function foldText(value: string): string {
   return value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
@@ -297,6 +335,8 @@ export function listTransactions(
   const input = parseTransactionListInput(value)
   const where: string[] = []
   const parameters: (string | number)[] = []
+  const transferWhere: string[] = []
+  const transferParameters: (string | number)[] = []
   const add = (condition: string, ...values: (string | number)[]) => {
     where.push(condition)
     parameters.push(...values)
@@ -317,11 +357,33 @@ export function listTransactions(
     from = `${last.slice(0, 7)}-01`
     to = last
   }
-  if (from) add('transactions.date >= ?', from)
-  if (to) add('transactions.date <= ?', to)
-  if (input.accountId) add('transactions.account_id = ?', input.accountId)
+  const addTransfer = (condition: string, ...values: (string | number)[]) => {
+    transferWhere.push(condition)
+    transferParameters.push(...values)
+  }
+  if (from) {
+    add('transactions.date >= ?', from)
+    addTransfer('transfers.date >= ?', from)
+  }
+  if (to) {
+    add('transactions.date <= ?', to)
+    addTransfer('transfers.date <= ?', to)
+  }
+  if (input.accountId) {
+    add('transactions.account_id = ?', input.accountId)
+    addTransfer(
+      '(transfers.from_account_id = ? OR transfers.to_account_id = ?)',
+      input.accountId,
+      input.accountId,
+    )
+  }
+  if (input.exclusion === 'onlyExcluded') {
+    add('transactions.excluded = 1')
+    addTransfer('0 = 1')
+  }
+  if (input.exclusion === 'hideExcluded') add('transactions.excluded = 0')
   if (input.payeeId) add('transactions.payee_id = ?', input.payeeId)
-  if (input.tagId)
+  if (input.tagId) {
     add(
       `EXISTS (
         SELECT 1 FROM transaction_lines AS tagged_lines
@@ -330,7 +392,10 @@ export function listTransactions(
       )`,
       input.tagId,
     )
-  if (input.categoryId)
+    addTransfer('0 = 1')
+  }
+  if (input.payeeId) addTransfer('0 = 1')
+  if (input.categoryId) {
     add(
       `EXISTS (
     SELECT 1 FROM transaction_lines AS filter_lines
@@ -341,10 +406,16 @@ export function listTransactions(
       input.categoryId,
       input.categoryId,
     )
+    addTransfer('0 = 1')
+  }
   if (input.search) {
     add(
       '(instr(fold_text(payees.name), ?) > 0 OR instr(fold_text(transactions.note), ?) > 0)',
       foldText(input.search),
+      foldText(input.search),
+    )
+    addTransfer(
+      'instr(fold_text(transfers.note), ?) > 0',
       foldText(input.search),
     )
   }
@@ -352,30 +423,90 @@ export function listTransactions(
     JOIN accounts ON accounts.id = transactions.account_id
     LEFT JOIN payees ON payees.id = transactions.payee_id
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}`
+  const transfersAvailable = Boolean(
+    database
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'transfers'",
+      )
+      .get(),
+  )
+  const includeTransfers =
+    transfersAvailable &&
+    Boolean(database.prepare('SELECT 1 FROM transfers LIMIT 1').get())
+  const filteredTransfers = `FROM transfers
+    ${transferWhere.length ? `WHERE ${transferWhere.join(' AND ')}` : ''}`
+  const entries = `
+    SELECT transactions.id, 'transaction' AS entryType,
+      transactions.date, transactions.created_at AS createdAt ${filtered}
+    ${
+      includeTransfers
+        ? `UNION ALL
+    SELECT transfers.id, 'transfer' AS entryType,
+      transfers.date, transfers.created_at AS createdAt ${filteredTransfers}`
+        : ''
+    }`
+  const entryParameters = includeTransfers
+    ? [...parameters, ...transferParameters]
+    : parameters
   // One read snapshot for rows and aggregates. Offset allows arbitrary virtual
   // windows; only the bounded page goes through the ledger line checks.
   return database.transaction(() => {
-    const storedRows = database
-      .prepare(
-        `${TRANSACTION_SELECT}
-      WHERE transactions.id IN (SELECT transactions.id ${filtered}
-        ORDER BY ${LIST_ORDER} LIMIT ? OFFSET ?)
-      ORDER BY ${LIST_ORDER}`,
-      )
-      .all(...parameters, input.limit!, input.offset!) as StoredTransaction[]
-    const lineTags = getLinesTags(
-      database,
-      storedRows.map((row) => row.lineId),
-    )
-    const rows = storedRows.map((row) =>
-      transactionView(database, row, lineTags.get(row.lineId) ?? []),
-    )
+    const rows = includeTransfers
+      ? (
+          database
+            .prepare(
+              `SELECT id, entryType FROM (${entries})
+               ORDER BY date DESC, createdAt DESC, id DESC LIMIT ? OFFSET ?`,
+            )
+            .all(...entryParameters, input.limit!, input.offset!) as {
+            id: string
+            entryType: 'transaction' | 'transfer'
+          }[]
+        ).map(({ id, entryType }) => {
+          if (entryType === 'transfer') return getTransfer(database, id)
+          const transaction = getTransaction(database, id)
+          const link = database
+            .prepare('SELECT id FROM transfers WHERE fee_transaction_id = ?')
+            .get(id) as { id: string } | undefined
+          return link
+            ? { ...transaction, linkedTransferId: link.id }
+            : transaction
+        })
+      : (() => {
+          const storedRows = database
+            .prepare(
+              `${TRANSACTION_SELECT}
+               WHERE transactions.id IN (SELECT transactions.id ${filtered}
+                 ORDER BY transactions.date DESC, transactions.created_at DESC,
+                   transactions.id DESC LIMIT ? OFFSET ?)
+               ORDER BY transactions.date DESC, transactions.created_at DESC,
+                 transactions.id DESC`,
+            )
+            .all(
+              ...parameters,
+              input.limit!,
+              input.offset!,
+            ) as StoredTransaction[]
+          const lineTags = getLinesTags(
+            database,
+            storedRows.map((row) => row.lineId),
+          )
+          return storedRows.map((row) =>
+            transactionView(database, row, lineTags.get(row.lineId) ?? []),
+          )
+        })()
     const totalCount = Number(
       (
         database
-          .prepare(`SELECT COUNT(*) AS count ${filtered}`)
+          .prepare(
+            includeTransfers
+              ? `SELECT COUNT(*) AS count FROM (${entries})`
+              : `SELECT COUNT(*) AS count ${filtered}`,
+          )
           .safeIntegers()
-          .get(...parameters) as { count: bigint }
+          .get(...(includeTransfers ? entryParameters : parameters)) as {
+          count: bigint
+        }
       ).count,
     )
     if (!Number.isSafeInteger(totalCount))
@@ -383,26 +514,34 @@ export function listTransactions(
     const aggregates = database
       .prepare(
         `SELECT filtered_transactions.date, filtered_transactions.currency,
-      SUM(CASE filtered_transactions.kind WHEN 'expense' THEN aggregate_lines.amount_minor ELSE 0 END) AS expenseMinor,
-      SUM(CASE filtered_transactions.kind WHEN 'income' THEN aggregate_lines.amount_minor ELSE 0 END) AS incomeMinor
+      SUM(CASE WHEN filtered_transactions.excluded = 0 AND filtered_transactions.kind = 'expense' THEN aggregate_lines.amount_minor ELSE 0 END) AS expenseMinor,
+      SUM(CASE WHEN filtered_transactions.excluded = 0 AND filtered_transactions.kind = 'income' THEN aggregate_lines.amount_minor ELSE 0 END) AS incomeMinor
       FROM (
-        SELECT transactions.id, transactions.date, transactions.kind, accounts.currency
+        SELECT transactions.id, transactions.date, transactions.kind, transactions.excluded, accounts.currency
         ${filtered}
       ) AS filtered_transactions
       JOIN transaction_lines AS aggregate_lines
         ON aggregate_lines.transaction_id = filtered_transactions.id
+      ${
+        input.tagId
+          ? `WHERE EXISTS (
+        SELECT 1 FROM transaction_line_tags AS aggregate_tags
+        WHERE aggregate_tags.line_id = aggregate_lines.id AND aggregate_tags.tag_id = ?
+      )`
+          : ''
+      }
       GROUP BY filtered_transactions.date, filtered_transactions.currency
       ORDER BY filtered_transactions.date DESC, filtered_transactions.currency`,
       )
       .safeIntegers()
-      .all(...parameters) as {
+      .all(...parameters, ...(input.tagId ? [input.tagId] : [])) as {
       date: string
       currency: TransactionTotals['currency']
       expenseMinor: bigint
       incomeMinor: bigint
     }[]
     const totals = new Map<TransactionTotals['currency'], TransactionTotals>()
-    const days: TransactionPage['days'] = []
+    const dayTotals = new Map<string, TransactionTotals[]>()
     const safe = (value: bigint): number => {
       const number = Number(value)
       if (!Number.isSafeInteger(number))
@@ -415,9 +554,9 @@ export function listTransactions(
         expenseMinor: safe(row.expenseMinor),
         incomeMinor: safe(row.incomeMinor),
       }
-      if (days.at(-1)?.date !== row.date)
-        days.push({ date: row.date, totals: [] })
-      days.at(-1)!.totals.push(dayTotal)
+      const currentDay = dayTotals.get(row.date) ?? []
+      currentDay.push(dayTotal)
+      dayTotals.set(row.date, currentDay)
       const total = totals.get(row.currency) ?? {
         currency: row.currency,
         expenseMinor: 0,
@@ -427,6 +566,15 @@ export function listTransactions(
       total.incomeMinor = safe(BigInt(total.incomeMinor) + row.incomeMinor)
       totals.set(row.currency, total)
     }
+    const days = includeTransfers
+      ? (
+          database
+            .prepare(
+              `SELECT DISTINCT date FROM (${entries}) ORDER BY date DESC`,
+            )
+            .all(...entryParameters) as { date: string }[]
+        ).map(({ date }) => ({ date, totals: dayTotals.get(date) ?? [] }))
+      : [...dayTotals].map(([date, totals]) => ({ date, totals }))
     return {
       rows,
       totalCount,

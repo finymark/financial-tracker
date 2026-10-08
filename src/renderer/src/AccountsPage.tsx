@@ -5,7 +5,8 @@ import { CardContent } from './components/ui/card'
 import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
 import { createFormatters, type Language, type MessageKey } from './i18n'
-import { parseAmountInput } from './lib/amount-input'
+import { parseAmountExpression } from '../../shared/amount-expression'
+import { AmountInput } from './components/amount-input'
 
 const errorKeys = [
   'accounts.error.name',
@@ -79,8 +80,9 @@ export function AccountsPage({ language, t }: AccountsPageProps) {
       await window.app.accounts.create({
         name,
         currency,
-        openingBalance: parseAmountInput(
+        openingBalance: parseAmountExpression(
           openingBalance,
+          currency,
           'accounts.error.balance',
           {
             allowNegative: true,
@@ -336,19 +338,19 @@ export function AccountsPage({ language, t }: AccountsPageProps) {
               >
                 {t('accounts.openingBalance')}
               </label>
-              <Input
+              <AmountInput
                 id="account-opening-balance"
-                inputMode="decimal"
                 value={openingBalance}
-                maxLength={22}
-                required
+                currency={currency}
+                language={language}
+                t={t}
+                errorKey="accounts.error.balance"
+                hintKey="accounts.balanceHint"
+                allowNegative
+                allowZero
                 disabled={busy || loading}
-                aria-describedby="balance-hint"
-                onChange={(event) => setOpeningBalance(event.target.value)}
+                onChange={setOpeningBalance}
               />
-              <p id="balance-hint" className="text-xs text-muted-foreground">
-                {t('accounts.balanceHint')}
-              </p>
             </div>
             <div className="space-y-2">
               <label

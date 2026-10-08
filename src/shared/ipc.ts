@@ -37,6 +37,12 @@ import type {
   TransactionIdInput,
   UpdateTransactionInput,
 } from './transactions'
+import type {
+  CreateTransferInput,
+  Transfer,
+  TransferIdInput,
+  UpdateTransferInput,
+} from './transfers'
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
@@ -72,6 +78,9 @@ export const IPC_CHANNELS = {
   transactionsCreate: 'transactions:create',
   transactionsUpdate: 'transactions:update',
   transactionsDelete: 'transactions:delete',
+  transfersCreate: 'transfers:create',
+  transfersUpdate: 'transfers:update',
+  transfersDelete: 'transfers:delete',
   undoLast: 'undo:last',
   payeesList: 'payees:list',
   tagsList: 'tags:list',
@@ -91,6 +100,11 @@ export interface AppBridge {
     create(input: CreateTransactionInput): Promise<Transaction>
     update(input: UpdateTransactionInput): Promise<Transaction>
     delete(input: TransactionIdInput): Promise<void>
+  }
+  transfers: {
+    create(input: CreateTransferInput): Promise<Transfer>
+    update(input: UpdateTransferInput): Promise<Transfer>
+    delete(input: TransferIdInput): Promise<void>
   }
   undo: {
     last(): Promise<boolean>

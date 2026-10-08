@@ -8,6 +8,7 @@ import {
   type ProfileApplication,
 } from './profile-application'
 import { ProfileRegistry } from './profile-registry'
+import { openDatabase } from '../db'
 import type { CreateTransactionInput } from '../../shared/transactions'
 
 const directories: string[] = []
@@ -190,7 +191,9 @@ test('renames tags everywhere and undo restores the original identity and spelli
     application.queries
       .listTransactions({ tagId: tag.id })
       .rows.every(
-        (transaction) => transaction.line.tags[0].name === 'Vacation',
+        (transaction) =>
+          transaction.kind !== 'transfer' &&
+          transaction.line.tags[0].name === 'Vacation',
       ),
   ).toBe(true)
   expect(application.commands.undoLast()).toBe(true)
@@ -222,15 +225,19 @@ test('deleting a tag removes all associations and undo restores them without cha
   ).toBe(0)
   const deleted = application.queries.listTransactions()
   expect(deleted.rows).toEqual(
-    before.rows.map((transaction) => ({
-      ...transaction,
-      line: {
-        ...transaction.line,
-        tags: transaction.line.tags.filter(
-          (candidate) => candidate.id !== tag.id,
-        ),
-      },
-    })),
+    before.rows.map((transaction) =>
+      transaction.kind === 'transfer'
+        ? transaction
+        : {
+            ...transaction,
+            line: {
+              ...transaction.line,
+              tags: transaction.line.tags.filter(
+                (candidate) => candidate.id !== tag.id,
+              ),
+            },
+          },
+    ),
   )
   expect(deleted.totals).toEqual(before.totals)
   expect(application.queries.getAccountBalance(input.accountId)).toBe(balance)
@@ -316,18 +323,40 @@ test('tags stay isolated by profile', async () => {
   expect(first.application.queries.listTags()).toEqual(tagged.line.tags)
 })
 
-test('upgrading the previous schema preserves the ledger and tags persist on reopen while undo history does not', async () => {
+test('appending tags migration 10 preserves the version 9 ledger and tags persist on reopen while undo history does not', async () => {
   const {
     application: previous,
     input,
     profile,
     paths,
-  } = await setup(CURRENT_MIGRATIONS.slice(0, 7))
-  const legacy = previous.commands.createTransaction(input)
+  } = await setup(CURRENT_MIGRATIONS.slice(0, 9))
+  const legacy = previous.commands.createTransaction({
+    ...input,
+    excluded: true,
+  })
+  const destination = previous.commands.createAccount({
+    name: 'Destination',
+    currency: 'CHF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  previous.commands.createTransfer({
+    fromAccountId: input.accountId,
+    fromAmountMinor: 200,
+    toAccountId: destination.id,
+    toAmountMinor: 200,
+    date: input.date,
+    note: 'Before tags',
+    fee: { amountMinor: 10, excluded: true },
+  })
+  expect(previous.queries.getProfileInfo().schemaVersion).toBe(9)
+  const balance = previous.queries.getAccountBalance(input.accountId)
   const before = previous.queries.listTransactions()
   previous.close()
   const upgraded = await openProfileApplication({ profile, paths, clock })
   applications.push(upgraded)
+  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(10)
+  expect(upgraded.queries.getAccountBalance(input.accountId)).toBe(balance)
   expect(upgraded.queries.listTransactions()).toEqual(before)
   expect(upgraded.queries.listTags()).toEqual([])
   const tagged = upgraded.commands.updateTransaction({
@@ -413,4 +442,135 @@ test('editing existing transaction fields without supplying tag names preserves 
   ).toEqual([edited])
   expect(application.commands.undoLast()).toBe(true)
   expect(application.queries.listTransactions().rows).toEqual([first])
+})
+
+test('tag and exclusion filters combine while hiding transfers and preserving whole-set totals and balances', async () => {
+  const { application, input } = await setup()
+  const destination = application.commands.createAccount({
+    name: 'Destination',
+    currency: 'CHF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  const included = application.commands.createTransaction({
+    ...input,
+    totalMinor: 200,
+    tagNames: ['Trip', 'Project'],
+  })
+  const excluded = application.commands.createTransaction({
+    ...input,
+    totalMinor: 900,
+    excluded: true,
+    tagNames: ['Trip'],
+  })
+  application.commands.createTransaction({ ...input, totalMinor: 700 })
+  const transfer = application.commands.createTransfer({
+    fromAccountId: input.accountId,
+    fromAmountMinor: 500,
+    toAccountId: destination.id,
+    toAmountMinor: 500,
+    date: input.date,
+    note: 'Trip transfer',
+    fee: { amountMinor: 50 },
+  })
+  expect(transfer.fee?.line.tags).toEqual([])
+  const balance = application.queries.getAccountBalance(input.accountId)
+  const tagId = excluded.line.tags[0].id
+  const all = application.queries.listTransactions({ tagId, limit: 1 })
+  expect(all.totalCount).toBe(2)
+  expect(all.rows).toHaveLength(1)
+  expect(all.rows.every((row) => row.kind !== 'transfer')).toBe(true)
+  const includedTotals = [
+    { currency: 'CHF', expenseMinor: 200, incomeMinor: 0 },
+  ]
+  expect(all.totals).toEqual(includedTotals)
+  expect(all.days).toEqual([{ date: input.date, totals: includedTotals }])
+  expect(
+    application.queries.listTransactions({ tagId, offset: 1 }).totals,
+  ).toEqual(all.totals)
+  const onlyExcluded = application.queries.listTransactions({
+    tagId,
+    exclusion: 'onlyExcluded',
+  })
+  expect(onlyExcluded.rows).toEqual([excluded])
+  expect(onlyExcluded.totalCount).toBe(1)
+  const zeroTotals = [{ currency: 'CHF', expenseMinor: 0, incomeMinor: 0 }]
+  expect(onlyExcluded.totals).toEqual(zeroTotals)
+  expect(onlyExcluded.days).toEqual([{ date: input.date, totals: zeroTotals }])
+  const hideExcluded = application.queries.listTransactions({
+    tagId,
+    exclusion: 'hideExcluded',
+  })
+  expect(hideExcluded.rows).toEqual([included])
+  expect(hideExcluded.totalCount).toBe(1)
+  expect(hideExcluded.totals).toEqual(includedTotals)
+  expect(
+    application.queries.listTransactions({ exclusion: 'hideExcluded' }).rows,
+  ).toContainEqual(transfer)
+  expect(application.queries.getAccountBalance(input.accountId)).toBe(balance)
+})
+
+test('transaction undo captures tags and the excluded flag together across create, edit and delete', async () => {
+  const { application, input } = await setup()
+  const original = application.commands.createTransaction({
+    ...input,
+    excluded: true,
+    tagNames: ['Original'],
+  })
+  const edited = application.commands.updateTransaction({
+    ...input,
+    id: original.id,
+    excluded: false,
+    tagNames: ['Edited'],
+  })
+  application.commands.deleteTransaction(edited.id)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toEqual([edited])
+  expect(application.commands.undoLast()).toBe(true)
+  expect(
+    application.queries.listTransactions({ exclusion: 'onlyExcluded' }).rows,
+  ).toEqual([original])
+  expect(application.queries.listTags()).toEqual(original.line.tags)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toEqual([])
+  expect(application.queries.listTags()).toEqual([])
+  expect(application.queries.getAccountBalance(input.accountId)).toBe(0)
+})
+
+test('tag totals aggregate only tagged lines rather than the whole matching transaction', async () => {
+  const { application, input, paths } = await setup()
+  const original = application.commands.createTransaction({
+    ...input,
+    totalMinor: 500,
+    tagNames: ['Trip'],
+  })
+  // Arrange a multi-line ledger fixture without enabling split editing. Only a
+  // non-visible aggregate is queried, so the existing unsplit row guard remains.
+  const database = openDatabase(paths.databasePath)
+  try {
+    database.transaction(() => {
+      database
+        .prepare('UPDATE transaction_lines SET amount_minor = 200 WHERE id = ?')
+        .run(original.line.id)
+      database
+        .prepare(
+          'INSERT INTO transaction_lines (id, transaction_id, amount_minor, category_id) VALUES (?, ?, ?, ?)',
+        )
+        .run('00000000-0000-4000-8000-000000000001', original.id, 300, null)
+    })()
+  } finally {
+    database.close()
+  }
+  const page = application.queries.listTransactions({
+    tagId: original.line.tags[0].id,
+    offset: 1,
+  })
+  expect(page.rows).toEqual([])
+  expect(page.totalCount).toBe(1)
+  const totals = [{ currency: 'CHF', expenseMinor: 200, incomeMinor: 0 }]
+  expect(page.totals).toEqual(totals)
+  expect(page.days).toEqual([{ date: input.date, totals }])
+  expect(application.queries.listTransactions({ offset: 1 }).totals).toEqual([
+    { currency: 'CHF', expenseMinor: 500, incomeMinor: 0 },
+  ])
 })

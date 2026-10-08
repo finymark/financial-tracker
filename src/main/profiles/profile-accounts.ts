@@ -31,15 +31,34 @@ function getAccount(database: Database.Database, id: string): StoredAccount {
   return account
 }
 
+function hasTransfersTable(database: Database.Database): boolean {
+  return Boolean(
+    database
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'transfers'",
+      )
+      .get(),
+  )
+}
+
 export function hasAccountTransactions(
   database: Database.Database,
   id: string,
 ): boolean {
   const account = getAccount(database, id)
-  return Boolean(
+  const transaction = Boolean(
     database
       .prepare('SELECT 1 FROM transactions WHERE account_id = ? LIMIT 1')
       .get(account.id),
+  )
+  if (transaction || !hasTransfersTable(database)) return transaction
+  return Boolean(
+    database
+      .prepare(
+        `SELECT 1 FROM transfers
+         WHERE from_account_id = ? OR to_account_id = ? LIMIT 1`,
+      )
+      .get(account.id, account.id),
   )
 }
 
@@ -55,7 +74,21 @@ export function getAccountBalance(
       ), 0) AS total FROM transactions WHERE account_id = ?`,
     )
     .get(account.id) as { total: number }
-  const balance = account.openingBalance + totals.total
+  const transferTotals = hasTransfersTable(database)
+    ? (database
+        .prepare(
+          `SELECT COALESCE(SUM(
+            CASE
+              WHEN from_account_id = ? THEN -from_amount_minor
+              ELSE to_amount_minor
+            END
+          ), 0) AS total
+          FROM transfers
+          WHERE from_account_id = ? OR to_account_id = ?`,
+        )
+        .get(account.id, account.id, account.id) as { total: number })
+    : { total: 0 }
+  const balance = account.openingBalance + totals.total + transferTotals.total
   if (!Number.isSafeInteger(balance)) throw new Error('accounts.error.balance')
   return balance
 }

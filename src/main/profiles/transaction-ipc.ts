@@ -11,6 +11,7 @@ import {
   validateTransactionNote,
   validateTransactionPayeeName,
   validateTransactionTotal,
+  validateTransactionExcluded,
 } from './transaction-validation'
 import { inputRecord, registerIpcHandler } from '../ipc'
 import { validateTagNames } from './tag-validation'
@@ -29,6 +30,7 @@ function transactionFields(value: unknown) {
       input.tagNames === undefined
         ? undefined
         : validateTagNames(input.tagNames),
+    excluded: validateTransactionExcluded(input.excluded),
   }
 }
 
