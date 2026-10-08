@@ -1,4 +1,4 @@
-import { realpathSync, statSync } from 'node:fs'
+import { existsSync, realpathSync, statSync } from 'node:fs'
 import { isAbsolute, relative } from 'node:path'
 import {
   baseCurrencies,
@@ -8,6 +8,7 @@ import {
 } from '../../shared/settings'
 
 function isSameOrInside(path: string, parent: string): boolean {
+  if (!existsSync(parent)) return false
   const relation = relative(realpathSync(parent), realpathSync(path))
   return (
     relation === '' || (!relation.startsWith('..') && !isAbsolute(relation))

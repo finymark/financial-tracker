@@ -77,6 +77,11 @@ describe('file guard', () => {
     ['client secret', ['client_secret', 'synthetic'].join(' = '), 'secret'],
     ['password assignment', ['password', 'synthetic'].join('='), 'secret'],
     ['email address', mailbox, 'email'],
+    [
+      'email address after a slash',
+      `https://example.org/u/${mailbox}`,
+      'email',
+    ],
   ])(
     'blocks %s without printing its contents',
     async (_label, content, rule) => {
