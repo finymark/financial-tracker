@@ -13,6 +13,7 @@ import type {
 } from '../../shared/report-cash-flow'
 import type { ReportDateRangeInput } from '../../shared/reports'
 import { type Language, type MessageKey } from './i18n'
+import { HelpHint } from './components/ui/help-hint'
 
 interface CashFlowReportProps {
   request: ReportDateRangeInput
@@ -125,8 +126,16 @@ export function CashFlowReport({ request, language, t }: CashFlowReportProps) {
   return (
     <section className="space-y-4" aria-labelledby="cash-flow-title">
       <div>
-        <h3 id="cash-flow-title" className="font-medium">
+        <h3
+          id="cash-flow-title"
+          className="flex items-center gap-1 font-medium"
+        >
           {t('reports.cashFlow.title')}
+          <HelpHint
+            t={t}
+            topicKey="reports.cashFlow.title"
+            textKey="help.reports.cashFlow"
+          />
         </h3>
         <p className="text-sm text-muted-foreground">
           {t('reports.cashFlow.description')}

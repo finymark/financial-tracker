@@ -5,6 +5,7 @@ import type { MessageKey } from '../../i18n'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { NativeSelect } from '../ui/native-select'
+import { HelpHint } from '../ui/help-hint'
 import type { RunCommand } from './transaction-form'
 
 interface TemplatePickerProps {
@@ -53,9 +54,22 @@ export function TemplatePicker({
         className="mb-6 space-y-3 rounded-md border p-3"
         aria-label={t('templates.title')}
       >
-        <label className="block space-y-1 text-sm font-medium">
-          {t('templates.title')}
+        <div className="space-y-1">
+          <div className="flex items-center gap-1">
+            <label
+              htmlFor="transaction-template"
+              className="text-sm font-medium"
+            >
+              {t('templates.title')}
+            </label>
+            <HelpHint
+              t={t}
+              topicKey="templates.title"
+              textKey="help.transactions.templates"
+            />
+          </div>
           <NativeSelect
+            id="transaction-template"
             value={selectedTemplateId}
             disabled={busy}
             onChange={(event) => {
@@ -71,7 +85,7 @@ export function TemplatePicker({
               </option>
             ))}
           </NativeSelect>
-        </label>
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button
             disabled={busy || !selectedTemplateId}
@@ -151,21 +165,28 @@ export function TemplatePicker({
             >
               {t('templates.saveTransaction')}
             </Button>
-            <Button
-              variant="ghost"
-              disabled={busy}
-              onClick={() =>
-                void run(
-                  () =>
-                    window.app.transactions.duplicate({
-                      id: savedTransaction.id,
-                    }),
-                  true,
-                )
-              }
-            >
-              {t('transactions.duplicate')}
-            </Button>
+            <span className="inline-flex items-center gap-1">
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    () =>
+                      window.app.transactions.duplicate({
+                        id: savedTransaction.id,
+                      }),
+                    true,
+                  )
+                }
+              >
+                {t('transactions.duplicate')}
+              </Button>
+              <HelpHint
+                t={t}
+                topicKey="transactions.duplicate"
+                textKey="help.transactions.duplicate"
+              />
+            </span>
             <Button
               variant="ghost"
               disabled={busy || savedTransaction.lines.length > 1}

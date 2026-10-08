@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from './ui/card'
 import { Input } from './ui/input'
+import { HelpHint } from './ui/help-hint'
 import { NativeSelect } from './ui/native-select'
 
 const errorKeys = [
@@ -116,7 +117,14 @@ export function PayeeSettings({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('payees.title')}</CardTitle>
+        <CardTitle className="flex items-center gap-1">
+          {t('payees.title')}
+          <HelpHint
+            t={t}
+            topicKey="payees.title"
+            textKey="help.settings.payees"
+          />
+        </CardTitle>
         <CardDescription>{t('payees.description')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

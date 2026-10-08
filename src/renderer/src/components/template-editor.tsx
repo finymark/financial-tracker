@@ -13,6 +13,7 @@ import { AmountInput } from './amount-input'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { NativeSelect } from './ui/native-select'
+import { HelpHint } from './ui/help-hint'
 
 interface Props {
   template?: TransactionTemplate
@@ -83,8 +84,13 @@ export function TemplateEditor({
   }
   return (
     <form onSubmit={submit} className="space-y-4 rounded-md border p-3">
-      <h3 className="font-semibold">
+      <h3 className="flex items-center gap-1 font-semibold">
         {t(template ? 'templates.edit' : 'templates.create')}
+        <HelpHint
+          t={t}
+          topicKey={template ? 'templates.edit' : 'templates.create'}
+          textKey="help.transactions.templates"
+        />
       </h3>
       <p className="text-sm text-muted-foreground">
         {t('templates.optionalHint')}

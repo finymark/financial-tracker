@@ -21,6 +21,7 @@ import { TemplateEditor } from '../template-editor'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { NativeSelect } from '../ui/native-select'
+import { HelpHint } from '../ui/help-hint'
 import { type Language, type MessageKey } from '../../i18n'
 import { parseAmountExpression } from '../../../../shared/amount-expression'
 import { AmountInput } from '../amount-input'
@@ -580,7 +581,7 @@ export function TransactionDrawer({
             <div className="mb-6 flex items-center justify-between gap-3">
               <h2
                 id="transaction-drawer-title"
-                className="text-xl font-semibold"
+                className="flex items-center gap-1 text-xl font-semibold"
               >
                 {t(
                   form.kind === 'adjustment'
@@ -591,6 +592,25 @@ export function TransactionDrawer({
                       ? 'transactions.edit'
                       : 'transactions.create',
                 )}
+                <HelpHint
+                  t={t}
+                  topicKey={
+                    form.kind === 'adjustment'
+                      ? 'adjustments.setRealBalance'
+                      : form.kind === 'transfer'
+                        ? 'transactions.transfer'
+                        : form.id
+                          ? 'transactions.edit'
+                          : 'transactions.create'
+                  }
+                  textKey={
+                    form.kind === 'adjustment'
+                      ? 'help.transactions.balanceAdjustment'
+                      : form.kind === 'transfer'
+                        ? 'help.transactions.transfer'
+                        : 'help.page.transactions'
+                  }
+                />
               </h2>
               <Button
                 variant="ghost"
@@ -667,18 +687,25 @@ export function TransactionDrawer({
                 )}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <label
-                      htmlFor="transaction-amount"
-                      className="text-sm font-medium"
-                    >
-                      {t(
-                        form.kind === 'transfer'
-                          ? 'transactions.fromAmount'
-                          : form.kind === 'adjustment'
-                            ? 'adjustments.observedBalance'
-                            : 'transactions.amount',
-                      )}
-                    </label>
+                    <div className="flex items-center gap-1">
+                      <label
+                        htmlFor="transaction-amount"
+                        className="text-sm font-medium"
+                      >
+                        {t(
+                          form.kind === 'transfer'
+                            ? 'transactions.fromAmount'
+                            : form.kind === 'adjustment'
+                              ? 'adjustments.observedBalance'
+                              : 'transactions.amount',
+                        )}
+                      </label>
+                      <HelpHint
+                        t={t}
+                        topicKey="transactions.amount"
+                        textKey="help.transactions.amountCalculator"
+                      />
+                    </div>
                     <AmountInput
                       id="transaction-amount"
                       ref={amountRef}
@@ -720,12 +747,19 @@ export function TransactionDrawer({
                 </div>
                 {form.kind !== 'adjustment' && (
                   <div className="space-y-2">
-                    <label
-                      htmlFor="transaction-kind"
-                      className="text-sm font-medium"
-                    >
-                      {t('transactions.kind')}
-                    </label>
+                    <div className="flex items-center gap-1">
+                      <label
+                        htmlFor="transaction-kind"
+                        className="text-sm font-medium"
+                      >
+                        {t('transactions.kind')}
+                      </label>
+                      <HelpHint
+                        t={t}
+                        topicKey="transactions.transfer"
+                        textKey="help.transactions.transfer"
+                      />
+                    </div>
                     <NativeSelect
                       id="transaction-kind"
                       value={form.kind}
@@ -924,12 +958,19 @@ export function TransactionDrawer({
                 {form.kind === 'transfer' && (
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <label
-                        htmlFor="transfer-fee"
-                        className="text-sm font-medium"
-                      >
-                        {t('transactions.fee')}
-                      </label>
+                      <div className="flex items-center gap-1">
+                        <label
+                          htmlFor="transfer-fee"
+                          className="text-sm font-medium"
+                        >
+                          {t('transactions.fee')}
+                        </label>
+                        <HelpHint
+                          t={t}
+                          topicKey="transactions.fee"
+                          textKey="help.transactions.transferFee"
+                        />
+                      </div>
                       <AmountInput
                         id="transfer-fee"
                         value={form.feeAmount}
@@ -1002,12 +1043,19 @@ export function TransactionDrawer({
                 {(form.kind === 'expense' || form.kind === 'income') &&
                   !form.splitLines && (
                     <div className="space-y-2">
-                      <label
-                        htmlFor="transaction-tag"
-                        className="text-sm font-medium"
-                      >
-                        {t('tags.title')}
-                      </label>
+                      <div className="flex items-center gap-1">
+                        <label
+                          htmlFor="transaction-tag"
+                          className="text-sm font-medium"
+                        >
+                          {t('tags.title')}
+                        </label>
+                        <HelpHint
+                          t={t}
+                          topicKey="tags.title"
+                          textKey="help.transactions.tags"
+                        />
+                      </div>
                       <div className="flex gap-2">
                         <Input
                           id="transaction-tag"
@@ -1101,19 +1149,26 @@ export function TransactionDrawer({
                 )}
                 {(form.kind === 'expense' || form.kind === 'income') && (
                   <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-sm font-medium">
-                      <input
-                        type="checkbox"
-                        checked={form.excluded}
-                        disabled={busy}
-                        aria-describedby="transaction-excluded-hint"
-                        onChange={(event) =>
-                          setForm({ ...form, excluded: event.target.checked })
-                        }
-                        className="size-4 accent-primary"
+                    <div className="flex items-center gap-1">
+                      <label className="flex items-center gap-2 text-sm font-medium">
+                        <input
+                          type="checkbox"
+                          checked={form.excluded}
+                          disabled={busy}
+                          aria-describedby="transaction-excluded-hint"
+                          onChange={(event) =>
+                            setForm({ ...form, excluded: event.target.checked })
+                          }
+                          className="size-4 accent-primary"
+                        />
+                        {t('transactions.excluded')}
+                      </label>
+                      <HelpHint
+                        t={t}
+                        topicKey="transactions.excluded"
+                        textKey="help.transactions.excluded"
                       />
-                      {t('transactions.excluded')}
-                    </label>
+                    </div>
                     <p
                       id="transaction-excluded-hint"
                       className="text-xs text-muted-foreground"

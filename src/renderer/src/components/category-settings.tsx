@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from './ui/card'
 import { Input } from './ui/input'
+import { HelpHint } from './ui/help-hint'
 import { NativeSelect } from './ui/native-select'
 
 const errorKeys = [
@@ -115,7 +116,14 @@ export function CategorySettings({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('categories.title')}</CardTitle>
+        <CardTitle className="flex items-center gap-1">
+          {t('categories.title')}
+          <HelpHint
+            t={t}
+            topicKey="categories.title"
+            textKey="help.settings.categories"
+          />
+        </CardTitle>
         <CardDescription>{t('categories.description')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -142,8 +150,16 @@ export function CategorySettings({
               className="space-y-3"
               aria-labelledby={`categories-${groupKind}`}
             >
-              <h3 id={`categories-${groupKind}`} className="font-semibold">
+              <h3
+                id={`categories-${groupKind}`}
+                className="flex items-center gap-1 font-semibold"
+              >
                 {t(`categories.${groupKind}`)}
+                <HelpHint
+                  t={t}
+                  topicKey={`categories.${groupKind}`}
+                  textKey="help.settings.categories"
+                />
               </h3>
               <ul className="space-y-2">
                 {categories
@@ -399,8 +415,16 @@ export function CategorySettings({
           className="space-y-3 border-t pt-6"
           aria-labelledby="create-category-title"
         >
-          <h3 id="create-category-title" className="font-semibold">
+          <h3
+            id="create-category-title"
+            className="flex items-center gap-1 font-semibold"
+          >
             {t('categories.create')}
+            <HelpHint
+              t={t}
+              topicKey="categories.create"
+              textKey="help.settings.categories"
+            />
           </h3>
           <form className="space-y-4" onSubmit={submitCreate}>
             <div className="space-y-2">

@@ -16,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from './ui/card'
+import { HelpHint } from './ui/help-hint'
 import {
   RuleEditor,
   emptyRuleForm,
@@ -137,7 +138,14 @@ export function RuleSettings({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('rules.title')}</CardTitle>
+        <CardTitle className="flex items-center gap-1">
+          {t('rules.title')}
+          <HelpHint
+            t={t}
+            topicKey="rules.title"
+            textKey="help.settings.rules"
+          />
+        </CardTitle>
         <CardDescription>{t('rules.description')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

@@ -89,6 +89,19 @@ test('Esc closes the drawer or help, and question mark opens translated help out
   ).toBeNull()
 })
 
+test('a focused help hint owns Esc but keeps the global question-mark shortcut', () => {
+  expect(
+    matchShortcut(key('Escape'), { scope: 'drawer', helpHint: true }),
+  ).toBeNull()
+  expect(
+    matchShortcut(key('?'), {
+      scope: 'app',
+      activatingControl: true,
+      helpHint: true,
+    }),
+  ).toBe('help')
+})
+
 test('Ctrl+Z retains app undo outside text controls and never intercepts text undo', () => {
   expect(matchShortcut(key('z', { ctrlKey: true }), { scope: 'app' })).toBe(
     'undo',

@@ -705,4 +705,115 @@ export const hu = {
   'phoneUpload.firewallGuidance':
     'A Windows kérheti a „Financial Tracker” engedélyezését. Csak a privát hálózatokon engedélyezd. Ha a telefon nem tud kapcsolódni, mindkét eszköz ugyanazt a Wi-Fi-hálózatot használja, és a Windows hálózata legyen Privát beállítású.',
   'phoneUpload.close': 'Bezárás',
+  'help.accessibleName': 'Súgó',
+  'help.page.profilePicker':
+    'A profil egy személy elkülönített pénzügyeit tartalmazza. Válassz meglévő profilt, vagy hozz létre újat; minden profil saját helyi adatbázisban tárolódik.',
+  'help.profilePicker.profiles':
+    'Nyiss meg egy profilt az elkülönített pénzügyei és beállításai használatához. Át is nevezheted, vagy végleg törölheted a helyi adataival együtt.',
+  'help.profilePicker.create':
+    'Hozz létre profilt egy másik, elkülönített pénzügyi adathalmazhoz ezen a számítógépen. Adj neki felismerhető nevet; ezt később módosíthatod.',
+  'help.page.overview':
+    'Itt az aktuális hónap kiadásait, bevételeit és nettó összegét hasonlíthatod össze az előző teljes hónappal. Az összegek az alap pénznemre váltva jelennek meg, ha van elérhető árfolyam.',
+  'help.page.transactions':
+    'Itt rögzítheted és tekintheted át a kiadásokat, bevételeket, átvezetéseket és egyenlegkorrekciókat. A szűrőkkel a listát és az összesítést is szűkítheted.',
+  'help.page.receipts':
+    'A nyugtafotók itt várnak, amíg tranzakcióként jóváhagyod vagy elveted őket. A szövegfelismerés helyben fut; mindig ellenőrizd az előre kitöltött adatokat.',
+  'help.page.recurring':
+    'Itt ütemezetten ismétlődő kiadásokat és bevételeket adhatsz meg. Az esedékes előfordulások függővé válnak, és csak a jóváhagyás után számítanak bele a pénzügyeidbe.',
+  'help.page.reports':
+    'Itt az alap pénznemre váltott, figyelembe vett kiadásokat és bevételeket elemezheted. Az árfolyam nélküli tranzakciók külön jelennek meg, és nem kerülnek bele az átváltott diagramokba vagy összesítésekbe.',
+  'help.page.accounts':
+    'A számla egyetlen pénznemben tartott pénz helye. Egyenlegét a nyitóegyenleg, a dátumozott pénzmozgások és az egyenlegkorrekciók adják.',
+  'help.page.settings':
+    'Ezek a beállítások az aktuális profilra vonatkoznak. Itt kezelheted a megjelenítést, a nyugtaátvételt, a rendszerezési szabályokat és a helyi biztonsági mentéseket.',
+  'help.page.quickAdd':
+    'A főablak megnyitása nélkül rögzíthetsz kiadást vagy bevételt az aktív profilban. Válaszd ki a számlát, ellenőrizd az adatokat, majd mentsd a tranzakciót.',
+  'help.overview.expenses':
+    'Az aktuális hónap eddig figyelembe vett kiadásai az előző teljes hónaphoz viszonyítva. A Tranzakciók megtekintése gombbal megnyithatod a megfelelő tranzakciókat.',
+  'help.overview.incomes':
+    'Az aktuális hónap eddig figyelembe vett bevételei az előző teljes hónaphoz viszonyítva. A Tranzakciók megtekintése gombbal megnyithatod a megfelelő tranzakciókat.',
+  'help.overview.net':
+    'A bevételek és kiadások különbsége az adott időszakban. Az átvezetések, egyenlegkorrekciók és kizárt tranzakciók nem módosítják.',
+  'help.overview.topCategories':
+    'Az aktuális hónap öt legnagyobb átváltott összegű kiadási kategóriája. Egy kategóriára kattintva megnyithatod a figyelembe vett tranzakcióit.',
+  'help.transactions.filters':
+    'A szűrők módosítják a megjelenő tranzakciókat és a lista feletti összesítést. Exportálás előtt alkalmazd őket; a CSV az összes találatot tartalmazza, nem csak az aktuális oldalt.',
+  'help.transactions.excluded':
+    'A kizárt tranzakció módosítja a számlaegyenleget, de kimarad a kiadási és bevételi összesítésekből és a kimutatásokból. Ilyen lehet például egy később visszatérített kiadás.',
+  'help.transactions.templates':
+    'A tranzakciós sablon újra felhasználható, előre kitöltött adatokat tárol. Válassz egyet az űrlap kitöltéséhez, vagy készíts sablont a gyakran együtt megadott mezőkből.',
+  'help.transactions.duplicate':
+    'A másolás azonnal ment egy új, mai dátumú tranzakciót az eredeti adatokkal és címkékkel. Ha mégsem szeretnéd megtartani, használd a Visszavonást.',
+  'help.transactions.balanceAdjustment':
+    'Rögzítsd a számla adott nap végén megfigyelt valós egyenlegét. Az alkalmazás a számla előzményeiből újraszámítja a különbséget, amely nem számít kiadásnak vagy bevételnek.',
+  'help.transactions.csvExport':
+    'Az alkalmazott szűrőknek megfelelő összes tranzakciót exportálja. A felosztás részei külön sorokba kerülnek; az átvezetések és egyenlegkorrekciók kimaradnak.',
+  'help.transactions.csvSeparator':
+    'Válaszd ki, hogyan jelenjenek meg a tizedes törtek a táblázatkezelőben. Pont esetén vessző, vessző esetén pontosvessző választja el a mezőket, így nincs félreértés.',
+  'help.transactions.amountCalculator':
+    'Az összeghez +, −, ×, ÷ jeleket és zárójeleket tartalmazó számítást is beírhatsz. A mező elhagyásakor vagy Enter lenyomásakor az eredmény századokra kerekítve jelenik meg.',
+  'help.transactions.split':
+    'A felosztás egy tranzakciót külön összegű, kategóriájú, címkéjű és megjegyzésű részekre bont. A részek összege egyezzen meg a tranzakció teljes összegével.',
+  'help.transactions.transfer':
+    'Az átvezetés két számla között mozgat pénzt, és nem kiadás vagy bevétel. Eltérő pénznemeknél mindkét tényleges összeget add meg; az alkalmazás ezekből számítja az árfolyamot.',
+  'help.transactions.transferFee':
+    'Az átvezetési díj külön kiadásként kerül a forrásszámlára. Válassz hozzá kategóriát, és csak akkor zárd ki, ha a kimutatásokban sem szeretnéd látni.',
+  'help.transactions.tags':
+    'A címkék kategóriákon átívelő, szabadon megadható jelölések. Adj hozzá meglévő vagy új címkéket; a Címkék kezelése részen átnevezheted vagy törölheted őket.',
+  'help.transactions.attachments':
+    'A mellékletek a profilba másolva a tranzakcióval együtt maradnak. Nyugtafotót, képet vagy PDF-et adhatsz hozzá; az eltávolítás törli a profilban lévő másolatot.',
+  'help.receipts.phoneUpload':
+    'Ideiglenes feltöltőoldalt indít az azonos privát Wi-Fi-hálózaton lévő telefonhoz. A munkamenet alatt a címet ismerők hozzáférhetnek a feltöltésekhez, ezért csak megbízható privát hálózaton használd, és utána zárd be.',
+  'help.recurring.pending':
+    'A függő tranzakciók döntésre váró, esedékes előfordulások. Jóváhagyhatod őket, módosíthatod az összeget vagy dátumot jóváhagyás előtt, illetve kihagyhatod az adott előfordulást.',
+  'help.recurring.definitions':
+    'A definíciók az ismétlődő tranzakciók újrahasznált adatait és ütemezését tárolják. A szüneteltetés leállítja az új függő előfordulásokat; folytatáskor a közben elmúlt dátumok kimaradnak.',
+  'help.recurring.editor':
+    'Add meg a jövőbeli előfordulásokhoz használt tranzakcióadatokat és ütemezést. A definíció mentése előtti előfordulások nem jönnek létre.',
+  'help.recurring.schedule':
+    'Válaszd ki az ismétlődés gyakoriságát és naptári napját. A nem kötelező záródátum után nem jön létre új előfordulás.',
+  'help.reports.dateRange':
+    'Válaszd ki a kategória-, havi trend- és pénzáramlási kimutatások dátumait. A költési ütem mindig az aktuális hónapot hasonlítja az előző három naptári hónaphoz.',
+  'help.reports.category':
+    'A figyelembe vett kiadások főkategóriánként, az alap pénznemben jelennek meg. Válassz főkategóriát, majd alkategóriát a mögöttes tranzakciók megnyitásához.',
+  'help.reports.trend':
+    'Hasonlítsd össze a figyelembe vett havi kiadásokat, bevételeket és nettó összeget. A részleges hónapok csak a kiválasztott tartomány napjait tartalmazzák.',
+  'help.reports.pace':
+    'Az aktuális havi eddigi kiadásokat az előző három naptári hónap azonos napjáig számolt átlagával hasonlítja össze. Rövidebb hónapoknál az utolsó napig számol.',
+  'help.reports.cashFlow':
+    'Megmutatja, hogyan áramlanak az átváltott bevételi kategóriák a kiadási kategóriákba. A megtakarítás vagy hiány kiegyenlíti az ábrát; az át nem váltott összegek külön maradnak.',
+  'help.reports.breakdown':
+    'Válassz főkategóriát az alkategóriák megtekintéséhez. Egy alkategóriára kattintva megnyílnak az összeg mögötti, figyelembe vett kiadási tranzakciók.',
+  'help.accounts.create':
+    'Hozz létre külön számlát minden olyan helyhez és pénznemhez, ahol pénzt tartasz. Add meg az egyenleget és a dátumot, amelytől az előzmények kezdődnek.',
+  'help.accounts.currency':
+    'Minden számlának pontosan egy pénzneme van. Ezt csak addig módosíthatod, amíg nincs tranzakció a számlán.',
+  'help.accounts.openingBalance':
+    'A nyitóegyenleg a számla egyenlege az előzmények kezdetén, a nyitás dátumán. Lehet pozitív, nulla vagy negatív, és számítást is beírhatsz a mezőbe.',
+  'help.accounts.archive':
+    'Az archiválás elrejti a számlát az adatbeviteli listákból, de nem törli az előzményeit vagy az egyenlegét. Ha újra használnád, szüntesd meg az archiválást.',
+  'help.settings.categories':
+    'A kategóriák legfeljebb két szinten sorolják be a kiadásokat vagy bevételeket: főkategória és alkategória. Átrendezheted vagy archiválhatod őket a meglévő tranzakciók módosítása nélkül.',
+  'help.settings.payees':
+    'A kedvezményezett a tranzakciókon használt egységes név. A nyers vagy eltérő nevekhez álnevet adhatsz; egyesítéskor a tranzakciók és álnevek a megmaradó kedvezményezetthez kerülnek.',
+  'help.settings.rules':
+    'A szabályok egyezés esetén automatikusan előre kitöltik a kedvezményezettet, kategóriát vagy címkéket. Sorrendben futnak, és az első egyező szabály érvényesül.',
+  'help.settings.ruleAmountCurrency':
+    'Az összeghatárok összehasonlítása ebben a pénznemben történik. Ha a szabály számlafeltételt tartalmaz, automatikusan annak pénzneme érvényes.',
+  'help.settings.backups':
+    'A profil megnyitásakor helyi adatbázis-mentés készül, és a legutóbbi tíz indítási mentés marad meg. A visszaállítás az aktuális profiladatokat a kiválasztott mentésre cseréli.',
+  'help.settings.watchedFolder':
+    'A mappába kerülő új nyugtafotók átkerülnek a Nyugta beérkezők közé. A sikeresen átvett fájlok a feldolgozott almappába kerülnek; szinkronizált helyi mappával másik eszközről is fogadhatsz fotókat.',
+  'help.settings.shortcut':
+    'Ez a rendszerszintű gyorsbillentyű akkor is megnyitja a Gyors rögzítést, ha a főablak rejtve van. Fókuszáld a gyorsbillentyű mezőjét, majd nyomd le a kívánt billentyűkombinációt.',
+  'help.settings.autostart':
+    'A Financial Tracker automatikusan elindulhat a Windowsba való bejelentkezés után. Az ablak bezárásakor az alkalmazás továbbra is elérhető marad az értesítési területen.',
+  'help.settings.baseCurrency':
+    'A kimutatások a többi pénznemet az adott nap árfolyamával erre a pénznemre váltják. A módosítás a kimutatások megjelenítését változtatja, a számlákon tárolt összegeket nem.',
+  'help.settings.exchangeRates':
+    'A hivatalos MNB-árfolyamok gyorsítótárazva szolgálnak a kimutatások átváltásához. Hiányzó vagy elavult árfolyamnál az érintett összegek a frissítésig külön jelennek meg.',
+  'help.settings.privacy':
+    'Az adatvédelmi mód elrejti a megjelenített összegeket és olvashatatlanná teszi a diagramértékeket, de a tárolt adatokat nem módosítja. Bárhol átkapcsolhatod a Ctrl+Shift+H billentyűkkel.',
+  'help.settings.formattingPreview':
+    'Az előnézet megmutatja, hogyan formázza a kiválasztott nyelv a dátumokat és számokat. A tárolt értékeket nem módosítja.',
 } satisfies MessageCatalog

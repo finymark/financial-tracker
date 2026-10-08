@@ -3,6 +3,7 @@ import type { Tag } from '../../../../shared/tags'
 import type { MessageKey } from '../../i18n'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
+import { HelpHint } from '../ui/help-hint'
 import type { RunCommand } from './transaction-form'
 
 interface TagManagerProps {
@@ -40,6 +41,14 @@ export function TagManager({
       <summary className="cursor-pointer text-sm font-medium">
         {t('tags.manage')}
       </summary>
+      <div className="flex items-center gap-1 text-sm font-medium">
+        {t('tags.title')}
+        <HelpHint
+          t={t}
+          topicKey="tags.title"
+          textKey="help.transactions.tags"
+        />
+      </div>
       {tags.length === 0 && (
         <p className="text-sm text-muted-foreground">{t('tags.empty')}</p>
       )}

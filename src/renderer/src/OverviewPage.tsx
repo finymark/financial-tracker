@@ -15,6 +15,7 @@ import type { OverviewDashboard } from '../../shared/report-overview'
 import type { TransactionListInput } from '../../shared/transactions'
 import { Button } from './components/ui/button'
 import { CardContent } from './components/ui/card'
+import { HelpHint } from './components/ui/help-hint'
 import { type Language, type MessageKey } from './i18n'
 
 interface OverviewPageProps {
@@ -163,8 +164,16 @@ export function OverviewPage({
                 aria-labelledby={`overview-${key}`}
                 className="space-y-3 rounded-lg border p-4"
               >
-                <h3 id={`overview-${key}`} className="font-medium">
+                <h3
+                  id={`overview-${key}`}
+                  className="flex items-center gap-1 font-medium"
+                >
                   {t(`overview.${key}`)}
+                  <HelpHint
+                    t={t}
+                    topicKey={`overview.${key}`}
+                    textKey={`help.overview.${key}`}
+                  />
                 </h3>
                 <p className="text-2xl font-semibold">
                   {amount(report.thisMonth[key])}
@@ -203,8 +212,16 @@ export function OverviewPage({
             aria-labelledby="overview-top-categories"
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 id="overview-top-categories" className="font-medium">
+              <h3
+                id="overview-top-categories"
+                className="flex items-center gap-1 font-medium"
+              >
                 {t('overview.topCategories')}
+                <HelpHint
+                  t={t}
+                  topicKey="overview.topCategories"
+                  textKey="help.overview.topCategories"
+                />
               </h3>
               <Button variant="ghost" onClick={onOpenReports}>
                 {t('overview.reports')}

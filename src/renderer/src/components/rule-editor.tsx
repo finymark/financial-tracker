@@ -10,6 +10,7 @@ import { AmountInput } from './amount-input'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { NativeSelect } from './ui/native-select'
+import { HelpHint } from './ui/help-hint'
 
 export interface RuleForm {
   id: string | null
@@ -238,9 +239,22 @@ export function RuleEditor({
         </label>
       </div>
       {!form.accountId && (
-        <label className="block space-y-1 text-sm font-medium">
-          {t('rules.amountCurrency')}
+        <div className="space-y-1">
+          <div className="flex items-center gap-1">
+            <label
+              htmlFor="rule-amount-currency"
+              className="text-sm font-medium"
+            >
+              {t('rules.amountCurrency')}
+            </label>
+            <HelpHint
+              t={t}
+              topicKey="rules.amountCurrency"
+              textKey="help.settings.ruleAmountCurrency"
+            />
+          </div>
           <NativeSelect
+            id="rule-amount-currency"
             value={form.amountCurrency}
             disabled={locked}
             onChange={(event) =>
@@ -253,7 +267,7 @@ export function RuleEditor({
             <option value="HUF">HUF</option>
             <option value="CHF">CHF</option>
           </NativeSelect>
-        </label>
+        </div>
       )}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1">

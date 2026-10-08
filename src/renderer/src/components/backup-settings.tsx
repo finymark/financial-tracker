@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from './ui/card'
 import { NativeSelect } from './ui/native-select'
+import { HelpHint } from './ui/help-hint'
 
 interface BackupSettingsProps {
   language: Language
@@ -94,7 +95,14 @@ export function BackupSettings({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('backups.title')}</CardTitle>
+        <CardTitle className="flex items-center gap-1">
+          {t('backups.title')}
+          <HelpHint
+            t={t}
+            topicKey="backups.title"
+            textKey="help.settings.backups"
+          />
+        </CardTitle>
         <CardDescription>{t('backups.description')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

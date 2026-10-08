@@ -8,6 +8,7 @@ import { NativeSelect } from './components/ui/native-select'
 import { type Language, type MessageKey } from './i18n'
 import { parseAmountExpression } from '../../shared/amount-expression'
 import { AmountInput } from './components/amount-input'
+import { HelpHint } from './components/ui/help-hint'
 
 const errorKeys = [
   'accounts.error.name',
@@ -180,31 +181,38 @@ export function AccountsPage({
                 >
                   {t('accounts.changeCurrency')}
                 </Button>
-                {!account.archived ? (
-                  <Button
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() =>
-                      void run(() =>
-                        window.app.accounts.archive({ id: account.id }),
-                      )
-                    }
-                  >
-                    {t('accounts.archive')}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() =>
-                      void run(() =>
-                        window.app.accounts.unarchive({ id: account.id }),
-                      )
-                    }
-                  >
-                    {t('accounts.unarchive')}
-                  </Button>
-                )}
+                <span className="inline-flex items-center gap-1">
+                  {!account.archived ? (
+                    <Button
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() =>
+                        void run(() =>
+                          window.app.accounts.archive({ id: account.id }),
+                        )
+                      }
+                    >
+                      {t('accounts.archive')}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() =>
+                        void run(() =>
+                          window.app.accounts.unarchive({ id: account.id }),
+                        )
+                      }
+                    >
+                      {t('accounts.unarchive')}
+                    </Button>
+                  )}
+                  <HelpHint
+                    t={t}
+                    topicKey="accounts.archive"
+                    textKey="help.accounts.archive"
+                  />
+                </span>
                 <Button
                   variant="ghost"
                   disabled={busy || account.hasTransactions}
@@ -314,8 +322,16 @@ export function AccountsPage({
         className="space-y-4 border-t pt-6"
         aria-labelledby="create-account-title"
       >
-        <h3 id="create-account-title" className="font-semibold">
+        <h3
+          id="create-account-title"
+          className="flex items-center gap-1 font-semibold"
+        >
           {t('accounts.create')}
+          <HelpHint
+            t={t}
+            topicKey="accounts.create"
+            textKey="help.accounts.create"
+          />
         </h3>
         <form className="space-y-4" onSubmit={submitCreate}>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -333,9 +349,19 @@ export function AccountsPage({
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="account-currency" className="text-sm font-medium">
-                {t('accounts.currency')}
-              </label>
+              <div className="flex items-center gap-1">
+                <label
+                  htmlFor="account-currency"
+                  className="text-sm font-medium"
+                >
+                  {t('accounts.currency')}
+                </label>
+                <HelpHint
+                  t={t}
+                  topicKey="accounts.currency"
+                  textKey="help.accounts.currency"
+                />
+              </div>
               <NativeSelect
                 id="account-currency"
                 value={currency}
@@ -355,12 +381,19 @@ export function AccountsPage({
               </NativeSelect>
             </div>
             <div className="space-y-2">
-              <label
-                htmlFor="account-opening-balance"
-                className="text-sm font-medium"
-              >
-                {t('accounts.openingBalance')}
-              </label>
+              <div className="flex items-center gap-1">
+                <label
+                  htmlFor="account-opening-balance"
+                  className="text-sm font-medium"
+                >
+                  {t('accounts.openingBalance')}
+                </label>
+                <HelpHint
+                  t={t}
+                  topicKey="accounts.openingBalance"
+                  textKey="help.accounts.openingBalance"
+                />
+              </div>
               <AmountInput
                 id="account-opening-balance"
                 value={openingBalance}

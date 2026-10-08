@@ -14,5 +14,6 @@ export function shortcutTargetContext(target: EventTarget | null) {
     activatingControl: Boolean(
       element?.closest('button, a[href], [role="button"]'),
     ),
+    helpHint: Boolean(element?.closest('[data-help-hint="open"]')),
   }
 }

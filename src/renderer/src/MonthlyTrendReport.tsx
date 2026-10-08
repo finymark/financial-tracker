@@ -18,6 +18,7 @@ import type {
   ReportDateRangeInput,
 } from '../../shared/reports'
 import { type Language, type MessageKey } from './i18n'
+import { HelpHint } from './components/ui/help-hint'
 
 interface MonthlyTrendReportProps {
   request: ReportDateRangeInput
@@ -120,8 +121,16 @@ export function MonthlyTrendReport({
   return (
     <section className="space-y-4" aria-labelledby="monthly-trend-title">
       <div>
-        <h3 id="monthly-trend-title" className="font-medium">
+        <h3
+          id="monthly-trend-title"
+          className="flex items-center gap-1 font-medium"
+        >
           {t('reports.trend.title')}
+          <HelpHint
+            t={t}
+            topicKey="reports.trend.title"
+            textKey="help.reports.trend"
+          />
         </h3>
         <p className="text-sm text-muted-foreground">
           {t('reports.trend.description')}
