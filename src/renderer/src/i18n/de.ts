@@ -1,6 +1,11 @@
 import type { MessageCatalog } from './en'
 
 export const de = {
+  'updates.ready':
+    'Ein Update wurde heruntergeladen. Starten Sie zur Installation neu.',
+  'updates.restart': 'Neustarten und aktualisieren',
+  'updates.error':
+    'Neustart für das Update fehlgeschlagen. Bitte versuchen Sie es erneut.',
   'app.name': 'Financial Tracker',
   'app.tagline': 'Deine Finanzen auf deinem PC.',
   'navigation.label': 'Hauptnavigation',

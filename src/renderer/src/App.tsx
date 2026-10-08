@@ -13,6 +13,7 @@ import type {
   ActiveProfileInfo,
   ProfileRegistrySnapshot,
 } from '../../shared/profiles'
+import { UpdateNotice } from './components/update-notice'
 import { BackupSettings } from './components/backup-settings'
 import { AccountsPage } from './AccountsPage'
 import { Button } from './components/ui/button'
@@ -614,15 +615,15 @@ export default function App() {
       .finally(() => setLoading(false))
   }, [])
 
+  let content
   if (loading) {
-    return (
+    content = (
       <main className="grid min-h-dvh place-items-center text-sm text-muted-foreground">
         {t('profile.loading')}
       </main>
     )
-  }
-  if (showPicker || !active) {
-    return (
+  } else if (showPicker || !active) {
+    content = (
       <ProfilePicker
         snapshot={snapshot}
         active={active}
@@ -636,23 +637,32 @@ export default function App() {
         onCancel={() => setShowPicker(false)}
       />
     )
+  } else {
+    content = (
+      <Shell
+        key={active.id}
+        active={active}
+        t={t}
+        onSettingsChange={async (settings) => {
+          const saved = await window.app.profiles.updateSettings({
+            id: active.id,
+            settings,
+          })
+          setActive((current) =>
+            current?.id === active.id
+              ? { ...current, settings: saved }
+              : current,
+          )
+        }}
+        onRestored={setActive}
+        onSwitchProfile={() => setShowPicker(true)}
+      />
+    )
   }
   return (
-    <Shell
-      key={active.id}
-      active={active}
-      t={t}
-      onSettingsChange={async (settings) => {
-        const saved = await window.app.profiles.updateSettings({
-          id: active.id,
-          settings,
-        })
-        setActive((current) =>
-          current?.id === active.id ? { ...current, settings: saved } : current,
-        )
-      }}
-      onRestored={setActive}
-      onSwitchProfile={() => setShowPicker(true)}
-    />
+    <>
+      {content}
+      <UpdateNotice t={t} />
+    </>
   )
 }

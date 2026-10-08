@@ -21,6 +21,9 @@ import type { ProfileSettings } from './settings'
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
+  updatesIsReady: 'updates:is-ready',
+  updatesReady: 'updates:ready',
+  updatesRestart: 'updates:restart',
   dbPing: 'db:ping',
   profilesList: 'profiles:list',
   profilesCreate: 'profiles:create',
@@ -44,6 +47,11 @@ export const IPC_CHANNELS = {
 export type DatabasePing = 'ok'
 
 export interface AppBridge {
+  updates: {
+    isReady(): Promise<boolean>
+    onReady(listener: () => void): () => void
+    restart(): Promise<void>
+  }
   getVersion(): Promise<string>
   dbPing(): Promise<DatabasePing>
   backups: {

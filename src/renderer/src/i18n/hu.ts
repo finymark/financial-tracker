@@ -1,6 +1,10 @@
 import type { MessageCatalog } from './en'
 
 export const hu = {
+  'updates.ready':
+    'A frissítés letöltődött. A telepítéshez indítsa újra az alkalmazást.',
+  'updates.restart': 'Újraindítás és frissítés',
+  'updates.error': 'Nem sikerült újraindítani a frissítéshez. Próbálja újra.',
   'app.name': 'Financial Tracker',
   'app.tagline': 'Pénzügyeid a saját számítógépeden.',
   'navigation.label': 'Fő navigáció',

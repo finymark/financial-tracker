@@ -2,6 +2,16 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 
 const bridge: AppBridge = {
+  updates: {
+    isReady: () => ipcRenderer.invoke(IPC_CHANNELS.updatesIsReady),
+    onReady: (listener) => {
+      const handler = () => listener()
+      ipcRenderer.on(IPC_CHANNELS.updatesReady, handler)
+      return () =>
+        ipcRenderer.removeListener(IPC_CHANNELS.updatesReady, handler)
+    },
+    restart: () => ipcRenderer.invoke(IPC_CHANNELS.updatesRestart),
+  },
   getVersion: () => ipcRenderer.invoke(IPC_CHANNELS.getVersion),
   dbPing: () => ipcRenderer.invoke(IPC_CHANNELS.dbPing),
   backups: {
