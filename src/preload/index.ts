@@ -31,6 +31,22 @@ const bridge: AppBridge = {
       ipcRenderer.invoke(IPC_CHANNELS.attachmentsRemove, input),
     open: (input) => ipcRenderer.invoke(IPC_CHANNELS.attachmentsOpen, input),
   },
+  receipts: {
+    intake: (input) => ipcRenderer.invoke(IPC_CHANNELS.receiptsIntake, input),
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.receiptsList),
+    count: () => ipcRenderer.invoke(IPC_CHANNELS.receiptsCount),
+    defaultAccountId: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.receiptsDefaultAccount),
+    confirm: (input) => ipcRenderer.invoke(IPC_CHANNELS.receiptsConfirm, input),
+    discard: (input) => ipcRenderer.invoke(IPC_CHANNELS.receiptsDiscard, input),
+    preview: (input) => ipcRenderer.invoke(IPC_CHANNELS.receiptsPreview, input),
+    onChanged: (listener) => {
+      const handler = () => listener()
+      ipcRenderer.on(IPC_CHANNELS.receiptsChanged, handler)
+      return () =>
+        ipcRenderer.removeListener(IPC_CHANNELS.receiptsChanged, handler)
+    },
+  },
   desktop: {
     autostartStatus: () =>
       ipcRenderer.invoke(IPC_CHANNELS.desktopAutostartStatus),

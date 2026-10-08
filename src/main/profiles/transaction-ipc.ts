@@ -17,7 +17,7 @@ import { inputRecord, registerIpcHandler } from '../ipc'
 import { validateTagNames } from './tag-validation'
 import { parseStagedAttachment } from './attachment-ipc'
 
-function transactionFields(value: unknown, withAttachments = false) {
+export function transactionFields(value: unknown, withAttachments = false) {
   const input = inputRecord(value)
   const lines = (() => {
     if (input.lines === undefined) return undefined
