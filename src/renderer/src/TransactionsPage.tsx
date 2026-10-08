@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { X } from 'lucide-react'
 import type { Account } from '../../shared/accounts'
 import type { Category } from '../../shared/categories'
@@ -23,6 +23,9 @@ import { TransactionTable, Totals } from './components/transaction-table'
 import { parseAmountExpression } from '../../shared/amount-expression'
 import { AmountInput } from './components/amount-input'
 import { today } from '../../shared/date'
+import { matchShortcut } from './lib/shortcuts'
+import { shortcutTargetContext } from './lib/shortcut-context'
+import { useDialogFocus } from './lib/use-dialog-focus'
 
 const errorKeys = [
   'transactions.error.account',
@@ -66,6 +69,8 @@ interface TransactionsPageProps {
   language: Language
   t(key: MessageKey): string
   undoRevision: number
+  newTransactionRequested: boolean
+  onNewTransactionHandled(): void
   onTransactionChanged(): void
 }
 
@@ -120,6 +125,8 @@ export function TransactionsPage({
   language,
   t,
   undoRevision,
+  newTransactionRequested,
+  onNewTransactionHandled,
   onTransactionChanged,
 }: TransactionsPageProps) {
   const [page, setPage] = useState<TransactionPage>({
@@ -162,9 +169,35 @@ export function TransactionsPage({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<MessageKey | null>(null)
   const [form, setForm] = useState<FormState | null>(null)
+  const dialogRef = useRef<HTMLElement>(null)
+  const amountRef = useRef<HTMLInputElement>(null)
+  const createRef = useRef<HTMLButtonElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+  const [focusRevision, setFocusRevision] = useState(0)
   const [deleting, setDeleting] = useState<
     Transaction | Transfer | BalanceAdjustment | null
   >(null)
+  useDialogFocus(Boolean(form), dialogRef, amountRef, createRef)
+
+  useEffect(() => {
+    if (focusRevision) amountRef.current?.focus()
+  }, [focusRevision])
+
+  useEffect(() => {
+    if (!newTransactionRequested || loading || busy) return
+    if (accountOptions.length > 0) {
+      setError(null)
+      setDeleting(null)
+      setForm(emptyForm(accountOptions[0].id))
+    }
+    onNewTransactionHandled()
+  }, [
+    newTransactionRequested,
+    loading,
+    busy,
+    accountOptions,
+    onNewTransactionHandled,
+  ])
 
   useEffect(() => {
     let ignore = false
@@ -235,7 +268,11 @@ export function TransactionsPage({
     })
   }
 
-  async function run(action: () => Promise<unknown>, offerUndo = false) {
+  async function run(
+    action: () => Promise<unknown>,
+    offerUndo = false,
+    nextForm: FormState | null = null,
+  ) {
     setBusy(true)
     setError(null)
     try {
@@ -243,7 +280,8 @@ export function TransactionsPage({
       if (offerUndo) onTransactionChanged()
       setRequest((current) => ({ ...current, offset: 0 }))
       setRevision((current) => current + 1)
-      setForm(null)
+      setForm(nextForm)
+      if (nextForm) setFocusRevision((current) => current + 1)
       setDeleting(null)
       setRenamingTag(null)
       setDeletingTag(null)
@@ -259,77 +297,113 @@ export function TransactionsPage({
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    if (!form) return
-    void run(() => {
-      if (form.kind === 'adjustment') {
+    save()
+  }
+
+  const feeCategoryDefault =
+    categories.find(
+      (category) => category.seedKey === 'expense.fees' && !category.archived,
+    )?.id ?? ''
+
+  function changeKind(kind: TransactionKind | 'transfer') {
+    if (!form || busy || form.kind === kind || form.kind === 'adjustment')
+      return
+    // Expense/income can change kind; transfers use a separate command family.
+    if (form.id && (form.kind === 'transfer' || kind === 'transfer')) return
+    setForm({
+      ...form,
+      kind,
+      categoryId: '',
+      feeCategoryId: kind === 'transfer' ? feeCategoryDefault : '',
+    })
+  }
+
+  function save(addAnother = false) {
+    if (!form || busy) return
+    const nextForm =
+      addAnother && form.kind !== 'adjustment'
+        ? {
+            ...emptyForm(form.accountId),
+            date: form.date,
+            kind: form.kind,
+            toAccountId: form.toAccountId,
+            feeCategoryId: form.kind === 'transfer' ? feeCategoryDefault : '',
+          }
+        : null
+    void run(
+      () => {
+        if (form.kind === 'adjustment') {
+          const input = {
+            accountId: form.accountId,
+            date: form.date,
+            observedMinor: parseAmountExpression(
+              form.amount,
+              selectedAccount?.currency ?? 'HUF',
+              'adjustments.error.balance',
+              { allowNegative: true, allowZero: true },
+            ),
+            note: form.note,
+          }
+          return form.id
+            ? window.app.adjustments.update({ id: form.id, ...input })
+            : window.app.adjustments.create(input)
+        }
+        if (form.kind === 'transfer') {
+          const input = {
+            fromAccountId: form.accountId,
+            fromAmountMinor: parseAmountExpression(
+              form.amount,
+              selectedAccount?.currency ?? 'HUF',
+              'transactions.error.amount',
+            ),
+            toAccountId: form.toAccountId,
+            toAmountMinor: parseAmountExpression(
+              form.toAmount,
+              selectedToAccount?.currency ?? 'HUF',
+              'transactions.error.amount',
+            ),
+            date: form.date,
+            note: form.note,
+            fee: form.feeAmount
+              ? {
+                  amountMinor: parseAmountExpression(
+                    form.feeAmount,
+                    selectedAccount?.currency ?? 'HUF',
+                    'transactions.error.amount',
+                  ),
+                  categoryId: form.feeCategoryId || null,
+                  excluded: form.feeExcluded,
+                }
+              : null,
+          }
+          return form.id
+            ? window.app.transfers.update({ id: form.id, ...input })
+            : window.app.transfers.create(input)
+        }
         const input = {
           accountId: form.accountId,
+          kind: form.kind,
           date: form.date,
-          observedMinor: parseAmountExpression(
-            form.amount,
-            selectedAccount?.currency ?? 'HUF',
-            'adjustments.error.balance',
-            { allowNegative: true, allowZero: true },
-          ),
-          note: form.note,
-        }
-        return form.id
-          ? window.app.adjustments.update({ id: form.id, ...input })
-          : window.app.adjustments.create(input)
-      }
-      if (form.kind === 'transfer') {
-        const input = {
-          fromAccountId: form.accountId,
-          fromAmountMinor: parseAmountExpression(
+          totalMinor: parseAmountExpression(
             form.amount,
             selectedAccount?.currency ?? 'HUF',
             'transactions.error.amount',
           ),
-          toAccountId: form.toAccountId,
-          toAmountMinor: parseAmountExpression(
-            form.toAmount,
-            selectedToAccount?.currency ?? 'HUF',
-            'transactions.error.amount',
-          ),
-          date: form.date,
+          payeeName: form.payeeName,
+          categoryId: form.categoryId || null,
           note: form.note,
-          fee: form.feeAmount
-            ? {
-                amountMinor: parseAmountExpression(
-                  form.feeAmount,
-                  selectedAccount?.currency ?? 'HUF',
-                  'transactions.error.amount',
-                ),
-                categoryId: form.feeCategoryId || null,
-                excluded: form.feeExcluded,
-              }
-            : null,
+          tagNames: form.pendingTagName.trim()
+            ? [...form.tagNames, form.pendingTagName.trim()]
+            : form.tagNames,
+          excluded: form.excluded,
         }
         return form.id
-          ? window.app.transfers.update({ id: form.id, ...input })
-          : window.app.transfers.create(input)
-      }
-      const input = {
-        accountId: form.accountId,
-        kind: form.kind,
-        date: form.date,
-        totalMinor: parseAmountExpression(
-          form.amount,
-          selectedAccount?.currency ?? 'HUF',
-          'transactions.error.amount',
-        ),
-        payeeName: form.payeeName,
-        categoryId: form.categoryId || null,
-        note: form.note,
-        tagNames: form.pendingTagName.trim()
-          ? [...form.tagNames, form.pendingTagName.trim()]
-          : form.tagNames,
-        excluded: form.excluded,
-      }
-      return form.id
-        ? window.app.transactions.update({ id: form.id, ...input })
-        : window.app.transactions.create(input)
-    }, true)
+          ? window.app.transactions.update({ id: form.id, ...input })
+          : window.app.transactions.create(input)
+      },
+      true,
+      nextForm,
+    )
   }
 
   function addTag() {
@@ -390,8 +464,13 @@ export function TransactionsPage({
             {t('adjustments.setRealBalance')}
           </Button>
           <Button
+            ref={createRef}
             disabled={busy || loading || accountOptions.length === 0}
-            onClick={() => setForm(emptyForm(accountOptions[0]?.id))}
+            onClick={() => {
+              setError(null)
+              setDeleting(null)
+              setForm(emptyForm(accountOptions[0]?.id))
+            }}
           >
             {t('transactions.create')}
           </Button>
@@ -402,7 +481,7 @@ export function TransactionsPage({
           {t('transactions.noAccounts')}
         </p>
       )}
-      {error && (
+      {error && !form && (
         <div role="alert" className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-medium text-error">{t(error)}</p>
           <Button
@@ -853,6 +932,40 @@ export function TransactionsPage({
           }}
         >
           <section
+            ref={dialogRef}
+            tabIndex={-1}
+            onKeyDownCapture={(event) => {
+              const action = matchShortcut(event.nativeEvent, {
+                scope: 'drawer',
+                ...shortcutTargetContext(event.target),
+              })
+              if (!action) return
+              // Let datalist fields accept a suggestion and tag fields add a
+              // tag with Enter. Ctrl+Enter remains the batch-entry shortcut.
+              if (
+                action === 'save' &&
+                event.target instanceof Element &&
+                event.target.closest('[data-native-enter]')
+              )
+                return
+              event.preventDefault()
+              event.stopPropagation()
+              if (busy) return
+              if (action === 'close') setForm(null)
+              else if (
+                action === 'expense' ||
+                action === 'income' ||
+                action === 'transfer'
+              ) {
+                changeKind(action)
+                setFocusRevision((current) => current + 1)
+              } else if (action === 'save') formRef.current?.requestSubmit()
+              else if (
+                action === 'saveAndAddAnother' &&
+                formRef.current?.reportValidity()
+              )
+                save(true)
+            }}
             role="dialog"
             aria-modal="true"
             aria-labelledby="transaction-drawer-title"
@@ -883,45 +996,40 @@ export function TransactionsPage({
                 <X aria-hidden="true" />
               </Button>
             </div>
-            <form className="space-y-4" onSubmit={submit}>
-              {form.kind !== 'adjustment' && (
+            <form ref={formRef} className="space-y-4" onSubmit={submit}>
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <label
-                    htmlFor="transaction-kind"
+                    htmlFor="transaction-amount"
                     className="text-sm font-medium"
                   >
-                    {t('transactions.kind')}
+                    {t(
+                      form.kind === 'transfer'
+                        ? 'transactions.fromAmount'
+                        : form.kind === 'adjustment'
+                          ? 'adjustments.observedBalance'
+                          : 'transactions.amount',
+                    )}
                   </label>
-                  <NativeSelect
-                    id="transaction-kind"
-                    value={form.kind}
-                    disabled={busy}
-                    onChange={(event) =>
-                      setForm({
-                        ...form,
-                        kind: event.target.value as
-                          TransactionKind | 'transfer',
-                        categoryId: '',
-                        feeCategoryId:
-                          event.target.value === 'transfer'
-                            ? (categories.find(
-                                (category) =>
-                                  category.seedKey === 'expense.fees' &&
-                                  !category.archived,
-                              )?.id ?? '')
-                            : '',
-                      })
+                  <AmountInput
+                    id="transaction-amount"
+                    ref={amountRef}
+                    value={form.amount}
+                    currency={selectedAccount?.currency ?? 'HUF'}
+                    language={language}
+                    t={t}
+                    errorKey={
+                      form.kind === 'adjustment'
+                        ? 'adjustments.error.balance'
+                        : 'transactions.error.amount'
                     }
-                  >
-                    <option value="expense">{t('transactions.expense')}</option>
-                    <option value="income">{t('transactions.income')}</option>
-                    <option value="transfer">
-                      {t('transactions.transfer')}
-                    </option>
-                  </NativeSelect>
+                    hintKey="transactions.amountHint"
+                    allowNegative={form.kind === 'adjustment'}
+                    allowZero={form.kind === 'adjustment'}
+                    disabled={busy}
+                    onChange={(amount) => setForm({ ...form, amount })}
+                  />
                 </div>
-              )}
-              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <label
                     htmlFor="transaction-date"
@@ -941,38 +1049,46 @@ export function TransactionsPage({
                     }
                   />
                 </div>
+              </div>
+              {form.kind !== 'adjustment' && (
                 <div className="space-y-2">
                   <label
-                    htmlFor="transaction-amount"
+                    htmlFor="transaction-kind"
                     className="text-sm font-medium"
                   >
-                    {t(
-                      form.kind === 'transfer'
-                        ? 'transactions.fromAmount'
-                        : form.kind === 'adjustment'
-                          ? 'adjustments.observedBalance'
-                          : 'transactions.amount',
-                    )}
+                    {t('transactions.kind')}
                   </label>
-                  <AmountInput
-                    id="transaction-amount"
-                    value={form.amount}
-                    currency={selectedAccount?.currency ?? 'HUF'}
-                    language={language}
-                    t={t}
-                    errorKey={
-                      form.kind === 'adjustment'
-                        ? 'adjustments.error.balance'
-                        : 'transactions.error.amount'
-                    }
-                    hintKey="transactions.amountHint"
-                    allowNegative={form.kind === 'adjustment'}
-                    allowZero={form.kind === 'adjustment'}
+                  <NativeSelect
+                    id="transaction-kind"
+                    value={form.kind}
                     disabled={busy}
-                    onChange={(amount) => setForm({ ...form, amount })}
-                  />
+                    onChange={(event) =>
+                      changeKind(
+                        event.target.value as TransactionKind | 'transfer',
+                      )
+                    }
+                  >
+                    <option
+                      value="expense"
+                      disabled={Boolean(form.id && form.kind === 'transfer')}
+                    >
+                      {t('transactions.expense')}
+                    </option>
+                    <option
+                      value="income"
+                      disabled={Boolean(form.id && form.kind === 'transfer')}
+                    >
+                      {t('transactions.income')}
+                    </option>
+                    <option
+                      value="transfer"
+                      disabled={Boolean(form.id && form.kind !== 'transfer')}
+                    >
+                      {t('transactions.transfer')}
+                    </option>
+                  </NativeSelect>
                 </div>
-              </div>
+              )}
               <div className="space-y-2">
                 <label
                   htmlFor="transaction-account"
@@ -1069,6 +1185,7 @@ export function TransactionsPage({
                   </label>
                   <Input
                     id="transaction-payee"
+                    data-native-enter
                     list="transaction-payees"
                     value={form.payeeName}
                     maxLength={100}
@@ -1200,6 +1317,7 @@ export function TransactionsPage({
                   <div className="flex gap-2">
                     <Input
                       id="transaction-tag"
+                      data-native-enter
                       list="transaction-tags"
                       value={form.pendingTagName}
                       maxLength={100}
@@ -1299,7 +1417,12 @@ export function TransactionsPage({
                   </p>
                 </div>
               )}
-              <div className="flex gap-2 pt-2">
+              {error && (
+                <p role="alert" className="text-sm font-medium text-error">
+                  {t(error)}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2 pt-2">
                 <Button type="submit" disabled={busy}>
                   {t(
                     form.kind === 'adjustment'
@@ -1307,6 +1430,17 @@ export function TransactionsPage({
                       : 'transactions.save',
                   )}
                 </Button>
+                {form.kind !== 'adjustment' && (
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => {
+                      if (formRef.current?.reportValidity()) save(true)
+                    }}
+                  >
+                    {t('transactions.saveAndAddAnother')}
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   disabled={busy}
