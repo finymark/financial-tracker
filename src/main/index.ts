@@ -560,7 +560,8 @@ function startApplication(): void {
   const icon = nativeImage.createFromPath(iconPath)
   if (icon.isEmpty())
     throw new Error('Application tray icon could not be loaded')
-  tray = new Tray(icon.resize({ width: 16, height: 16 }))
+  // Pass the ICO path so Windows can select the best frame for the current DPI.
+  tray = new Tray(iconPath)
   tray.on('click', showMainWindow)
   tray.on('double-click', showMainWindow)
   updateTray()

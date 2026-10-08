@@ -6,8 +6,6 @@ files:
   - out/**/*
   - '!node_modules/@tesseract.js-data/**/*'
 extraResources:
-  - from: build/icon.png
-    to: icon.png
   - from: build/icon.ico
     to: icon.ico
   - from: node_modules/financial-tracker-ocr-models
