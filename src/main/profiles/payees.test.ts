@@ -192,7 +192,7 @@ test('merges transactions and aliases into the survivor and undoes the merge exa
     application.queries
       .listTransactions()
       .rows.map((transaction) =>
-        transaction.kind === 'transfer' ? null : transaction.payeeId,
+        'payeeId' in transaction ? transaction.payeeId : null,
       ),
   ).toEqual([
     survivorTransaction.payeeId,

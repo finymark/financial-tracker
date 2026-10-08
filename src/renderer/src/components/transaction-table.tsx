@@ -4,6 +4,7 @@ import {
   ArrowLeftRight,
   ArrowUpRight,
   Pencil,
+  Scale,
   Trash2,
 } from 'lucide-react'
 import type { Account } from '../../../shared/accounts'
@@ -14,6 +15,7 @@ import type {
   TransactionTotals,
 } from '../../../shared/transactions'
 import type { Transfer } from '../../../shared/transfers'
+import type { BalanceAdjustment } from '../../../shared/adjustments'
 import { createFormatters, type Language, type MessageKey } from '../i18n'
 import { Button } from './ui/button'
 
@@ -24,8 +26,8 @@ interface Props {
   language: Language
   t(key: MessageKey): string
   busy: boolean
-  onEdit(transaction: Transaction | Transfer): void
-  onDelete(transaction: Transaction | Transfer): void
+  onEdit(transaction: Transaction | Transfer | BalanceAdjustment): void
+  onDelete(transaction: Transaction | Transfer | BalanceAdjustment): void
 }
 
 export function Totals({
@@ -71,8 +73,10 @@ export function TransactionTable({
 }: Props) {
   const [scrollTop, setScrollTop] = useState(0)
   const format = createFormatters(language)
-  const items: ({ day: string } | { transaction: Transaction | Transfer })[] =
-    []
+  const items: (
+    | { day: string }
+    | { transaction: Transaction | Transfer | BalanceAdjustment }
+  )[] = []
   let day = ''
   for (const transaction of page.rows) {
     if (day !== transaction.date) {
@@ -95,19 +99,20 @@ export function TransactionTable({
       onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
     >
       <table
-        className="w-full min-w-[800px] table-fixed text-sm"
+        className="w-full min-w-[950px] table-fixed text-sm"
         aria-rowcount={items.length + 1}
       >
         <thead className="sticky top-0 z-10 bg-background text-left">
           <tr style={{ height: ROW_HEIGHT }}>
-            <th className="w-[22%] px-3">{t('transactions.payee')}</th>
-            <th className="w-[15%] px-3">{t('transactions.account')}</th>
-            <th className="w-[15%] px-3">{t('transactions.category')}</th>
-            <th className="w-[20%] px-3">{t('transactions.note')}</th>
+            <th className="w-[18%] px-3">{t('transactions.payee')}</th>
+            <th className="w-[14%] px-3">{t('transactions.account')}</th>
+            <th className="w-[14%] px-3">{t('transactions.category')}</th>
+            <th className="w-[14%] px-3">{t('tags.title')}</th>
+            <th className="w-[14%] px-3">{t('transactions.note')}</th>
             <th className="w-[14%] px-3 text-right">
               {t('transactions.amount')}
             </th>
-            <th className="w-[14%] px-3">
+            <th className="w-[12%] px-3">
               <span className="sr-only">{t('transactions.actions')}</span>
             </th>
           </tr>
@@ -116,7 +121,7 @@ export function TransactionTable({
           {start > 0 && (
             <tr aria-hidden="true">
               <td
-                colSpan={6}
+                colSpan={7}
                 style={{ height: start * ROW_HEIGHT, padding: 0 }}
               />
             </tr>
@@ -132,7 +137,7 @@ export function TransactionTable({
                 >
                   <th
                     scope="rowgroup"
-                    colSpan={6}
+                    colSpan={7}
                     className="px-3 text-left font-medium"
                   >
                     <div className="flex items-center justify-between gap-3">
@@ -188,6 +193,7 @@ export function TransactionTable({
                   <td className="truncate px-3" title={rateText}>
                     {rateText}
                   </td>
+                  <td />
                   <td className="truncate px-3" title={transaction.note}>
                     {transaction.note}
                   </td>
@@ -202,6 +208,69 @@ export function TransactionTable({
                       {format.money(
                         transaction.toAmountMinor,
                         to?.currency ?? 'HUF',
+                      )}
+                    </span>
+                  </td>
+                  <td className="px-1">
+                    <RowActions
+                      transaction={transaction}
+                      busy={busy}
+                      t={t}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                    />
+                  </td>
+                </tr>
+              )
+            }
+            if (transaction.kind === 'adjustment') {
+              const account = accounts.find(
+                (account) => account.id === transaction.accountId,
+              )
+              const sign = transaction.differenceMinor < 0 ? '−' : '+'
+              const absoluteDifference = Math.abs(transaction.differenceMinor)
+              return (
+                <tr
+                  key={transaction.id}
+                  aria-rowindex={start + index + 2}
+                  className="border-b bg-primary/5"
+                  style={{ height: ROW_HEIGHT }}
+                >
+                  <td className="truncate px-3 font-medium">
+                    <span className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1">
+                        <Scale aria-hidden="true" className="size-3" />
+                        {t('adjustments.rowType')}
+                      </span>
+                      {transaction.noLongerCorrectsAnything && (
+                        <span
+                          className="shrink-0 rounded border px-1 text-xs text-muted-foreground"
+                          title={t('adjustments.zeroDifferenceHint')}
+                        >
+                          {t('adjustments.zeroDifference')}
+                        </span>
+                      )}
+                    </span>
+                  </td>
+                  <td className="truncate px-3" title={account?.name}>
+                    {account?.name ?? t('transactions.unknownAccount')}
+                  </td>
+                  <td className="truncate px-3">
+                    {t('adjustments.observedBalance')}
+                  </td>
+                  <td />
+                  <td className="truncate px-3" title={transaction.note}>
+                    {transaction.note}
+                  </td>
+                  <td
+                    className="truncate px-3 text-right font-medium tabular-nums"
+                    title={t('adjustments.difference')}
+                  >
+                    <span className="whitespace-nowrap">
+                      {sign}
+                      {format.money(
+                        absoluteDifference,
+                        account?.currency ?? 'HUF',
                       )}
                     </span>
                   </td>
@@ -256,6 +325,14 @@ export function TransactionTable({
                 <td className="truncate px-3" title={category?.name}>
                   {category?.name ?? t('transactions.noCategory')}
                 </td>
+                <td
+                  className="truncate px-3"
+                  title={transaction.line.tags
+                    .map((tag) => tag.name)
+                    .join(', ')}
+                >
+                  {transaction.line.tags.map((tag) => tag.name).join(', ')}
+                </td>
                 <td className="truncate px-3" title={transaction.note}>
                   {transaction.note}
                 </td>
@@ -299,7 +376,7 @@ export function TransactionTable({
           {end < items.length && (
             <tr aria-hidden="true">
               <td
-                colSpan={6}
+                colSpan={7}
                 style={{
                   height: (items.length - end) * ROW_HEIGHT,
                   padding: 0,
@@ -336,7 +413,7 @@ function RowActions({
   onEdit,
   onDelete,
 }: Pick<Props, 'busy' | 't' | 'onEdit' | 'onDelete'> & {
-  transaction: Transaction | Transfer
+  transaction: Transaction | Transfer | BalanceAdjustment
 }) {
   return (
     <div className="flex gap-1">

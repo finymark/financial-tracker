@@ -72,6 +72,11 @@ import type {
   Transfer,
   UpdateTransferInput,
 } from '../../shared/transfers'
+import type {
+  BalanceAdjustment,
+  CreateBalanceAdjustmentInput,
+  UpdateBalanceAdjustmentInput,
+} from '../../shared/adjustments'
 import { listTransactions } from './profile-transactions'
 import { listPayeeAliases, listPayees, suggestPayees } from './profile-payees'
 import {
@@ -79,6 +84,9 @@ import {
   mergePayeesUndoableCommand,
   removePayeeAliasUndoableCommand,
 } from './payee-undo'
+import type { Tag, RenameTagInput } from '../../shared/tags'
+import { renameTagUndoableCommand, deleteTagUndoableCommand } from './tag-undo'
+import { listTags } from './profile-tags'
 import {
   createTransactionUndoableCommand,
   deleteTransactionUndoableCommand,
@@ -101,6 +109,11 @@ import {
   deleteTransferUndoableCommand,
   updateTransferUndoableCommand,
 } from './transfer-undo'
+import {
+  createBalanceAdjustmentUndoableCommand,
+  deleteBalanceAdjustmentUndoableCommand,
+  updateBalanceAdjustmentUndoableCommand,
+} from './adjustment-undo'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -159,6 +172,7 @@ export interface ProfileQueries {
   listPayees(): Payee[]
   listPayeeAliases(payeeId: string): PayeeAlias[]
   suggestPayees(input: PayeeSuggestionInput): PayeeSuggestion[]
+  listTags(): Tag[]
   hasCategoryTransactions(id: string): boolean
   listCategories(): Category[]
   listCategoryOptions(kind: CategoryKind): Category[]
@@ -175,12 +189,21 @@ export interface ProfileCommands {
   createTransaction(input: CreateTransactionInput): Transaction
   updateTransaction(input: UpdateTransactionInput): Transaction
   deleteTransaction(id: string): void
+  renameTag(input: RenameTagInput): Tag
+  deleteTag(id: string): void
   createTransfer(input: CreateTransferInput): Transfer
   updateTransfer(input: UpdateTransferInput): Transfer
   deleteTransfer(id: string): void
   addPayeeAlias(input: AddPayeeAliasInput): PayeeAlias
   removePayeeAlias(id: string): void
   mergePayees(input: MergePayeesInput): Payee
+  createBalanceAdjustment(
+    input: CreateBalanceAdjustmentInput,
+  ): BalanceAdjustment
+  updateBalanceAdjustment(
+    input: UpdateBalanceAdjustmentInput,
+  ): BalanceAdjustment
+  deleteBalanceAdjustment(id: string): void
   undoLast(): boolean
   createCategory(input: CreateCategoryInput): Category
   renameCategory(input: RenameCategoryInput): Category
@@ -395,6 +418,46 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
   ),
   defineSqlMigration(
     10,
+    'tags on transaction lines',
+    `
+    CREATE TABLE tags (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 100),
+      normalized_name TEXT NOT NULL UNIQUE CHECK (normalized_name = payee_key(name)),
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE transaction_line_tags (
+      line_id TEXT NOT NULL REFERENCES transaction_lines(id) ON DELETE CASCADE,
+      tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (line_id, tag_id)
+    );
+    CREATE INDEX transaction_line_tags_tag_id ON transaction_line_tags(tag_id, line_id);
+  `,
+  ),
+  defineSqlMigration(
+    11,
+    'target-based balance adjustments',
+    `
+    CREATE TABLE balance_adjustments (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      account_id TEXT NOT NULL REFERENCES accounts(id),
+      date TEXT NOT NULL CHECK (date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+      observed_minor INTEGER NOT NULL CHECK (
+        typeof(observed_minor) = 'integer' AND
+        observed_minor BETWEEN -9007199254740991 AND 9007199254740991
+      ),
+      note TEXT NOT NULL CHECK (length(note) <= 1000),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX balance_adjustments_newest
+      ON balance_adjustments(date DESC, created_at DESC, id DESC);
+    CREATE INDEX balance_adjustments_account_history
+      ON balance_adjustments(account_id, date, created_at, id);
+  `,
+  ),
+  defineSqlMigration(
+    12,
     'payee aliases',
     `
     CREATE TABLE payee_aliases (
@@ -569,6 +632,14 @@ class OpenProfileApplication implements ProfileApplication {
         this.#executeUndoableCommand(
           deleteTransactionUndoableCommand(this.#database, id),
         ),
+      deleteTag: (id) =>
+        this.#executeUndoableCommand(
+          deleteTagUndoableCommand(this.#database, id),
+        ),
+      renameTag: (input) =>
+        this.#executeUndoableCommand(
+          renameTagUndoableCommand(this.#database, input),
+        ),
       createTransfer: (input) =>
         this.#executeUndoableCommand(
           createTransferUndoableCommand(this.#database, input, this.#clock),
@@ -592,6 +663,26 @@ class OpenProfileApplication implements ProfileApplication {
       mergePayees: (input) =>
         this.#executeUndoableCommand(
           mergePayeesUndoableCommand(this.#database, input, this.#clock),
+        ),
+      createBalanceAdjustment: (input) =>
+        this.#executeUndoableCommand(
+          createBalanceAdjustmentUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+          ),
+        ),
+      updateBalanceAdjustment: (input) =>
+        this.#executeUndoableCommand(
+          updateBalanceAdjustmentUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+          ),
+        ),
+      deleteBalanceAdjustment: (id) =>
+        this.#executeUndoableCommand(
+          deleteBalanceAdjustmentUndoableCommand(this.#database, id),
         ),
       undoLast: () => {
         this.#assertAvailable()
@@ -641,6 +732,10 @@ class OpenProfileApplication implements ProfileApplication {
       listTransactions: (input) => {
         this.#assertAvailable()
         return listTransactions(this.#database, input, this.#clock)
+      },
+      listTags: () => {
+        this.#assertAvailable()
+        return listTags(this.#database)
       },
       listPayees: () => {
         this.#assertAvailable()

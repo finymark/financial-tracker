@@ -5,8 +5,9 @@ TypeScript, and SQLite. The app opens to a collapsible sidebar with Overview,
 Transactions, Accounts, and Settings pages. On start you pick or create a
 profile; each profile has its own SQLite database and data folder. Financial
 data stays local. Accounts track opening balances, signed expense/income
-transactions, and both legs of transfers. Settings includes payee alias/merge
-management and two-level expense/income category management.
+transactions, both legs of transfers, and target-based balance adjustments.
+Settings includes payee alias/merge management and two-level expense/income
+category management.
 
 ## Requirements
 
@@ -129,7 +130,7 @@ them, and pattern matching cannot detect every possible form of sensitive data.
 
 The renderer has no Node access; a sandboxed, isolated preload exposes only the
 typed app, update, profile (including settings), account, category, transaction,
-payee, and backup commands/queries. Every IPC input is validated in the main
+transfer, balance adjustment, payee, tag, and backup commands/queries. Every IPC input is validated in the main
 process, and every handler rejects calls not sent by the app's own renderer frame.
 Production CSP permits only same-origin connections; localhost WebSockets are
 added only by the development server for hot reload. SQLite foreign-key
@@ -311,9 +312,10 @@ not off-device copies or backups of the separate data folder.
   accounts remain visible on Accounts with their balance and opening date.
 - Delete an account after confirming in the page. An opening balance alone does
   not prevent deletion: "empty" means no transactions.
-- Balances equal opening balances plus income, minus expenses (including linked
-  transfer fees), and both signed transfer legs. Accounts with transactions or
-  transfers cannot be deleted or have their currency changed; archive them instead.
+- Balances walk the dated account history and include the opening balance, income,
+  expenses (including linked transfer fees), both signed transfer legs, and the
+  recomputed effects of balance adjustments. Accounts with any of those movements
+  cannot be deleted or have their currency changed; archive them instead.
 
 ## Categories
 
@@ -346,7 +348,7 @@ not off-device copies or backups of the separate data folder.
 - **Transactions → Record transaction** opens a right-side drawer for an expense,
   income, or transfer. Expenses and income choose one non-archived account, a
   calendar date no later than today, a positive amount, an optional payee and
-  category, and a note.
+  category, any number of tags, and a note.
 - A transfer is one record containing source and destination accounts and positive
   amounts, date, and note. The accounts must differ. Same-currency amounts must
   match; cross-currency amounts are both authoritative and the list derives and
@@ -368,7 +370,9 @@ not off-device copies or backups of the separate data folder.
   expense or income categories matching the transaction kind and preserve the
   two-level hierarchy.
 - Each transaction currently has exactly one line whose amount equals its total.
-  This is the unsplit ledger shape; split transactions are not included yet.
+  Tags are many-to-many associations on that line (`transaction_line_tags`), not
+  duplicated on the header, so #66 can give each split part its own tags without
+  migrating existing associations. Split transactions are not included yet.
 - Edit any listed transaction or transfer from the same drawer, or delete it after
   confirmation. Create, edit, delete, category reassignment, and balance updates
   run through the profile application command boundary in one SQLite transaction.
@@ -377,6 +381,9 @@ not off-device copies or backups of the separate data folder.
   editing control. Undo restores the transaction header, all of its lines,
   timestamps, identifiers, payee reference, and any payee created by that command
   from before/after aggregate images captured in the original write transaction.
+  Tag associations and inline-created tags are included; undo removes only tags
+  created by the undone command, not reused tags. Tag rename and delete use the
+  same undo extension point and offer the same toast and keyboard action.
   Transfer undo includes both legs and its linked fee.
   History is in memory for the open profile only and is cleared by profile
   switching, restart, restore, or another profile write that has no declared undo
@@ -385,24 +392,38 @@ not off-device copies or backups of the separate data folder.
   unique within the profile ignoring case and diacritics. Add and remove alias
   commands are undoable. Merging moves every transaction and alias to the chosen
   surviving payee, keeps the merged name as an alias, and is undoable as one
-  command.
+  command. Payee aliases use appended migration 12 after the unchanged tag and
+  target-based balance-adjustment migrations 10–11.
 - Mark an expense or income as **Excluded** in the create/edit drawer when it
   should affect its account balance but not spending/income totals (for example,
   an expense awaiting reimbursement). The table shows an Excluded badge. The
   **Excluded transactions** filter offers all transactions (default), only
   excluded, or hide excluded and combines with the other filters. Only-excluded
-  hides transfers; hide-excluded keeps them (transfers have no exclusion flag). Filtered-set
+  hides transfers and balance adjustments; hide-excluded keeps both (neither has an exclusion flag). Filtered-set
   and whole-day totals always ignore excluded amounts, including in the
   only-excluded view, where matching days/currencies show zero totals. Saving a
   flag change uses the same Undo toast and Ctrl+Z as other transaction edits.
   Existing transactions remain included when upgrading via migration 8.
+- **Set real balance** opens the drawer for a balance adjustment: an account's
+  observed balance on a non-future date, with an optional note. The stored value
+  is the observation, never a fixed delta. Its displayed difference is recomputed
+  as history changes, so an earlier forgotten movement is absorbed instead of
+  counted twice. Adjustments affect balances but never expense/income totals;
+  they have a distinct list row and a **No correction needed** flag when their
+  current difference is zero. Create, edit, delete, and undo use the same profile
+  command boundary. Migration 11 appends the adjustment table after tags, preserving migrations 8–10 unchanged.
+- Account history is chronological. On one calendar day the opening balance is
+  applied first, ordinary transactions (including linked fee expenses) and transfer legs are applied next, and
+  adjustments apply at the end of the day in creation-time/UUID order. Therefore
+  a movement entered later for an adjustment's date is included before that
+  observation and changes the adjustment's effective difference.
 - The dense table is newest first (date, creation timestamp, then UUID), grouped
   by day, with income/expense signs and icons. Transfers have a distinct row and
   icon and show both accounts and amounts. Each day shows totals for that
   whole filtered day, even when it continues onto another page. Only the visible
   rows plus a small overscan are mounted in the fixed-height scrolling viewport.
 - Combine period (all dates, this month, last month, this year, or an inclusive
-  custom range), account, category, payee, and free-text filters with **Apply
+  custom range), account, category, payee, tag, and free-text filters with **Apply
   filters**. Presets use the application's injected clock. A main category
   includes its subcategories; archived accounts/categories remain filterable.
   Free text matches payee name or note, ignoring case and diacritics, and treats
@@ -422,6 +443,76 @@ not off-device copies or backups of the separate data folder.
   test times a filtered first page plus all aggregates with a generous 500 ms
   bound, arranging the 20 000 transactions through application commands in one
   fixture transaction (outside the measured query).
+
+### Keyboard-first transaction entry
+
+With a profile open and at least one active account, **N** or **Ctrl+N** opens a
+new transaction drawer from any shell page and focuses Amount. These shortcuts
+and **?** (shortcut help) do not interrupt typing in inputs, notes, selects, or
+editable content. A **Keyboard shortcuts** button also opens the translated
+HU/EN/DE cheat sheet. Shortcut definitions and pure matching live together in
+`src/renderer/src/lib/shortcuts.ts`, including the existing Ctrl+Z command.
+
+Inside the drawer:
+
+- **Alt+1 / Alt+2 / Alt+3** select expense / income / transfer. New transactions
+  support all three; existing expenses/income can switch between those two.
+  Existing transfers cannot be converted to expenses/income or vice versa.
+- **Tab / Shift+Tab** follow the displayed order: amount, date, type, account,
+  the remaining type-specific fields, note, exclusion flag, and save/cancel
+  actions. Focus stays inside the drawer or shortcut-help dialog and returns
+  to the previous control on close (or Record transaction after changing pages).
+- **Enter** saves from a field, including calculator amounts; in a multiline
+  note it inserts a newline. Focused buttons retain their own Enter action, so
+  Cancel and Close can still be activated normally. Native validation and the
+  existing amount parser run before any write; failures keep the drawer open
+  and show the translated error inside it.
+- **Esc** cancels/closes without saving. Closing is disabled during a save.
+- **Ctrl+Enter** saves and starts another new transaction, also from a note.
+  Date, account(s), and type are retained; amounts, payee, category, note, and
+  exclusion flags are cleared. A transfer's fee category resets to Fees.
+  Amount receives focus again. The same action is available as a button.
+
+Saving and adding another uses the same validated, undoable transaction/transfer
+commands as ordinary Save. There is no new database command or migration.
+
+### Manual keyboard-only entry check
+
+Run `npm run dev` with a synthetic profile and active HUF and CHF accounts. Use
+only the keyboard for the following, repeating in HU/EN/DE and light/dark themes:
+
+1. From Overview, Accounts, and Settings, press N and Ctrl+N. Verify Transactions
+   opens with Amount focused. Type an expression such as `12000/2`; Tab previews
+   it. Walk every field and action with Tab/Shift+Tab and verify focus cannot
+   escape the drawer. Change date/account, enter a payee/category/note, and save
+   with Enter. Verify the transaction and account balance.
+2. Open again; use Alt+1/2/3 to select each type. Complete an income, a
+   same-currency transfer, and a HUF-to-CHF transfer, including destination amount
+   and an optional fee, using only Tab, arrow keys, and typing. Check each save.
+3. Enter a multiline note; Enter must add a newline, not save. Press Ctrl+Enter:
+   verify exactly one transaction is saved, the drawer stays open on a new blank
+   amount, and date/account(s)/type remain. Enter a second amount and repeat;
+   verify amounts, payee, category, note, and flags did not carry over. Try a
+   transfer batch as well, and then save normally to close.
+4. Try `1+`, `1/0`, a missing required amount, tomorrow's date, and mismatched
+   same-currency transfer amounts. Enter and Ctrl+Enter must not create records
+   or reset the form. Fix the inputs and save once; check the Undo toast and
+   Ctrl+Z after closing. Text-field Ctrl+Z must still edit text.
+5. Open the drawer and press Esc; verify no write and focus restoration. Tab to
+   Cancel and press Enter; it must cancel rather than save. Repeat with Close.
+   While typing in payee, note, amount, and filter search, verify N, Ctrl+N, and
+   ? do not open another drawer/help or replace the draft.
+6. Outside typing controls, press ? and verify the translated cheat sheet opens.
+   Cycle Tab/Shift+Tab, then Esc to close and restore focus. Also open help from
+   the drawer's Close button with ?; closing help must return to that button,
+   leave the draft unchanged, and keep subsequent Tab inside the drawer.
+   With no active accounts, N must not open an unusable drawer; show the normal
+   no-accounts guidance instead.
+
+Renderer focus and full keyboard flow remain manual checks. Automated tests
+cover the pure matcher (scope, modifiers, typing exclusions, multiline notes,
+button activation, repeats, composition, and already-handled events) and the
+existing profile-application SQLite seam covers persistence and undo.
 
 ### Amount calculator
 
@@ -448,9 +539,11 @@ Division by zero, malformed expressions, unsafe integer-hundredth results, and
 non-positive transaction results are rejected. Opening balances may be negative
 or zero.
 
-Leaving the field or pressing Enter evaluates it and shows a translated result
-preview before save. Enter in the amount field evaluates only; it does not save
-the form. The original expression stays editable. Changing it or the currency
+Leaving the field evaluates it and shows a translated result preview before
+save. In Accounts, Enter in the amount field evaluates only; it does not save
+the form. In the transaction drawer, Enter evaluates and saves the transaction,
+matching the keyboard-first entry flow above. The original expression stays
+editable. Changing it or the currency
 hides the previous preview until reevaluation. Previews use the existing money
 formatter: CHF shows two decimals, while HUF rounds to whole units for display
 only; the stored result still retains hundredths.
@@ -459,8 +552,10 @@ only; the stored result still retains hundredths.
 
 Run `npm run dev`. In Accounts and in the transaction create/edit drawer, enter
 `12000/2`, `4490*3`, `100+250-30`, `1,5`, `1.234`, `1 234,50`, `1.234,5`, and
-`1,234.5` for HUF and CHF. Blur or press Enter: verify the preview appears and
-Enter does not save. Check `1/3`, `2/3`, and `1/3*3` for final-only rounding
+`1,234.5` for HUF and CHF. Blur: verify the preview appears. In Accounts,
+Enter also previews without saving; in the transaction drawer, Enter saves a
+valid expression (use Tab to preview first). Check `1/3`, `2/3`, and `1/3*3` for
+final-only rounding
 (CHF previews `0.33`, `0.67`, and `1.00`). Change the expression or currency and
 verify the old preview disappears. Try `1+`, `1/0`, and `90071992547409.92`:
 check the inline validation and that saving does not create a record. Verify
@@ -470,6 +565,50 @@ an edited transaction to check the stored amount. Repeat in HU/EN/DE and with
 keyboard navigation and light/dark themes. These renderer checks remain manual;
 the automated pure-parser tests cover arithmetic, ambiguous inputs, rounding,
 invalid expressions, sign constraints, and safe-integer bounds.
+
+## Tags
+
+- Tags use appended migration 10, after unchanged migrations 8 (excluded
+  transactions) and 9 (transfers). Transfers and their linked fees do not accept
+  tag input; a tag filter hides transfers and balance adjustments because neither has tags.
+- In the expense/income drawer, choose an existing tag or type a new name, then
+  press Enter or **Add tag**. Add several tags and remove individual tags before
+  saving; a name still in the input is also included when saving. Cancelling
+  creates nothing. Tag names are trimmed and must have 1–100 characters.
+- Tags belong only to the active profile. As with payees, reuse ignores case
+  with Unicode NFC normalization, including Hungarian/German accented names;
+  accents themselves remain significant. Repeated equivalent names produce one
+  association and keep the existing tag's spelling and identifier.
+- The table shows tags and the tag filter combines with all other filters using
+  AND. Filtered and daily totals cover the entire matching set, not only the
+  current page. Multiple tags never multiply a transaction's amount.
+- Expand **Transactions → Manage tags** to rename or delete a tag. Renaming
+  changes its name everywhere without changing identity. A name already used by
+  another tag is rejected (tags are not silently merged). Confirming deletion
+  removes the tag and all its associations, not the transactions or balances;
+  undo restores its exact identity, spelling, and associations.
+- Removing tags from a transaction or deleting a transaction leaves the tags
+  available for reuse. Tag rename/delete and transaction tag changes are
+  undoable within the current profile session. Restart, profile switching,
+  restore, and successful writes without an undo aggregate still clear history.
+
+### Manual Tags check
+
+Run `npm run dev` and open Transactions. Create a transaction with several tags
+by typing and by choosing suggestions; save with a name still in the input.
+Cancel a second draft with a new tag and verify it was not created. Reuse
+`Élelmiszer`/`élelmiszer` and `Ärztin`/`ärztin`, verify each retains one tag with
+its original spelling, and remove tags during edit. Combine tag, period,
+account, category, payee, and search filters; compare whole-set/day totals and
+page through more than 200 matches. Rename a tag, try a conflicting name, then
+cancel and confirm tag deletion. Verify affected transactions remain and tags
+and totals refresh. Use the toast and Ctrl+Z after create/edit/delete and tag
+rename/delete; check tags and associations restore, including an unused reused
+tag. Switch profiles and restart to check isolation, persistence, and cleared
+undo history. Repeat with keyboard navigation, light/dark appearance, and
+HU/EN/DE. UI checks remain manual; real SQLite application-API tests cover tag
+reuse, filtering/totals, validation/atomicity, rename/delete, undo, isolation,
+upgrade preservation, and reopening.
 
 ### Manual Transactions check
 
@@ -486,9 +625,19 @@ German and check translated validation, keyboard focus, and light/dark themes.
 Verify the transfer row shows both accounts and the actual cross-currency rate,
 account filters include either leg, transfer legs do not alter expense/income
 totals, and an optional fee defaults to Fees. Try the calculator on both transfer
-amounts and the optional fee, including Enter without saving and leaving the fee
-blank. Mark a fee Excluded, check balances stay unchanged while expense totals
+amounts and the optional fee, using Tab to preview before saving with Enter and
+leaving the fee blank. Mark a fee Excluded, check balances stay unchanged while
+expense totals
 omit it, then edit/delete/undo the transfer and verify the fee flag is restored.
+Use **Set real balance** for an account showing 51,500 HUF and observe 50,000 HUF
+on 10 October. Check the distinct adjustment row shows a −1,500 HUF difference,
+the account balance becomes 50,000 HUF, and expense/income totals do not change.
+Then enter a forgotten 1,500 HUF expense dated 5 October: the difference must
+become zero, the row must show **No correction needed**, and the balance must
+stay 50,000 HUF. Try zero and negative observations, reject tomorrow's date,
+then create, edit, delete, and undo an adjustment. Check period/account/search
+filters include it, category/payee/tag/only-excluded filters do not, and
+hide-excluded keeps it.
 After create, edit, and delete, use
 both the toast action and `Ctrl+Z` and verify
 the exact previous transaction returns. While typing in amount, payee, note, or

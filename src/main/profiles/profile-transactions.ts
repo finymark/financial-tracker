@@ -24,6 +24,10 @@ import {
 import { today } from '../../shared/date'
 import { getTransfer } from './profile-transfers'
 import { resolvePayee } from './profile-payees'
+import { validateTagNames } from './tag-validation'
+import { getLineTags, getLinesTags, setLineTags } from './profile-tags'
+import type { Tag } from '../../shared/tags'
+import { getBalanceAdjustment } from './profile-adjustments'
 
 interface StoredTransaction {
   id: string
@@ -62,7 +66,11 @@ const TRANSACTION_SELECT = `
   LEFT JOIN payees ON payees.id = transactions.payee_id
   LEFT JOIN transaction_lines ON transaction_lines.transaction_id = transactions.id`
 
-function transactionView(row: StoredTransaction | undefined): Transaction {
+function transactionView(
+  database: Database.Database,
+  row: StoredTransaction | undefined,
+  tags?: Tag[],
+): Transaction {
   if (!row) throw new Error('transactions.error.notFound')
   if (row.lineCount !== 1 || row.lineTotal !== row.totalMinor || !row.lineId) {
     throw new Error('transactions.error.lines')
@@ -83,6 +91,7 @@ function transactionView(row: StoredTransaction | undefined): Transaction {
       id: row.lineId,
       amountMinor: row.amountMinor,
       categoryId: row.categoryId,
+      tags: tags ?? getLineTags(database, row.lineId),
     },
   }
 }
@@ -92,6 +101,7 @@ export function getTransaction(
   id: string,
 ): Transaction {
   return transactionView(
+    database,
     database
       .prepare(`${TRANSACTION_SELECT} WHERE transactions.id = ?`)
       .get(id) as StoredTransaction | undefined,
@@ -142,6 +152,7 @@ export function createTransaction(
   const payeeName = validateTransactionPayeeName(input.payeeName)
   const categoryId = validateTransactionCategoryId(input.categoryId)
   const note = validateTransactionNote(input.note)
+  const tagNames = validateTagNames(input.tagNames)
   const excluded = validateTransactionExcluded(input.excluded)
   validateReferences(database, accountId, kind, categoryId)
   const timestamp = clock().toISOString()
@@ -164,12 +175,14 @@ export function createTransaction(
       timestamp,
       timestamp,
     )
+  const lineId = randomUUID()
   database
     .prepare(
       `INSERT INTO transaction_lines
         (id, transaction_id, amount_minor, category_id) VALUES (?, ?, ?, ?)`,
     )
-    .run(randomUUID(), id, totalMinor, categoryId)
+    .run(lineId, id, totalMinor, categoryId)
+  setLineTags(database, lineId, tagNames, timestamp)
   if (excluded !== undefined) {
     database
       .prepare('UPDATE transactions SET excluded = ? WHERE id = ?')
@@ -193,6 +206,10 @@ export function updateTransaction(
   const payeeName = validateTransactionPayeeName(input.payeeName)
   const categoryId = validateTransactionCategoryId(input.categoryId)
   const note = validateTransactionNote(input.note)
+  const tagNames =
+    input.tagNames === undefined
+      ? current.line.tags.map((tag) => tag.name)
+      : validateTagNames(input.tagNames)
   const excluded = validateTransactionExcluded(input.excluded)
   validateReferences(database, accountId, kind, categoryId, current)
   const timestamp = clock().toISOString()
@@ -219,6 +236,7 @@ export function updateTransaction(
       'UPDATE transaction_lines SET amount_minor = ?, category_id = ? WHERE id = ?',
     )
     .run(totalMinor, categoryId, current.line.id)
+  setLineTags(database, current.line.id, tagNames, timestamp)
   if (excluded !== undefined) {
     database
       .prepare('UPDATE transactions SET excluded = ? WHERE id = ?')
@@ -277,6 +295,8 @@ export function listTransactions(
   const parameters: (string | number)[] = []
   const transferWhere: string[] = []
   const transferParameters: (string | number)[] = []
+  const adjustmentWhere: string[] = []
+  const adjustmentParameters: (string | number)[] = []
   const add = (condition: string, ...values: (string | number)[]) => {
     where.push(condition)
     parameters.push(...values)
@@ -301,13 +321,19 @@ export function listTransactions(
     transferWhere.push(condition)
     transferParameters.push(...values)
   }
+  const addAdjustment = (condition: string, ...values: (string | number)[]) => {
+    adjustmentWhere.push(condition)
+    adjustmentParameters.push(...values)
+  }
   if (from) {
     add('transactions.date >= ?', from)
     addTransfer('transfers.date >= ?', from)
+    addAdjustment('balance_adjustments.date >= ?', from)
   }
   if (to) {
     add('transactions.date <= ?', to)
     addTransfer('transfers.date <= ?', to)
+    addAdjustment('balance_adjustments.date <= ?', to)
   }
   if (input.accountId) {
     add('transactions.account_id = ?', input.accountId)
@@ -316,14 +342,29 @@ export function listTransactions(
       input.accountId,
       input.accountId,
     )
+    addAdjustment('balance_adjustments.account_id = ?', input.accountId)
   }
   if (input.exclusion === 'onlyExcluded') {
     add('transactions.excluded = 1')
     addTransfer('0 = 1')
+    addAdjustment('0 = 1')
   }
   if (input.exclusion === 'hideExcluded') add('transactions.excluded = 0')
   if (input.payeeId) add('transactions.payee_id = ?', input.payeeId)
+  if (input.tagId) {
+    add(
+      `EXISTS (
+        SELECT 1 FROM transaction_lines AS tagged_lines
+        JOIN transaction_line_tags ON transaction_line_tags.line_id = tagged_lines.id
+        WHERE tagged_lines.transaction_id = transactions.id AND transaction_line_tags.tag_id = ?
+      )`,
+      input.tagId,
+    )
+    addTransfer('0 = 1')
+    addAdjustment('0 = 1')
+  }
   if (input.payeeId) addTransfer('0 = 1')
+  if (input.payeeId) addAdjustment('0 = 1')
   if (input.categoryId) {
     add(
       `EXISTS (
@@ -336,6 +377,7 @@ export function listTransactions(
       input.categoryId,
     )
     addTransfer('0 = 1')
+    addAdjustment('0 = 1')
   }
   if (input.search) {
     add(
@@ -345,6 +387,10 @@ export function listTransactions(
     )
     addTransfer(
       'instr(fold_text(transfers.note), ?) > 0',
+      foldText(input.search),
+    )
+    addAdjustment(
+      'instr(fold_text(balance_adjustments.note), ?) > 0',
       foldText(input.search),
     )
   }
@@ -362,8 +408,20 @@ export function listTransactions(
   const includeTransfers =
     transfersAvailable &&
     Boolean(database.prepare('SELECT 1 FROM transfers LIMIT 1').get())
+  const adjustmentsAvailable = Boolean(
+    database
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'balance_adjustments'",
+      )
+      .get(),
+  )
+  const includeAdjustments =
+    adjustmentsAvailable &&
+    Boolean(database.prepare('SELECT 1 FROM balance_adjustments LIMIT 1').get())
   const filteredTransfers = `FROM transfers
     ${transferWhere.length ? `WHERE ${transferWhere.join(' AND ')}` : ''}`
+  const filteredAdjustments = `FROM balance_adjustments
+    ${adjustmentWhere.length ? `WHERE ${adjustmentWhere.join(' AND ')}` : ''}`
   const entries = `
     SELECT transactions.id, 'transaction' AS entryType,
       transactions.date, transactions.created_at AS createdAt ${filtered}
@@ -373,14 +431,24 @@ export function listTransactions(
     SELECT transfers.id, 'transfer' AS entryType,
       transfers.date, transfers.created_at AS createdAt ${filteredTransfers}`
         : ''
+    }
+    ${
+      includeAdjustments
+        ? `UNION ALL
+    SELECT balance_adjustments.id, 'adjustment' AS entryType,
+      balance_adjustments.date, balance_adjustments.created_at AS createdAt ${filteredAdjustments}`
+        : ''
     }`
-  const entryParameters = includeTransfers
-    ? [...parameters, ...transferParameters]
-    : parameters
+  const entryParameters = [
+    ...parameters,
+    ...(includeTransfers ? transferParameters : []),
+    ...(includeAdjustments ? adjustmentParameters : []),
+  ]
   // One read snapshot for rows and aggregates. Offset allows arbitrary virtual
   // windows; only the bounded page goes through the ledger line checks.
   return database.transaction(() => {
-    const rows = includeTransfers
+    const hasAdditionalEntryTypes = includeTransfers || includeAdjustments
+    const rows = hasAdditionalEntryTypes
       ? (
           database
             .prepare(
@@ -389,10 +457,12 @@ export function listTransactions(
             )
             .all(...entryParameters, input.limit!, input.offset!) as {
             id: string
-            entryType: 'transaction' | 'transfer'
+            entryType: 'transaction' | 'transfer' | 'adjustment'
           }[]
         ).map(({ id, entryType }) => {
           if (entryType === 'transfer') return getTransfer(database, id)
+          if (entryType === 'adjustment')
+            return getBalanceAdjustment(database, id)
           const transaction = getTransaction(database, id)
           const link = database
             .prepare('SELECT id FROM transfers WHERE fee_transaction_id = ?')
@@ -401,8 +471,8 @@ export function listTransactions(
             ? { ...transaction, linkedTransferId: link.id }
             : transaction
         })
-      : (
-          database
+      : (() => {
+          const storedRows = database
             .prepare(
               `${TRANSACTION_SELECT}
                WHERE transactions.id IN (SELECT transactions.id ${filtered}
@@ -416,17 +486,24 @@ export function listTransactions(
               input.limit!,
               input.offset!,
             ) as StoredTransaction[]
-        ).map(transactionView)
+          const lineTags = getLinesTags(
+            database,
+            storedRows.map((row) => row.lineId),
+          )
+          return storedRows.map((row) =>
+            transactionView(database, row, lineTags.get(row.lineId) ?? []),
+          )
+        })()
     const totalCount = Number(
       (
         database
           .prepare(
-            includeTransfers
+            hasAdditionalEntryTypes
               ? `SELECT COUNT(*) AS count FROM (${entries})`
               : `SELECT COUNT(*) AS count ${filtered}`,
           )
           .safeIntegers()
-          .get(...(includeTransfers ? entryParameters : parameters)) as {
+          .get(...(hasAdditionalEntryTypes ? entryParameters : parameters)) as {
           count: bigint
         }
       ).count,
@@ -444,11 +521,19 @@ export function listTransactions(
       ) AS filtered_transactions
       JOIN transaction_lines AS aggregate_lines
         ON aggregate_lines.transaction_id = filtered_transactions.id
+      ${
+        input.tagId
+          ? `WHERE EXISTS (
+        SELECT 1 FROM transaction_line_tags AS aggregate_tags
+        WHERE aggregate_tags.line_id = aggregate_lines.id AND aggregate_tags.tag_id = ?
+      )`
+          : ''
+      }
       GROUP BY filtered_transactions.date, filtered_transactions.currency
       ORDER BY filtered_transactions.date DESC, filtered_transactions.currency`,
       )
       .safeIntegers()
-      .all(...parameters) as {
+      .all(...parameters, ...(input.tagId ? [input.tagId] : [])) as {
       date: string
       currency: TransactionTotals['currency']
       expenseMinor: bigint
@@ -480,7 +565,7 @@ export function listTransactions(
       total.incomeMinor = safe(BigInt(total.incomeMinor) + row.incomeMinor)
       totals.set(row.currency, total)
     }
-    const days = includeTransfers
+    const days = hasAdditionalEntryTypes
       ? (
           database
             .prepare(
