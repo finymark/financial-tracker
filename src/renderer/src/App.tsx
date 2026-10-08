@@ -19,6 +19,7 @@ import { shortcutTargetContext } from './lib/shortcut-context'
 import { UpdateNotice } from './components/update-notice'
 import { BackupSettings } from './components/backup-settings'
 import { CategorySettings } from './components/category-settings'
+import { PayeeSettings } from './components/payee-settings'
 import { AccountsPage } from './AccountsPage'
 import { TransactionsPage } from './TransactionsPage'
 import { Button } from './components/ui/button'
@@ -367,6 +368,7 @@ function Shell({
   const [settingsError, setSettingsError] = useState(false)
   const [backupBusy, setBackupBusy] = useState(false)
   const [categoryBusy, setCategoryBusy] = useState(false)
+  const [payeeBusy, setPayeeBusy] = useState(false)
   const [categoryRevision, setCategoryRevision] = useState(0)
   const [undoRevision, setUndoRevision] = useState(0)
   const [undoOffered, setUndoOffered] = useState(false)
@@ -490,7 +492,7 @@ function Shell({
               aria-label={t(`navigation.${id}`)}
               aria-current={page === id ? 'page' : undefined}
               title={collapsed ? t(`navigation.${id}`) : undefined}
-              disabled={backupBusy || categoryBusy}
+              disabled={backupBusy || categoryBusy || payeeBusy}
               onClick={() => setPage(id)}
             >
               <Icon aria-hidden="true" />
@@ -509,7 +511,7 @@ function Shell({
           title={
             collapsed ? `${active.name} — ${t('profile.switch')}` : undefined
           }
-          disabled={backupBusy || categoryBusy}
+          disabled={backupBusy || categoryBusy || payeeBusy}
           onClick={onSwitchProfile}
         >
           <UsersRound className="size-5 shrink-0" aria-hidden="true" />
@@ -583,7 +585,12 @@ function Shell({
                     <NativeSelect
                       id="language"
                       value={language}
-                      disabled={savingSettings || backupBusy || categoryBusy}
+                      disabled={
+                        savingSettings ||
+                        backupBusy ||
+                        categoryBusy ||
+                        payeeBusy
+                      }
                       onChange={(event) => {
                         const value = languages.find(
                           (item) => item === event.target.value,
@@ -605,7 +612,12 @@ function Shell({
                     <NativeSelect
                       id="theme"
                       value={theme}
-                      disabled={savingSettings || backupBusy || categoryBusy}
+                      disabled={
+                        savingSettings ||
+                        backupBusy ||
+                        categoryBusy ||
+                        payeeBusy
+                      }
                       onChange={(event) => {
                         const value = themeModes.find(
                           (item) => item === event.target.value,
@@ -630,7 +642,12 @@ function Shell({
                     <NativeSelect
                       id="base-currency"
                       value={baseCurrency}
-                      disabled={savingSettings || backupBusy || categoryBusy}
+                      disabled={
+                        savingSettings ||
+                        backupBusy ||
+                        categoryBusy ||
+                        payeeBusy
+                      }
                       onChange={(event) => {
                         const value = baseCurrencies.find(
                           (item) => item === event.target.value,
@@ -687,10 +704,22 @@ function Shell({
             )}
           </Card>
           {page === 'settings' && (
+            <PayeeSettings
+              key={`${active.id}:${undoRevision}`}
+              t={t}
+              disabled={savingSettings || backupBusy || categoryBusy}
+              onBusyChange={setPayeeBusy}
+              onChanged={() => {
+                setUndoError(false)
+                setUndoOffered(true)
+              }}
+            />
+          )}
+          {page === 'settings' && (
             <CategorySettings
               key={`${active.id}:${categoryRevision}:${undoRevision}`}
               t={t}
-              disabled={savingSettings || backupBusy}
+              disabled={savingSettings || backupBusy || payeeBusy}
               onBusyChange={setCategoryBusy}
             />
           )}
@@ -704,7 +733,7 @@ function Shell({
                 setCategoryRevision((revision) => revision + 1)
               }}
               onBusyChange={setBackupBusy}
-              disabled={savingSettings || categoryBusy}
+              disabled={savingSettings || categoryBusy || payeeBusy}
             />
           )}
         </div>

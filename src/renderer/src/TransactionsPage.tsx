@@ -12,6 +12,7 @@ import type {
   TransactionPeriod,
   TransactionExclusionFilter,
 } from '../../shared/transactions'
+import type { PayeeSuggestion } from '../../shared/payees'
 import type { Transfer } from '../../shared/transfers'
 import type { BalanceAdjustment } from '../../shared/adjustments'
 import { Button } from './components/ui/button'
@@ -159,6 +160,9 @@ export function TransactionsPage({
     Record<TransactionKind, Category[]>
   >({ expense: [], income: [] })
   const [payees, setPayees] = useState<Payee[]>([])
+  const [payeeSuggestions, setPayeeSuggestions] = useState<PayeeSuggestion[]>(
+    [],
+  )
   const [tags, setTags] = useState<Tag[]>([])
   const [renamingTag, setRenamingTag] = useState<{
     id: string
@@ -249,6 +253,29 @@ export function TransactionsPage({
       ignore = true
     }
   }, [request, revision, language, undoRevision])
+
+  const payeeQuery =
+    form?.kind === 'expense' || form?.kind === 'income'
+      ? form.payeeName
+      : undefined
+  useEffect(() => {
+    if (payeeQuery === undefined) {
+      setPayeeSuggestions([])
+      return
+    }
+    let ignore = false
+    void window.app.payees
+      .suggest({ query: payeeQuery, limit: 10 })
+      .then((suggestions) => {
+        if (!ignore) setPayeeSuggestions(suggestions)
+      })
+      .catch(() => {
+        if (!ignore) setPayeeSuggestions([])
+      })
+    return () => {
+      ignore = true
+    }
+  }, [payeeQuery])
 
   function applyFilters(event: FormEvent) {
     event.preventDefault()
@@ -1195,7 +1222,7 @@ export function TransactionsPage({
                     }
                   />
                   <datalist id="transaction-payees">
-                    {payees.map((payee) => (
+                    {payeeSuggestions.map((payee) => (
                       <option key={payee.id} value={payee.name} />
                     ))}
                   </datalist>

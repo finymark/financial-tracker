@@ -51,12 +51,6 @@ export function registerTransactionIpc(
   )
   registerIpcHandler(
     ipcMain,
-    IPC_CHANNELS.payeesList,
-    (): Awaited<ReturnType<AppBridge['payees']['list']>> =>
-      controller.getActiveApplication().queries.listPayees(),
-  )
-  registerIpcHandler(
-    ipcMain,
     IPC_CHANNELS.transactionsCreate,
     (
       _event,

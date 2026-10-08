@@ -5,8 +5,9 @@ TypeScript, and SQLite. The app opens to a collapsible sidebar with Overview,
 Transactions, Accounts, and Settings pages. On start you pick or create a
 profile; each profile has its own SQLite database and data folder. Financial
 data stays local. Accounts track opening balances, signed expense/income
-transactions, both legs of transfers, and target-based balance adjustments. Settings includes two-level
-expense/income category management.
+transactions, both legs of transfers, and target-based balance adjustments.
+Settings includes payee alias/merge management and two-level expense/income
+category management.
 
 ## Requirements
 
@@ -361,8 +362,11 @@ not off-device copies or backups of the separate data folder.
   both transfer amounts, and optional fees, with a positive result required.
   Amounts are persisted as exact integer hundredths. HUF is displayed without
   decimals; CHF is displayed with two decimals.
-- Typing a new payee creates it in the active profile. An existing payee with the
-  same Unicode-normalized name ignoring case is reused. Category choices are limited to active
+- The payee field queries ranked autocomplete suggestions: more frequently used
+  payees come first, with recency breaking equal-frequency ties. Typing a new
+  payee creates it in the active profile. An existing payee with the same
+  Unicode-normalized name ignoring case is reused. A case- and
+  diacritic-insensitive alias resolves to its payee. Category choices are limited to active
   expense or income categories matching the transaction kind and preserve the
   two-level hierarchy.
 - Each transaction currently has exactly one line whose amount equals its total.
@@ -384,6 +388,12 @@ not off-device copies or backups of the separate data folder.
   History is in memory for the open profile only and is cleared by profile
   switching, restart, restore, or another profile write that has no declared undo
   aggregate. Account and category commands are not undoable yet.
+- **Settings → Payees** lists each payee and its raw-name aliases. Alias keys are
+  unique within the profile ignoring case and diacritics. Add and remove alias
+  commands are undoable. Merging moves every transaction and alias to the chosen
+  surviving payee, keeps the merged name as an alias, and is undoable as one
+  command. Payee aliases use appended migration 12 after the unchanged tag and
+  target-based balance-adjustment migrations 10–11.
 - Mark an expense or income as **Excluded** in the create/edit drawer when it
   should affect its account balance but not spending/income totals (for example,
   an expense awaiting reimbursement). The table shows an Excluded badge. The
@@ -651,6 +661,19 @@ the browser mounts only a small row window, and edit/delete refreshes the first
 page and totals. UI checks remain manual; the application-API tests cover filters,
 calendar boundaries, stable paging, exact totals, excluded flags and filters,
 undo, upgrade preservation, persistence, and the 20 000-transaction query bound.
+
+### Manual Payees check
+
+Record payees with different usage counts and last-used dates. Open the
+transaction drawer, type part of a name, and verify autocomplete puts higher
+frequency first and more recent payees first when frequencies match. In
+Settings → Payees, add an alias containing accents, then type its unaccented,
+different-case form in a new transaction and verify the canonical payee is used.
+Remove and undo an alias. Merge two payees and verify their transactions and
+aliases appear under the survivor, the merged name works as an alias, and one
+Undo restores both payees exactly. Repeat in HU/EN/DE, light/dark themes, and
+with keyboard navigation. Application-API tests cover ranking, folded alias
+matching and uniqueness, merge, undo, and migration.
 
 ### Manual Categories check
 

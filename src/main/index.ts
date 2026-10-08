@@ -13,6 +13,7 @@ import { registerTransactionIpc } from './profiles/transaction-ipc'
 import { registerUndoIpc } from './profiles/undo-ipc'
 import { registerTagIpc } from './profiles/tag-ipc'
 import { registerTransferIpc } from './profiles/transfer-ipc'
+import { registerPayeeIpc } from './profiles/payee-ipc'
 import { registerBalanceAdjustmentIpc } from './profiles/adjustment-ipc'
 import { ProfileRegistry } from './profiles/profile-registry'
 import { registerIpcHandler } from './ipc'
@@ -91,6 +92,7 @@ void app.whenReady().then(() => {
   registerAccountIpc(ipcMain, profiles)
   registerCategoryIpc(ipcMain, profiles)
   registerTransactionIpc(ipcMain, profiles)
+  registerPayeeIpc(ipcMain, profiles)
   registerTransferIpc(ipcMain, profiles)
   registerBalanceAdjustmentIpc(ipcMain, profiles)
   registerUndoIpc(ipcMain, profiles)
