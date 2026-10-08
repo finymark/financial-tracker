@@ -80,7 +80,9 @@ The guard is also usable outside hooks, for example
 (quote filenames containing spaces), relative to the repository root or absolute.
 Deleted files in a diff are skipped. No arguments or an unreadable/malformed
 configuration exits with code 2; findings exit with code 1; clean files exit 0.
-The guard's CLI tests run as part of `npm test`.
+The guard's rule tests run in-process as part of `npm test`, with separate CLI
+smoke tests verifying exit codes and diagnostics without repeated process launches
+for every rule.
 
 ### Personal-data false positives
 
@@ -121,7 +123,10 @@ Every IPC input is validated
 in the main process. Account and category writes use the profile application API, with each
 command executed in one SQLite transaction. SQLite is used only in the main
 process. Profiles are listed in `profiles.json` under the app's user-data folder; each
-profile lives in `profiles/<id>/` (database, data folder, and backups). Migrations are forward-only and run after a verified backup; a
+profile lives in `profiles/<id>/` (database, data folder, and backups). Registry
+writes replace the file atomically and briefly retry transient Windows file locks
+(up to five retries with 310 ms total backoff); persistent failures still surface
+without replacing the previous registry. Migrations are forward-only and run after a verified backup; a
 database with a newer schema is refused. Installer packaging is not included yet.
 
 ## Continuous integration

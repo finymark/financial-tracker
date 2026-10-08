@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 const personalRules = ['windows-home', 'secret', 'email', 'fixture-image']
 const patterns = [
@@ -71,14 +72,12 @@ function isImage(content) {
   )
 }
 
-async function check(file, allowlist) {
-  const name = path
-    .relative(process.cwd(), path.resolve(file))
-    .split(path.sep)
-    .join('/')
+async function check(file, allowlist, directory) {
+  const absolutePath = path.resolve(directory, file)
+  const name = path.relative(directory, absolutePath).split(path.sep).join('/')
   let info
   try {
-    info = await stat(file)
+    info = await stat(absolutePath)
   } catch (error) {
     // Diff callers can include deletions; there is no remaining content to scan.
     if (error.code === 'ENOENT') return []
@@ -87,7 +86,7 @@ async function check(file, allowlist) {
   if (!info.isFile()) return []
   if (info.size > 1_000_000)
     return [`${name}: file-size: exceeds 1 MB (1,000,000 bytes)`]
-  const content = await readFile(file)
+  const content = await readFile(absolutePath)
   const findings = []
   const report = (rule, line) => {
     if (
@@ -137,27 +136,40 @@ async function check(file, allowlist) {
   return findings
 }
 
-async function main() {
-  const files = process.argv.slice(2).filter((argument) => argument !== '--')
+export async function runGuard(
+  files,
+  { directory = process.cwd(), report = console.error } = {},
+) {
   if (!files.length) {
-    console.error('Usage: node scripts/check-files.mjs [--] <file> [file ...]')
-    process.exitCode = 2
-    return
+    report('Usage: node scripts/check-files.mjs [--] <file> [file ...]')
+    return 2
   }
-  const allowlist = await readAllowlist('.personal-data-allowlist.json')
-  const findings = (
-    await Promise.all(files.map((file) => check(file, allowlist)))
-  ).flat()
-  if (findings.length) {
-    console.error(findings.join('\n'))
-    console.error(
-      'File guard failed. Remove the finding or review a personal-data allowlist entry.',
+  try {
+    const allowlist = await readAllowlist(
+      path.resolve(directory, '.personal-data-allowlist.json'),
     )
-    process.exitCode = 1
+    const findings = (
+      await Promise.all(files.map((file) => check(file, allowlist, directory)))
+    ).flat()
+    if (findings.length) {
+      report(findings.join('\n'))
+      report(
+        'File guard failed. Remove the finding or review a personal-data allowlist entry.',
+      )
+      return 1
+    }
+    return 0
+  } catch (error) {
+    report(`File guard could not run: ${error.code ?? error.message}`)
+    return 2
   }
 }
 
-main().catch((error) => {
-  console.error(`File guard could not run: ${error.code ?? error.message}`)
-  process.exitCode = 2
-})
+if (
+  process.argv[1] &&
+  pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url
+) {
+  process.exitCode = await runGuard(
+    process.argv.slice(2).filter((argument) => argument !== '--'),
+  )
+}

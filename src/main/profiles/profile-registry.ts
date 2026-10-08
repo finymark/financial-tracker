@@ -14,6 +14,8 @@ import type {
 } from '../../shared/profiles'
 
 const REGISTRY_VERSION = 1
+const RENAME_RETRY_DELAYS = [10, 20, 40, 80, 160]
+const RETRYABLE_RENAME_CODES = new Set(['EPERM', 'EACCES', 'EBUSY'])
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -33,6 +35,8 @@ export interface ProfileRegistryOptions {
   userDataDirectory: string
   clock?: () => Date
   createId?: () => string
+  rename?: typeof renameSync
+  wait?: (milliseconds: number) => void
 }
 
 function validateName(name: string): string {
@@ -94,12 +98,25 @@ export class ProfileRegistry {
   readonly #profilesDirectory: string
   readonly #clock: () => Date
   readonly #createId: () => string
+  readonly #rename: typeof renameSync
+  readonly #wait: (milliseconds: number) => void
 
   constructor(options: ProfileRegistryOptions) {
     this.#registryPath = join(options.userDataDirectory, 'profiles.json')
     this.#profilesDirectory = join(options.userDataDirectory, 'profiles')
     this.#clock = options.clock ?? (() => new Date())
     this.#createId = options.createId ?? randomUUID
+    this.#rename = options.rename ?? renameSync
+    this.#wait =
+      options.wait ??
+      ((milliseconds) => {
+        Atomics.wait(
+          new Int32Array(new SharedArrayBuffer(4)),
+          0,
+          0,
+          milliseconds,
+        )
+      })
     mkdirSync(this.#profilesDirectory, { recursive: true })
     if (!existsSync(this.#registryPath)) this.#write(this.#emptyRegistry())
     this.#read()
@@ -233,6 +250,20 @@ export class ProfileRegistry {
       encoding: 'utf8',
       flag: 'w',
     })
-    renameSync(temporaryPath, this.#registryPath)
+    // Windows indexers/antivirus can briefly lock the destination. Keep the
+    // original intact and retry only the atomic replace, for at most 310 ms.
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        this.#rename(temporaryPath, this.#registryPath)
+        return
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException | null)?.code
+        const delay = RENAME_RETRY_DELAYS[attempt]
+        if (delay === undefined || !RETRYABLE_RENAME_CODES.has(code ?? '')) {
+          throw error
+        }
+        this.#wait(delay)
+      }
+    }
   }
 }
