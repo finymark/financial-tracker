@@ -634,7 +634,9 @@ export const en = {
   'settings.error': 'The settings could not be saved. Please try again.',
   'watchedFolder.title': 'Watched folder',
   'watchedFolder.hint':
-    'Any local folder works, including one synced by Google Drive for Desktop or OneDrive. Complete receipt photos are moved into its feldolgozott subfolder.',
+    'Any local folder outside Financial Tracker data works, including one synced by Google Drive for Desktop or OneDrive. Complete receipt photos are moved into its feldolgozott subfolder.',
+  'watchedFolder.error.userData':
+    'Choose a folder outside the Financial Tracker data folder.',
   'watchedFolder.current': 'Current folder',
   'watchedFolder.none': 'No folder selected',
   'watchedFolder.status': 'Status',

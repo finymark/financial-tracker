@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const destination = join(root, 'node_modules', 'financial-tracker-ocr-models')
-const dataScope = `@${'tesseract.js-data'}`
+const dataScope = '@tesseract.js-data'
 
 rmSync(destination, { recursive: true, force: true })
 mkdirSync(destination, { recursive: true })

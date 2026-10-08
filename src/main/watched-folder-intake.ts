@@ -11,6 +11,7 @@ import type {
   WatchedFolderFailure,
   WatchedFolderStatus,
 } from '../shared/settings'
+import type { ReceiptIntake, ReceiptSource } from '../shared/receipts'
 
 const RESCAN_INTERVAL_MS = 30_000
 const STABLE_FOR_MS = 2_000
@@ -19,9 +20,9 @@ const IN_USE_CODES = new Set(['EBUSY', 'EPERM', 'EACCES'])
 const IMAGE_EXTENSION = /\.(?:jpe?g|png|webp)$/i
 const TEMPORARY_NAME = /(?:^\.|^~\$|\.(?:tmp|partial|crdownload)(?:\.|$))/i
 
-export type ReceiptIntake = (
-  input: { path: string } | { bytes: Uint8Array; name: string },
-  source: 'drop' | 'folder' | 'phone',
+export type ReceiptIntakeHandler = (
+  input: Extract<ReceiptIntake, { path: string }>,
+  source: Extract<ReceiptSource, 'folder'>,
 ) => Promise<unknown>
 
 interface WatchedFolderEntry {
@@ -109,7 +110,7 @@ function isCandidate(name: string): boolean {
 }
 
 export class WatchedFolderIntake {
-  readonly #intake: ReceiptIntake
+  readonly #intake: ReceiptIntakeHandler
   readonly #fileSystem: WatchedFolderFileSystem
   readonly #timers: WatchedFolderTimers
   readonly #clock: () => number
@@ -127,7 +128,10 @@ export class WatchedFolderIntake {
   #scanAgain = false
   #scanPromise: Promise<void> | null = null
 
-  constructor(intake: ReceiptIntake, options: WatchedFolderIntakeOptions = {}) {
+  constructor(
+    intake: ReceiptIntakeHandler,
+    options: WatchedFolderIntakeOptions = {},
+  ) {
     this.#intake = intake
     this.#fileSystem = { ...defaultFileSystem, ...options.fileSystem }
     this.#timers = options.timers ?? defaultTimers

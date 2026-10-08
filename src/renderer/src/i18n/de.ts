@@ -663,7 +663,9 @@ export const de = {
     'Die Einstellungen konnten nicht gespeichert werden. Bitte versuche es erneut.',
   'watchedFolder.title': 'Überwachter Ordner',
   'watchedFolder.hint':
-    'Jeder lokale Ordner funktioniert, auch ein mit Google Drive für Desktop oder OneDrive synchronisierter Ordner. Vollständig übertragene Belegfotos werden in den Unterordner feldolgozott verschoben.',
+    'Jeder lokale Ordner außerhalb der Financial-Tracker-Daten funktioniert, auch ein mit Google Drive für Desktop oder OneDrive synchronisierter Ordner. Vollständig übertragene Belegfotos werden in den Unterordner feldolgozott verschoben.',
+  'watchedFolder.error.userData':
+    'Wähle einen Ordner außerhalb des Financial-Tracker-Datenordners.',
   'watchedFolder.current': 'Aktueller Ordner',
   'watchedFolder.none': 'Kein Ordner ausgewählt',
   'watchedFolder.status': 'Status',

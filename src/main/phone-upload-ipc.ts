@@ -17,13 +17,13 @@ import {
   startPhoneUploadServer,
   type PhoneUploadServerSession,
   type PhoneUploadServerState,
-  type ReceiptIntake,
+  type ReceiptIntakeHandler,
 } from './phone-upload-server'
 
 export interface ActivePhoneUploadProfile {
   id: string
   language: Language
-  intake: ReceiptIntake
+  intake: ReceiptIntakeHandler
 }
 
 export interface PhoneUploadIpcOptions {
@@ -31,6 +31,8 @@ export interface PhoneUploadIpcOptions {
   onReceived?(event: PhoneUploadReceivedEvent): void
   getNetworkInterfaces?: typeof networkInterfaces
   clock?: () => number
+  startServer?: typeof startPhoneUploadServer
+  renderQr?: typeof renderPhoneUploadQr
 }
 
 export interface PhoneUploadIpcRegistration {
@@ -105,6 +107,8 @@ export function registerPhoneUploadIpc(
 ): PhoneUploadIpcRegistration {
   const clock = options.clock ?? Date.now
   const getInterfaces = options.getNetworkInterfaces ?? networkInterfaces
+  const startServer = options.startServer ?? startPhoneUploadServer
+  const renderQr = options.renderQr ?? renderPhoneUploadQr
   let current: OpenSession | null = null
   let pending: Promise<unknown> = Promise.resolve()
 
@@ -147,7 +151,7 @@ export function registerPhoneUploadIpc(
       await previous.server.stop()
       let server: PhoneUploadServerSession | null = null
       try {
-        server = await startPhoneUploadServer({
+        server = await startServer({
           bindAddress: selected,
           language: previous.profile.language,
           intake: previous.profile.intake,
@@ -167,7 +171,7 @@ export function registerPhoneUploadIpc(
           ...previous,
           selectedAddress: selected,
           server,
-          qrDataUrl: await renderPhoneUploadQr(server.url),
+          qrDataUrl: await renderQr(server.url),
         }
         current = rebound
         return sessionInfo(rebound)
@@ -192,7 +196,7 @@ export function registerPhoneUploadIpc(
     }
     let server: PhoneUploadServerSession | null = null
     try {
-      server = await startPhoneUploadServer({
+      server = await startServer({
         bindAddress: selectedAddress,
         language: profile.language,
         intake: profile.intake,
@@ -214,7 +218,7 @@ export function registerPhoneUploadIpc(
         expiresAt,
         state,
         server,
-        qrDataUrl: await renderPhoneUploadQr(server.url),
+        qrDataUrl: await renderQr(server.url),
       }
       current = opened
       return sessionInfo(opened)

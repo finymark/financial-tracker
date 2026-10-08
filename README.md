@@ -210,11 +210,12 @@ Get-Content $log
 $process.ExitCode
 ```
 
-It must print `SQLite smoke test OK`, `Image smoke test OK`, then
-`QR smoke test OK`, and exit 0.
+It must print `SQLite smoke test OK`, `Image smoke test OK`,
+`OCR smoke test OK`, then `QR smoke test OK`, and exit 0.
 The flag opens a temporary file-backed database, runs a query, and processes a
-tiny in-memory image with Sharp, then renders a QR code before cleaning up and
-exiting without opening a window or reading profiles. For an installed-artifact check, silently
+tiny in-memory image with Sharp, preprocesses and reads a synthetic receipt in
+the OCR worker, then renders a QR code before cleaning up and exiting without
+opening a window or reading profiles. For an installed-artifact check, silently
 install `Financial Tracker Setup <version>.exe` with `/S /D=<temporary-directory>`
 (the directory argument must be last), then run the installed executable with
 `--smoke-test`. Uninstall that temporary installation afterwards. Do not use this
@@ -417,8 +418,8 @@ and light/dark mode where applicable:
    `release/win-unpacked/Financial Tracker.exe`, and repeat shortcut, tray,
    profile-picker, Enter/Esc, privacy, and conflict checks. Then run
    `release/win-unpacked/Financial Tracker.exe --smoke-test`; it must print
-   `SQLite smoke test OK`, `Image smoke test OK`, then `QR smoke test OK`, and
-   exit 0.
+   `SQLite smoke test OK`, `Image smoke test OK`, `OCR smoke test OK`, then
+   `QR smoke test OK`, and exit 0.
 
 ## Exchange rates and base-currency conversion
 
@@ -815,8 +816,8 @@ and verify the attachment opens again.
 
 Build with `npx electron-builder --win nsis --publish never`, then run
 `"release/win-unpacked/Financial Tracker.exe" --smoke-test`. It must print
-`SQLite smoke test OK`, `Image smoke test OK`, `QR smoke test OK`, and
-`OCR smoke test OK`, then exit
+`SQLite smoke test OK`, `Image smoke test OK`, `OCR smoke test OK`, and
+`QR smoke test OK`, then exit
 successfully.
 
 ## Receipt inbox
@@ -845,8 +846,9 @@ successfully.
 - Inbox intake is a background write and does not replace or clear the existing
   Undo history. Active inbox photos are retained by the attachment sweep and are
   included in the incremental attachment backup pool and restore process.
-- Each profile can choose a watched folder in **Settings**. Any local folder,
-  including one synced by Google Drive for Desktop or OneDrive, can feed JPEG,
+- Each profile can choose a watched folder in **Settings**. Any local folder
+  outside the app's user-data directory, including one synced by Google Drive
+  for Desktop or OneDrive, can feed JPEG,
   PNG, and WebP photos into that profile's inbox. The app checks only top-level
   files, ignores hidden and temporary sync files, and retries unavailable folders
   every 30 seconds.
@@ -887,6 +889,9 @@ the batch, while the server limits each photo to 25 MB, accepts at most two
 uploads concurrently and 50 in one session, and stops after 10 minutes, when
 the dialog closes, when the profile changes, or when the app quits. No receipt
 is sent to a cloud service.
+The page, token, and photos travel over plain HTTP on the local network, so
+anyone on the same network who sees the URL could upload or read uploads during
+that session; use phone upload only on trusted private Wi-Fi.
 
 #### Manual phone-upload check
 
@@ -914,8 +919,9 @@ later scan succeeds. Confirm every accepted photo moves to `feldolgozott`, files
 already there are ignored, and a same-named destination produces ` (2)` without
 overwriting either file. Temporarily disconnect or rename the folder and verify
 the status changes to **Folder unavailable**, then returns to **Watching** when
-the folder is available again. Clear the setting and verify new photos remain in
-place.
+the folder is available again. Try the app's user-data folder and a folder inside
+it, and verify each is rejected with a translated error. Clear the setting and
+verify new photos remain in place.
 
 ### Manual Categorisation rules check
 
@@ -1534,8 +1540,8 @@ window lifecycle are manual checks, not covered by the unit suite.
 1. Run `npm run build`, then `npx electron-builder --win nsis --publish never`.
    Run `"release/win-unpacked/Financial Tracker.exe" --smoke-test` and also with
    `--hidden --smoke-test`: both must print **SQLite smoke test OK**, **Image
-   smoke test OK**, then **QR smoke test OK** and exit with code 0 without a tray
-   icon or window.
+   smoke test OK**, **OCR smoke test OK**, then **QR smoke test OK** and exit
+   with code 0 without a tray icon or window.
    Repeat the smoke test while a normal
    instance is running to check it does not acquire/block the single-instance
    lock or steal focus. Install the generated NSIS installer from `release/`.

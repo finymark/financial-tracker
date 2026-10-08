@@ -125,6 +125,14 @@ describe('file guard', () => {
     expect((await run('sample.txt')).status).toBe(0)
   })
 
+  it.each(['node_modules/@tesseract.js-data/eng', "'!node_modules/@scope/**'"])(
+    'does not mistake scoped npm path %s for an email address',
+    async (value) => {
+      write('sample.txt', value)
+      expect((await run('sample.txt')).status).toBe(0)
+    },
+  )
+
   it.each([
     'png',
     'JPG',

@@ -11,7 +11,7 @@ import { basename, join } from 'node:path'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import {
   WatchedFolderIntake,
-  type ReceiptIntake,
+  type ReceiptIntakeHandler,
   type WatchedFolderFileSystem,
   type WatchedFolderIntakeOptions,
 } from './watched-folder-intake'
@@ -36,7 +36,7 @@ function controlledWatch() {
 }
 
 function createWatcher(
-  intake: ReceiptIntake,
+  intake: ReceiptIntakeHandler,
   options: WatchedFolderIntakeOptions = {},
 ): WatchedFolderIntake {
   const watcher = new WatchedFolderIntake(intake, options)
@@ -209,7 +209,7 @@ test('runs only one intake at a time', async () => {
     releaseFirst = resolve
   })
   const intake = vi
-    .fn<ReceiptIntake>()
+    .fn<ReceiptIntakeHandler>()
     .mockImplementationOnce(() => firstPending)
     .mockResolvedValue(undefined)
   const watcher = createWatcher(intake, { clock: () => Date.now() })
@@ -231,7 +231,7 @@ test('stop waits for the current intake and prevents the next ready image', asyn
   const firstPending = new Promise<void>((resolve) => {
     releaseFirst = resolve
   })
-  const intake = vi.fn<ReceiptIntake>().mockReturnValue(firstPending)
+  const intake = vi.fn<ReceiptIntakeHandler>().mockReturnValue(firstPending)
   const watcher = createWatcher(intake, { clock: () => Date.now() })
 
   await watcher.start(folder)

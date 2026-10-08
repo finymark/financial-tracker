@@ -3,14 +3,16 @@ import { createServer, type IncomingMessage, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { NetworkInterfaceInfo } from 'node:os'
 import { basename } from 'node:path'
+import type { ReceiptIntake, ReceiptSource } from '../shared/receipts'
 import type { Language } from '../shared/settings'
+import { detectAttachmentFileType } from './attachment-file-type'
 
 export const PHONE_UPLOAD_MAX_BYTES = 25 * 1024 * 1024
 export const PHONE_UPLOAD_DURATION_MS = 10 * 60 * 1000
 
-export type ReceiptIntake = (
-  input: { bytes: Buffer; name: string },
-  source: 'phone',
+export type ReceiptIntakeHandler = (
+  input: Extract<ReceiptIntake, { bytes: Uint8Array }>,
+  source: Extract<ReceiptSource, 'phone'>,
 ) => Promise<unknown>
 
 export interface PhoneUploadServerState {
@@ -21,7 +23,7 @@ export interface PhoneUploadServerState {
 export interface PhoneUploadServerOptions {
   bindAddress: string
   language: Language
-  intake: ReceiptIntake
+  intake: ReceiptIntakeHandler
   onUploaded?: (count: number) => void
   clock?: () => number
   setTimer?: (callback: () => void, milliseconds: number) => unknown
@@ -154,7 +156,7 @@ function uploadPage(language: Language, nonce: string): string {
   <main>
     <h1>${escapeHtml(message.title)}</h1>
     <label>${escapeHtml(message.choose)}
-      <input id="photos" type="file" accept="image/*" capture="environment" multiple>
+      <input id="photos" type="file" accept="image/*" multiple>
     </label>
     <ul id="results" aria-live="polite"></ul>
   </main>
@@ -238,19 +240,8 @@ function fileName(request: IncomingMessage): string {
 }
 
 function isImage(bytes: Buffer): boolean {
-  return (
-    (bytes.length >= 3 &&
-      bytes[0] === 0xff &&
-      bytes[1] === 0xd8 &&
-      bytes[2] === 0xff) ||
-    (bytes.length >= 8 &&
-      bytes
-        .subarray(0, 8)
-        .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) ||
-    (bytes.length >= 12 &&
-      bytes.subarray(0, 4).toString('ascii') === 'RIFF' &&
-      bytes.subarray(8, 12).toString('ascii') === 'WEBP')
-  )
+  const type = detectAttachmentFileType(bytes)
+  return Boolean(type && type.mediaType !== 'application/pdf')
 }
 
 function respondJson(
@@ -264,6 +255,30 @@ function respondJson(
     'X-Content-Type-Options': 'nosniff',
   })
   response.end(JSON.stringify(value))
+}
+
+function rejectRequest(
+  request: IncomingMessage,
+  response: import('node:http').ServerResponse,
+  status: number,
+  headers: Record<string, string> = {},
+  json = false,
+): void {
+  response.shouldKeepAlive = false
+  response.writeHead(status, {
+    ...headers,
+    Connection: 'close',
+    ...(json
+      ? {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store',
+          'X-Content-Type-Options': 'nosniff',
+        }
+      : {}),
+  })
+  response.end(json ? JSON.stringify({ ok: false }) : undefined, () => {
+    request.destroy()
+  })
 }
 
 function closeServer(server: Server): Promise<void> {
@@ -289,18 +304,18 @@ export async function startPhoneUploadServer(
 
   const server = createServer((request, response) => {
     if (clock() >= expiresAt) {
-      response.writeHead(404).end()
+      rejectRequest(request, response, 404)
       void stop()
       return
     }
     const route = requestRoute(request, token)
     if (!route) {
-      response.writeHead(404).end()
+      rejectRequest(request, response, 404)
       return
     }
     if (route === 'page') {
       if (request.method !== 'GET') {
-        response.writeHead(405, { Allow: 'GET' }).end()
+        rejectRequest(request, response, 405, { Allow: 'GET' })
         return
       }
       const nonce = randomBytes(18).toString('base64')
@@ -314,7 +329,7 @@ export async function startPhoneUploadServer(
       return
     }
     if (request.method !== 'POST' && request.method !== 'PUT') {
-      response.writeHead(405, { Allow: 'POST, PUT' }).end()
+      rejectRequest(request, response, 405, { Allow: 'POST, PUT' })
       return
     }
     const contentLength = request.headers['content-length']
@@ -323,16 +338,14 @@ export async function startPhoneUploadServer(
       /^\d+$/.test(contentLength) &&
       Number(contentLength) > PHONE_UPLOAD_MAX_BYTES
     ) {
-      request.resume()
-      respondJson(response, 413, { ok: false })
+      rejectRequest(request, response, 413, {}, true)
       return
     }
     if (
       state.activeUploads >= 2 ||
       state.uploadedCount + state.activeUploads >= 50
     ) {
-      request.resume()
-      respondJson(response, 429, { ok: false })
+      rejectRequest(request, response, 429, {}, true)
       return
     }
     state.activeUploads += 1
@@ -351,9 +364,8 @@ export async function startPhoneUploadServer(
       if (byteCount + chunk.length > PHONE_UPLOAD_MAX_BYTES) {
         rejected = true
         request.removeAllListeners('data')
-        request.resume()
         release()
-        respondJson(response, 413, { ok: false })
+        rejectRequest(request, response, 413, {}, true)
         return
       }
       byteCount += chunk.length
@@ -364,7 +376,7 @@ export async function startPhoneUploadServer(
       const bytes = Buffer.concat(chunks, byteCount)
       if (!isImage(bytes)) {
         release()
-        respondJson(response, 415, { ok: false })
+        rejectRequest(request, response, 415, {}, true)
         return
       }
       void Promise.resolve()
@@ -394,6 +406,8 @@ export async function startPhoneUploadServer(
     })
     request.on('aborted', release)
   })
+  server.headersTimeout = 30_000
+  server.requestTimeout = 120_000
 
   const stop = (): Promise<void> => {
     if (stopping) return stopping

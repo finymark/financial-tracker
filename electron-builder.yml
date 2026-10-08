@@ -4,7 +4,7 @@ directories:
   output: release
 files:
   - out/**/*
-  - '!node_modules/[@]tesseract.js-data/**/*'
+  - '!node_modules/@tesseract.js-data/**/*'
 extraResources:
   - from: build/icon.png
     to: icon.png
@@ -12,6 +12,7 @@ extraResources:
     to: ocr-models
 asar: true
 asarUnpack:
+  - out/main/receipt-preprocessing-worker.js
   - node_modules/better-sqlite3/**/*.node
   - node_modules/sharp/**/*
   - node_modules/@img/**/*

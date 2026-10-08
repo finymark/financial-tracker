@@ -1,5 +1,5 @@
-import { statSync } from 'node:fs'
-import { isAbsolute } from 'node:path'
+import { realpathSync, statSync } from 'node:fs'
+import { isAbsolute, relative } from 'node:path'
 import {
   baseCurrencies,
   languages,
@@ -7,7 +7,17 @@ import {
   type ProfileSettingsChanges,
 } from '../../shared/settings'
 
-export function parseSettingsChanges(value: unknown): ProfileSettingsChanges {
+function isSameOrInside(path: string, parent: string): boolean {
+  const relation = relative(realpathSync(parent), realpathSync(path))
+  return (
+    relation === '' || (!relation.startsWith('..') && !isAbsolute(relation))
+  )
+}
+
+export function parseSettingsChanges(
+  value: unknown,
+  userDataDirectory?: string,
+): ProfileSettingsChanges {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new TypeError('Settings must be an object')
   }
@@ -49,6 +59,9 @@ export function parseSettingsChanges(value: unknown): ProfileSettingsChanges {
         try {
           if (!statSync(setting).isDirectory()) {
             throw new TypeError('Invalid watched folder')
+          }
+          if (userDataDirectory && isSameOrInside(setting, userDataDirectory)) {
+            throw new TypeError('watchedFolder.error.userData')
           }
         } catch (error) {
           if (error instanceof TypeError) throw error

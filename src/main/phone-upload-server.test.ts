@@ -54,7 +54,7 @@ test('serves the upload page and sends an image to the injected receipt intake',
     bindAddress: '127.0.0.1',
     language: 'en',
     intake: async (input, source) => {
-      received.push({ ...input, source })
+      received.push({ ...input, bytes: Buffer.from(input.bytes), source })
       return undefined
     },
   })
@@ -63,6 +63,9 @@ test('serves the upload page and sends an image to the injected receipt intake',
     const page = await send(session.url)
     expect(page.status).toBe(200)
     expect(page.body.toString('utf8')).toContain('Upload receipt photos')
+    expect(page.body.toString('utf8')).toContain('accept="image/*"')
+    expect(page.body.toString('utf8')).toContain('multiple')
+    expect(page.body.toString('utf8')).not.toContain('capture=')
     expect(page.headers['content-security-policy']).toContain(
       "default-src 'none'",
     )
@@ -153,9 +156,11 @@ test('rejects a body over 25 MB as soon as the limit is crossed', async () => {
   try {
     const response = await send(`${session.url}/upload`, {
       method: 'PUT',
-      body: Buffer.alloc(PHONE_UPLOAD_MAX_BYTES + 1, 1),
+      body: Buffer.from([1]),
+      headers: { 'content-length': String(PHONE_UPLOAD_MAX_BYTES + 1) },
     })
     expect(response.status).toBe(413)
+    expect(response.headers.connection).toBe('close')
     expect(intake).not.toHaveBeenCalled()
   } finally {
     await session.stop()
