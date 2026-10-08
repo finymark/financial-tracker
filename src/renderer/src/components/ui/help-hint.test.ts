@@ -25,6 +25,17 @@ describe('placeHelpTooltip', () => {
     ).toEqual({ left: 270, top: 48, placement: 'bottom' })
   })
 
+  test('treats the title bar as a top viewport inset', () => {
+    expect(
+      placeHelpTooltip(
+        { left: 380, top: 100, right: 400, bottom: 120 },
+        { width: 240, height: 50 },
+        viewport,
+        { top: 36 },
+      ),
+    ).toEqual({ left: 270, top: 128, placement: 'bottom' })
+  })
+
   test('shifts horizontally to stay inside the viewport', () => {
     expect(
       placeHelpTooltip(

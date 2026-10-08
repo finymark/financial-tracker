@@ -27,6 +27,10 @@ export interface HelpTooltipPosition {
   placement: 'top' | 'bottom'
 }
 
+interface ViewportInsets {
+  top?: number
+}
+
 const VIEWPORT_PADDING = 8
 const TOOLTIP_GAP = 8
 
@@ -41,8 +45,10 @@ export function placeHelpTooltip(
   anchor: Rect,
   tooltip: Size,
   viewport: Size,
+  insets: ViewportInsets = {},
 ): HelpTooltipPosition {
-  const roomAbove = anchor.top - VIEWPORT_PADDING
+  const topEdge = Math.max(0, insets.top ?? 0) + VIEWPORT_PADDING
+  const roomAbove = anchor.top - topEdge
   const roomBelow = viewport.height - anchor.bottom - VIEWPORT_PADDING
   const placement =
     roomAbove >= tooltip.height + TOOLTIP_GAP || roomAbove >= roomBelow
@@ -60,11 +66,23 @@ export function placeHelpTooltip(
     ),
     top: clamp(
       idealTop,
-      VIEWPORT_PADDING,
+      topEdge,
       viewport.height - tooltip.height - VIEWPORT_PADDING,
     ),
     placement,
   }
+}
+
+function titleBarTopInset() {
+  const titleBar = document.querySelector<HTMLElement>('.title-bar')
+  const bottom = titleBar?.getBoundingClientRect().bottom ?? 0
+  if (bottom > 0) return bottom
+  const token = Number.parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue(
+      '--title-bar-height',
+    ),
+  )
+  return Number.isFinite(token) && token > 0 ? token : 0
 }
 
 interface HelpHintProps {
@@ -94,6 +112,7 @@ export function HelpHint({ t, topicKey, textKey }: HelpHintProps) {
           button.getBoundingClientRect(),
           tooltip.getBoundingClientRect(),
           { width: window.innerWidth, height: window.innerHeight },
+          { top: titleBarTopInset() },
         ),
       )
     }

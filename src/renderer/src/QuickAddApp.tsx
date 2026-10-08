@@ -23,6 +23,7 @@ import { PrivacyProvider } from './lib/privacy'
 import { useTheme } from './lib/theme'
 import { today } from '../../shared/date'
 import { TitleBar } from './components/title-bar'
+import { HelpHint } from './components/ui/help-hint'
 
 type Translate = (key: MessageKey) => string
 
@@ -226,9 +227,16 @@ function QuickAddForm({
       <form ref={formRef} className="space-y-4" onSubmit={submit}>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <label htmlFor="quick-amount" className="text-sm font-medium">
-              {t('transactions.amount')}
-            </label>
+            <div className="flex items-center gap-1">
+              <label htmlFor="quick-amount" className="text-sm font-medium">
+                {t('transactions.amount')}
+              </label>
+              <HelpHint
+                t={t}
+                topicKey="transactions.amount"
+                textKey="help.transactions.amountCalculator"
+              />
+            </div>
             <AmountInput
               id="quick-amount"
               ref={amountRef}
@@ -327,9 +335,16 @@ function QuickAddForm({
           </NativeSelect>
         </label>
         <div className="space-y-2">
-          <label htmlFor="quick-tag" className="text-sm font-medium">
-            {t('tags.title')}
-          </label>
+          <div className="flex items-center gap-1">
+            <label htmlFor="quick-tag" className="text-sm font-medium">
+              {t('tags.title')}
+            </label>
+            <HelpHint
+              t={t}
+              topicKey="tags.title"
+              textKey="help.transactions.tags"
+            />
+          </div>
           <div className="flex gap-2">
             <Input
               id="quick-tag"
@@ -483,7 +498,14 @@ export default function QuickAddApp() {
         <TitleBar profileName={active?.name} />
         <main className="window-content min-h-0 flex-1 overflow-y-auto bg-background p-5 text-foreground">
           <header className="mb-5 flex items-center justify-between gap-3">
-            <h1 className="text-xl font-semibold">{t('quickAdd.title')}</h1>
+            <h1 className="flex items-center gap-1 text-xl font-semibold">
+              {t('quickAdd.title')}
+              <HelpHint
+                t={t}
+                topicKey="quickAdd.title"
+                textKey="help.page.quickAdd"
+              />
+            </h1>
             <Button
               variant="ghost"
               onClick={() => void window.app.desktop.closeQuickAdd()}

@@ -62,6 +62,7 @@ import type { RecurringPrefill } from './lib/recurring-prefill'
 import { WatchedFolderSettings } from './components/watched-folder-settings'
 import { ReceiptInboxPage } from './ReceiptInboxPage'
 import { TitleBar } from './components/title-bar'
+import { HelpHint } from './components/ui/help-hint'
 
 const pages = [
   { id: 'overview', icon: LayoutDashboard },
@@ -215,7 +216,14 @@ function ProfilePicker({
             className="mx-auto mb-3 size-9 text-primary"
             aria-hidden="true"
           />
-          <h1 className="text-2xl font-semibold">{t('profilePicker.title')}</h1>
+          <h1 className="flex items-center justify-center gap-1 text-2xl font-semibold">
+            {t('profilePicker.title')}
+            <HelpHint
+              t={t}
+              topicKey="profilePicker.title"
+              textKey="help.page.profilePicker"
+            />
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {t('profilePicker.description')}
           </p>
@@ -223,7 +231,14 @@ function ProfilePicker({
 
         <Card>
           <CardHeader>
-            <CardTitle>{t('profilePicker.choose')}</CardTitle>
+            <CardTitle className="flex items-center gap-1">
+              {t('profilePicker.choose')}
+              <HelpHint
+                t={t}
+                topicKey="profilePicker.choose"
+                textKey="help.profilePicker.profiles"
+              />
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {snapshot.profiles.length === 0 ? (
@@ -349,7 +364,14 @@ function ProfilePicker({
 
         <Card>
           <CardHeader>
-            <CardTitle>{t('profile.create')}</CardTitle>
+            <CardTitle className="flex items-center gap-1">
+              {t('profile.create')}
+              <HelpHint
+                t={t}
+                topicKey="profile.create"
+                textKey="help.profilePicker.create"
+              />
+            </CardTitle>
             <CardDescription>{t('profile.createDescription')}</CardDescription>
           </CardHeader>
           <CardContent>
@@ -758,21 +780,27 @@ function Shell({
       >
         <div className="mx-auto max-w-4xl space-y-8">
           <header>
-            <Button
-              className="float-right"
-              variant="ghost"
-              aria-pressed={active.settings.privacyMode}
-              title={`${t('privacy.toggle')} (${privacyShortcut})`}
-              disabled={savingSettings || backupBusy}
-              onClick={() => void togglePrivacy()}
-            >
-              {active.settings.privacyMode ? (
-                <EyeOff aria-hidden="true" />
-              ) : (
-                <Eye aria-hidden="true" />
-              )}
-              {t('privacy.toggle')}
-            </Button>
+            <span className="float-right inline-flex items-center gap-1">
+              <Button
+                variant="ghost"
+                aria-pressed={active.settings.privacyMode}
+                title={`${t('privacy.toggle')} (${privacyShortcut})`}
+                disabled={savingSettings || backupBusy}
+                onClick={() => void togglePrivacy()}
+              >
+                {active.settings.privacyMode ? (
+                  <EyeOff aria-hidden="true" />
+                ) : (
+                  <Eye aria-hidden="true" />
+                )}
+                {t('privacy.toggle')}
+              </Button>
+              <HelpHint
+                t={t}
+                topicKey="privacy.toggle"
+                textKey="help.settings.privacy"
+              />
+            </span>
             <Button
               className="float-right"
               variant="ghost"
@@ -789,28 +817,46 @@ function Shell({
               </p>
             )}
             {rateStatus && (
-              <p className="mb-2 text-xs text-muted-foreground" role="status">
-                {t(
-                  rateStatus.missing
-                    ? 'rates.status.missing'
-                    : rateStatus.stale
-                      ? 'rates.status.stale'
-                      : 'rates.status.upToDate',
-                )}
-                {rateStatus.lastRefresh && (
-                  <>
-                    {' · '}
-                    {t('rates.status.lastRefresh')}:{' '}
-                    {format.date(new Date(rateStatus.lastRefresh))}
-                  </>
-                )}
-              </p>
+              <div className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
+                <p role="status">
+                  {t(
+                    rateStatus.missing
+                      ? 'rates.status.missing'
+                      : rateStatus.stale
+                        ? 'rates.status.stale'
+                        : 'rates.status.upToDate',
+                  )}
+                  {rateStatus.lastRefresh && (
+                    <>
+                      {' · '}
+                      {t('rates.status.lastRefresh')}:{' '}
+                      {format.date(new Date(rateStatus.lastRefresh))}
+                    </>
+                  )}
+                </p>
+                <HelpHint
+                  t={t}
+                  topicKey={
+                    rateStatus.missing
+                      ? 'rates.status.missing'
+                      : rateStatus.stale
+                        ? 'rates.status.stale'
+                        : 'rates.status.upToDate'
+                  }
+                  textKey="help.settings.exchangeRates"
+                />
+              </div>
             )}
             <h1
               id="page-title"
-              className="text-2xl font-semibold tracking-tight"
+              className="flex items-center gap-1 text-2xl font-semibold tracking-tight"
             >
               {t(`navigation.${page}`)}
+              <HelpHint
+                t={t}
+                topicKey={`navigation.${page}`}
+                textKey={`help.page.${page}`}
+              />
             </h1>
           </header>
           <Card>
@@ -968,12 +1014,19 @@ function Shell({
                     </NativeSelect>
                   </div>
                   <div className="space-y-2">
-                    <label
-                      htmlFor="base-currency"
-                      className="text-sm font-medium"
-                    >
-                      {t('settings.baseCurrency')}
-                    </label>
+                    <div className="flex items-center gap-1">
+                      <label
+                        htmlFor="base-currency"
+                        className="text-sm font-medium"
+                      >
+                        {t('settings.baseCurrency')}
+                      </label>
+                      <HelpHint
+                        t={t}
+                        topicKey="settings.baseCurrency"
+                        textKey="help.settings.baseCurrency"
+                      />
+                    </div>
                     <NativeSelect
                       id="base-currency"
                       value={baseCurrency}
@@ -1025,9 +1078,14 @@ function Shell({
                 >
                   <h3
                     id="formatting-preview"
-                    className="mb-3 text-sm font-medium"
+                    className="mb-3 flex items-center gap-1 text-sm font-medium"
                   >
                     {t('settings.preview')}
+                    <HelpHint
+                      t={t}
+                      topicKey="settings.preview"
+                      textKey="help.settings.formattingPreview"
+                    />
                   </h3>
                   <dl className="grid gap-4 text-sm sm:grid-cols-2">
                     <div>
