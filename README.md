@@ -200,10 +200,14 @@ and are ignored by Git. Corporate proxies can block electron-builder's Electron,
 NSIS, or signing-tool downloads; report the failing URL/error rather than
 working around certificate verification or committing downloaded binaries.
 
-Check the packaged native module from PowerShell:
+Check the packaged native modules from PowerShell. Run the copy outside the
+repository, otherwise modules missing from the package can still resolve from
+the repository's `node_modules`:
 
 ```powershell
-$exe = Join-Path $PWD 'release/win-unpacked/Financial Tracker.exe'
+$app = Join-Path $env:TEMP 'financial-tracker-win-unpacked'
+Copy-Item -Recurse -Force 'release/win-unpacked' $app
+$exe = Join-Path $app 'Financial Tracker.exe'
 $log = Join-Path $env:TEMP 'financial-tracker-smoke.log'
 $process = Start-Process -FilePath $exe -ArgumentList '--smoke-test' -Wait -PassThru -RedirectStandardOutput $log
 Get-Content $log
@@ -216,7 +220,7 @@ The flag opens a temporary file-backed database, runs a query, and processes a
 tiny in-memory image with Sharp, preprocesses and reads a synthetic receipt in
 the OCR worker, then renders a QR code before cleaning up and exiting without
 opening a window or reading profiles. For an installed-artifact check, silently
-install `Financial Tracker Setup <version>.exe` with `/S /D=<temporary-directory>`
+install `Financial-Tracker-Setup-<version>.exe` with `/S /D=<temporary-directory>`
 (the directory argument must be last), then run the installed executable with
 `--smoke-test`. Uninstall that temporary installation afterwards. Do not use this
 check to replace an existing installation.
