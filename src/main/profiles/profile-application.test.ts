@@ -920,21 +920,24 @@ describe('profile application API', () => {
       createStartupBackup: false,
       startBackgroundWork: false,
     })
-    expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(
-      currentVersion + 3,
-    )
-    expect(observedRows).toEqual([
-      {
-        version: currentVersion + 1,
-        name: 'create a deferred migration reference',
-      },
-      {
-        version: currentVersion + 2,
-        name: 'resolve the deferred migration reference',
-      },
-    ])
-    expect(observedReferenceCount).toBe(1)
-    upgraded.close()
+    try {
+      expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(
+        currentVersion + 3,
+      )
+      expect(observedRows).toEqual([
+        {
+          version: currentVersion + 1,
+          name: 'create a deferred migration reference',
+        },
+        {
+          version: currentVersion + 2,
+          name: 'resolve the deferred migration reference',
+        },
+      ])
+      expect(observedReferenceCount).toBe(1)
+    } finally {
+      upgraded.close()
+    }
 
     const reopened = await openProfileApplication({
       profile,
@@ -1129,9 +1132,9 @@ describe('profile application API', () => {
       openingDate: '2026-01-01',
     })
     initial.close()
-    const commitFailure = defineSqlMigration(
+    const deferredViolation = defineSqlMigration(
       currentVersion + 1,
-      'fails during the final commit',
+      'leaves a deferred foreign-key violation',
       `
         CREATE TABLE commit_failure_parents (id INTEGER PRIMARY KEY);
         CREATE TABLE commit_failure_children (
@@ -1141,11 +1144,16 @@ describe('profile application API', () => {
         INSERT INTO commit_failure_children (parent_id) VALUES (1);
       `,
     )
+    const lastMigration = defineSqlMigration(
+      currentVersion + 2,
+      'last migration before the final commit',
+      'CREATE TABLE commit_failure_last (value TEXT)',
+    )
     let applyCompleted = false
     const migration = {
-      ...commitFailure,
+      ...lastMigration,
       apply(database: Database.Database) {
-        commitFailure.apply(database)
+        lastMigration.apply(database)
         applyCompleted = true
       },
     }
@@ -1155,7 +1163,7 @@ describe('profile application API', () => {
       await openProfileApplication({
         profile,
         paths,
-        migrations: [...CURRENT_MIGRATIONS, migration],
+        migrations: [...CURRENT_MIGRATIONS, deferredViolation, migration],
         clock,
         createStartupBackup: false,
         startBackgroundWork: false,
@@ -1167,8 +1175,8 @@ describe('profile application API', () => {
     expect(failure).toBeInstanceOf(MigrationError)
     expect(failure).toMatchObject({
       message: 'profiles.error.migration',
-      migrationVersion: currentVersion + 1,
-      migrationName: 'fails during the final commit',
+      migrationVersion: currentVersion + 2,
+      migrationName: 'last migration before the final commit',
       backupPath: expect.any(String),
       cause: expect.objectContaining({ code: 'SQLITE_CONSTRAINT_FOREIGNKEY' }),
     })
