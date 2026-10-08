@@ -982,6 +982,14 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
     CREATE INDEX attachments_stored_name ON attachments(stored_name);
   `,
   ),
+  defineSqlMigration(
+    22,
+    'profile watched folder',
+    `
+    ALTER TABLE profile_settings ADD COLUMN watched_folder TEXT
+      CHECK (watched_folder IS NULL OR length(watched_folder) > 0);
+  `,
+  ),
 ]
 
 function validateMigrations(
@@ -1832,19 +1840,24 @@ class OpenProfileApplication implements ProfileApplication {
       const settings = { ...this.#getSettings(), ...parsed }
       this.#database
         .prepare(
-          'UPDATE profile_settings SET language = ?, theme = ?, base_currency = ?, privacy_mode = ? WHERE id = 1',
+          'UPDATE profile_settings SET language = ?, theme = ?, base_currency = ?, privacy_mode = ?, watched_folder = ? WHERE id = 1',
         )
         .run(
           settings.language,
           settings.theme,
           settings.baseCurrency,
           Number(settings.privacyMode),
+          settings.watchedFolder,
         )
       return this.#getSettings()
     }
-    // Privacy is presentation-only: do not invalidate ledger undo images.
+    // Privacy and watched-folder intake do not invalidate ledger undo images.
     // Mixed writes retain the existing non-undoable settings-command boundary.
-    if (Object.keys(parsed).every((key) => key === 'privacyMode')) {
+    if (
+      Object.keys(parsed).every(
+        (key) => key === 'privacyMode' || key === 'watchedFolder',
+      )
+    ) {
       return this.#database.transaction(update)()
     }
     return this.#executeCommand(update)
@@ -1859,12 +1872,14 @@ class OpenProfileApplication implements ProfileApplication {
       theme: ProfileSettings['theme']
       base_currency: ProfileSettings['baseCurrency']
       privacy_mode?: number
+      watched_folder?: string | null
     }
     return {
       language: row.language,
       theme: row.theme,
       baseCurrency: row.base_currency,
       privacyMode: row.privacy_mode === 1,
+      watchedFolder: row.watched_folder ?? null,
     }
   }
 

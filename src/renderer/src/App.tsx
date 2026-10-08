@@ -57,6 +57,7 @@ import { OverviewPage } from './OverviewPage'
 import type { TransactionListInput } from '../../shared/transactions'
 import { RecurringPage } from './RecurringPage'
 import type { RecurringPrefill } from './lib/recurring-prefill'
+import { WatchedFolderSettings } from './components/watched-folder-settings'
 
 const pages = [
   { id: 'overview', icon: LayoutDashboard },
@@ -387,7 +388,7 @@ function Shell({
     [],
   )
   const [collapsed, setCollapsed] = useState(false)
-  const { language, theme, baseCurrency } = active.settings
+  const { language, theme, baseCurrency, watchedFolder } = active.settings
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsError, setSettingsError] = useState(false)
   const [backupBusy, setBackupBusy] = useState(false)
@@ -918,6 +919,20 @@ function Shell({
                     </NativeSelect>
                   </div>
                 </div>
+                <WatchedFolderSettings
+                  watchedFolder={watchedFolder}
+                  disabled={
+                    savingSettings ||
+                    accountBusy ||
+                    backupBusy ||
+                    categoryBusy ||
+                    payeeBusy ||
+                    ruleBusy
+                  }
+                  t={t}
+                  onChange={saveSettings}
+                  onError={() => setSettingsError(true)}
+                />
                 <AutostartSettings t={t} />
                 <ShortcutSettings t={t} />
                 <p className="text-sm text-muted-foreground">

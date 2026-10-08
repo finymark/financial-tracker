@@ -43,7 +43,7 @@ import type {
   ProfileSummary,
   RenameProfileInput,
 } from './profiles'
-import type { ProfileSettings } from './settings'
+import type { ProfileSettings, WatchedFolderStatus } from './settings'
 import type {
   CreateTransactionInput,
   TransactionListInput,
@@ -132,6 +132,8 @@ export const IPC_CHANNELS = {
   profilesOpen: 'profiles:open',
   profilesGetActive: 'profiles:get-active',
   profilesClose: 'profiles:close',
+  profilesPickWatchedFolder: 'profiles:pick-watched-folder',
+  profilesWatchedFolderStatus: 'profiles:watched-folder-status',
   backupsList: 'backups:list',
   backupsRestore: 'backups:restore',
   categoriesList: 'categories:list',
@@ -357,6 +359,8 @@ export interface AppBridge {
     open(input: ProfileIdInput): Promise<ActiveProfileInfo>
     getActive(): Promise<ActiveProfileInfo | null>
     close(): Promise<void>
+    pickWatchedFolder(): Promise<string | null>
+    watchedFolderStatus(): Promise<WatchedFolderStatus | null>
     updateSettings(input: UpdateProfileSettingsInput): Promise<ProfileSettings>
   }
 }

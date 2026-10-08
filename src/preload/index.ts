@@ -193,6 +193,10 @@ const bridge: AppBridge = {
     open: (input) => ipcRenderer.invoke(IPC_CHANNELS.profilesOpen, input),
     getActive: () => ipcRenderer.invoke(IPC_CHANNELS.profilesGetActive),
     close: () => ipcRenderer.invoke(IPC_CHANNELS.profilesClose),
+    pickWatchedFolder: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.profilesPickWatchedFolder),
+    watchedFolderStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.profilesWatchedFolderStatus),
     updateSettings: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.profilesUpdateSettings, input),
   },

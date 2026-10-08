@@ -113,6 +113,7 @@ describe('profile application API', () => {
         theme: 'system',
         baseCurrency: 'HUF',
         privacyMode: false,
+        watchedFolder: null,
       })
       expect(controller.listBackups()).toHaveLength(1)
       controller.close()
@@ -323,6 +324,7 @@ describe('profile application API', () => {
       expect(application.queries.getSettings()).toEqual({
         ...settings,
         privacyMode: false,
+        watchedFolder: null,
       })
       application.commands.createAccount({
         name: 'Later account',
@@ -341,6 +343,7 @@ describe('profile application API', () => {
       expect(application.queries.getSettings()).toEqual({
         ...settings,
         privacyMode: false,
+        watchedFolder: null,
       })
       expect(application.queries.listAccounts()).toEqual([])
       const created = application.commands.createAccount({
@@ -848,6 +851,7 @@ describe('profile application API', () => {
           theme: 'system',
           baseCurrency: 'HUF',
           privacyMode: false,
+          watchedFolder: null,
         })
       } finally {
         upgraded.close()
@@ -898,6 +902,7 @@ describe('profile application API', () => {
         theme: 'dark',
         baseCurrency: 'CHF',
         privacyMode: false,
+        watchedFolder: null,
       })
     } finally {
       reopened.close()
@@ -927,6 +932,7 @@ describe('profile application API', () => {
         theme: 'dark',
         baseCurrency: 'CHF',
         privacyMode: false,
+        watchedFolder: null,
       })
     } finally {
       backupApplication.close()

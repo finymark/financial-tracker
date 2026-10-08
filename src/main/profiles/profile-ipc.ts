@@ -1,4 +1,5 @@
-import type { IpcMain } from 'electron'
+import { BrowserWindow, dialog, type IpcMain } from 'electron'
+import { statSync } from 'node:fs'
 import { IPC_CHANNELS, type AppBridge } from '../../shared/ipc'
 import type {
   CreateProfileInput,
@@ -66,12 +67,21 @@ function parseUpdateSettingsInput(value: unknown): UpdateProfileSettingsInput {
   }
 }
 
+function parentWindow(
+  event: Electron.IpcMainInvokeEvent,
+): Electron.BrowserWindow {
+  const parent = BrowserWindow.fromWebContents(event.sender)
+  if (!parent) throw new Error('Folder picker requires the application window')
+  return parent
+}
+
 export function registerProfileIpc(
   ipcMain: IpcMain,
   controller: ProfileController,
   onProfileNeedsRateRefresh: () => void = () => {},
   onProfileClosed: () => void = () => {},
   onProfileLanguageChanged: () => void = () => {},
+  onWatchedFolderChanged: () => void = () => {},
 ): void {
   registerIpcHandler(
     ipcMain,
@@ -164,7 +174,35 @@ export function registerProfileIpc(
       const settings = controller.updateSettings(input)
       if (input.settings.language) onProfileLanguageChanged()
       if (input.settings.baseCurrency) onProfileNeedsRateRefresh()
+      if (Object.hasOwn(input.settings, 'watchedFolder'))
+        onWatchedFolderChanged()
       return settings
+    },
+  )
+  registerIpcHandler(
+    ipcMain,
+    IPC_CHANNELS.profilesPickWatchedFolder,
+    async (event): ReturnType<AppBridge['profiles']['pickWatchedFolder']> => {
+      if (!controller.getActive()) throw new Error('No profile is open')
+      const result = await dialog.showOpenDialog(parentWindow(event), {
+        properties: ['openDirectory'],
+      })
+      return result.canceled ? null : (result.filePaths[0] ?? null)
+    },
+  )
+  registerIpcHandler(
+    ipcMain,
+    IPC_CHANNELS.profilesWatchedFolderStatus,
+    (): ReturnType<AppBridge['profiles']['watchedFolderStatus']> => {
+      const folder = controller.getActive()?.settings.watchedFolder
+      if (!folder) return Promise.resolve(null)
+      try {
+        return Promise.resolve(
+          statSync(folder).isDirectory() ? 'watching' : 'unavailable',
+        )
+      } catch {
+        return Promise.resolve('unavailable')
+      }
     },
   )
   registerIpcHandler(ipcMain, IPC_CHANNELS.profilesClose, (): Promise<void> => {
