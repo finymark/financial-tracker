@@ -194,6 +194,28 @@ export const en = {
     'Choose valid filters and an ordered date range.',
   'transactions.error.totals':
     'The filtered total is too large to represent exactly.',
+  'transactions.duplicate': 'Duplicate transaction',
+  'templates.title': 'Transaction templates',
+  'templates.choose': 'Choose a template',
+  'templates.use': 'Use template',
+  'templates.create': 'Create template',
+  'templates.edit': 'Edit template',
+  'templates.delete': 'Delete template',
+  'templates.save': 'Save template',
+  'templates.name': 'Template name',
+  'templates.saveTransaction': 'Save as template',
+  'templates.savedTransactionHint':
+    'Uses the saved transaction, not unsaved drawer changes.',
+  'templates.optionalHint':
+    'Only the name is required. Leave any other field blank to enter it when using the template.',
+  'templates.tagsHint':
+    'One tag name per line. Tags are created only when recording a transaction.',
+  'templates.deleteConfirmation': 'Delete this transaction template?',
+  'templates.amountRequired': 'Enter an amount before saving this transaction.',
+  'templates.error.name': 'Enter a template name between 1 and 100 characters.',
+  'templates.error.split': 'Split transactions cannot be saved as templates.',
+  'templates.error.notFound':
+    'The transaction template could not be found. Refresh the list.',
   'transactions.create': 'Record transaction',
   'transactions.edit': 'Edit transaction',
   'transactions.delete': 'Delete',
