@@ -10,6 +10,11 @@ import {
   updateTransfer,
 } from './profile-transfers'
 import type { UndoableCommand } from './undo-history'
+import {
+  captureTransactionAggregate,
+  restoreTransactionAggregate,
+  type TransactionAggregateImage,
+} from './transaction-undo'
 
 interface StoredTransferImage {
   id: string
@@ -24,26 +29,9 @@ interface StoredTransferImage {
   updatedAt: string
 }
 
-interface StoredFeeImage {
-  id: string
-  accountId: string
-  kind: 'expense'
-  excluded: number
-  date: string
-  totalMinor: number
-  payeeId: null
-  note: string
-  createdAt: string
-  updatedAt: string
-  lineId: string
-  amountMinor: number
-  categoryId: string | null
-  lineNote?: string
-}
-
 interface TransferAggregateImage {
   transfer: StoredTransferImage | null
-  fee: StoredFeeImage | null
+  fee: TransactionAggregateImage
 }
 
 function captureAggregate(
@@ -62,30 +50,11 @@ function captureAggregate(
         )
         .get(transferId) as StoredTransferImage | undefined) ?? null)
     : null
-  const hasLineNotes = (
-    database.pragma('table_info(transaction_lines)') as { name: string }[]
-  ).some((column) => column.name === 'note')
-  const fee = transfer?.feeTransactionId
-    ? ((database
-        .prepare(
-          `SELECT transactions.id, transactions.account_id AS accountId,
-            transactions.kind, transactions.excluded, transactions.date,
-            transactions.total_minor AS totalMinor,
-            transactions.payee_id AS payeeId, transactions.note,
-            transactions.created_at AS createdAt,
-            transactions.updated_at AS updatedAt,
-            transaction_lines.id AS lineId,
-            transaction_lines.amount_minor AS amountMinor,
-            transaction_lines.category_id AS categoryId
-            ${hasLineNotes ? ', transaction_lines.note AS lineNote' : ''}
-          FROM transactions
-          JOIN transaction_lines
-            ON transaction_lines.transaction_id = transactions.id
-          WHERE transactions.id = ?`,
-        )
-        .get(transfer.feeTransactionId) as StoredFeeImage | undefined) ?? null)
-    : null
-  if (transfer?.feeTransactionId && !fee)
+  const fee = captureTransactionAggregate(
+    database,
+    transfer?.feeTransactionId ?? null,
+  )
+  if (transfer?.feeTransactionId && !fee.transaction)
     throw new Error('transfers.error.notFound')
   return { transfer, fee }
 }
@@ -98,52 +67,7 @@ function restoreAggregate(
   const transferId = before.transfer?.id ?? after.transfer?.id
   if (transferId)
     database.prepare('DELETE FROM transfers WHERE id = ?').run(transferId)
-  const feeIds = new Set(
-    [before.fee?.id, after.fee?.id].filter((id): id is string => Boolean(id)),
-  )
-  for (const feeId of feeIds)
-    database.prepare('DELETE FROM transactions WHERE id = ?').run(feeId)
-  if (before.fee) {
-    const fee = before.fee
-    database
-      .prepare(
-        `INSERT INTO transactions
-          (id, account_id, kind, date, total_minor, payee_id, note, excluded,
-            created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
-        fee.id,
-        fee.accountId,
-        fee.kind,
-        fee.date,
-        fee.totalMinor,
-        fee.payeeId,
-        fee.note,
-        fee.excluded,
-        fee.createdAt,
-        fee.updatedAt,
-      )
-    const hasLineNotes = (
-      database.pragma('table_info(transaction_lines)') as { name: string }[]
-    ).some((column) => column.name === 'note')
-    if (hasLineNotes)
-      database
-        .prepare(
-          `INSERT INTO transaction_lines
-            (id, transaction_id, amount_minor, category_id, note)
-           VALUES (?, ?, ?, ?, ?)`,
-        )
-        .run(fee.lineId, fee.id, fee.amountMinor, fee.categoryId, fee.lineNote)
-    else
-      database
-        .prepare(
-          `INSERT INTO transaction_lines
-            (id, transaction_id, amount_minor, category_id)
-           VALUES (?, ?, ?, ?)`,
-        )
-        .run(fee.lineId, fee.id, fee.amountMinor, fee.categoryId)
-  }
+  restoreTransactionAggregate(database, before.fee, after.fee)
   if (before.transfer) {
     const transfer = before.transfer
     database

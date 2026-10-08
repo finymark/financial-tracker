@@ -9,9 +9,6 @@ const bridge: AppBridge = {
     update: (input) => ipcRenderer.invoke(IPC_CHANNELS.rulesUpdate, input),
     reorder: (input) => ipcRenderer.invoke(IPC_CHANNELS.rulesReorder, input),
     delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.rulesDelete, input),
-    previewApplication: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.rulesPreviewApplication),
-    apply: () => ipcRenderer.invoke(IPC_CHANNELS.rulesApply),
   },
   updates: {
     isReady: () => ipcRenderer.invoke(IPC_CHANNELS.updatesIsReady),
@@ -101,6 +98,8 @@ const bridge: AppBridge = {
     changeCurrency: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.accountsChangeCurrency, input),
     archive: (input) => ipcRenderer.invoke(IPC_CHANNELS.accountsArchive, input),
+    unarchive: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.accountsUnarchive, input),
     delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.accountsDelete, input),
   },
   profiles: {

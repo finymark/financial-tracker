@@ -45,6 +45,7 @@ export function TemplateEditor({
     categoryId: template?.categoryId ?? '',
     tags: template?.tagNames.join('\n') ?? '',
     note: template?.note ?? '',
+    excluded: template?.excluded ?? false,
   })
   const [error, setError] = useState(false)
   const currency =
@@ -77,6 +78,7 @@ export function TemplateEditor({
         .map((name) => name.trim())
         .filter(Boolean),
       note: draft.note || null,
+      excluded: draft.excluded,
     })
   }
   return (
@@ -206,6 +208,17 @@ export function TemplateEditor({
               setDraft({ ...draft, note: event.target.value })
             }
           />
+        </label>
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={draft.excluded}
+            onChange={(event) =>
+              setDraft({ ...draft, excluded: event.target.checked })
+            }
+            className="size-4 accent-primary"
+          />
+          {t('transactions.excluded')}
         </label>
         <div className="flex gap-2">
           <Button type="submit">{t('templates.save')}</Button>

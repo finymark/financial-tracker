@@ -7,13 +7,12 @@ import type {
 } from '../../shared/templates'
 import {
   createTemplate,
+  deleteTemplate,
   getTemplate,
+  saveTransactionAsTemplate,
   storeTemplate,
-  validateTemplateReferences,
+  updateTemplate,
 } from './profile-templates'
-import { templateFields } from './template-validation'
-import { getTransaction } from './profile-transactions'
-import { validateTransactionId } from './transaction-validation'
 import type { UndoableCommand } from './undo-history'
 
 export function createTemplateUndoableCommand(
@@ -44,17 +43,7 @@ export function updateTemplateUndoableCommand(
 > {
   return {
     captureBefore: () => getTemplate(database, input.id),
-    execute: () => {
-      const current = getTemplate(database, input.id)
-      const template = {
-        ...current,
-        ...templateFields(input),
-        updatedAt: clock().toISOString(),
-      }
-      validateTemplateReferences(database, template)
-      storeTemplate(database, template)
-      return getTemplate(database, input.id)
-    },
+    execute: () => updateTemplate(database, input, clock),
     captureAfter: (result) => result,
     restoreBefore: (before) => storeTemplate(database, before),
   }
@@ -66,9 +55,7 @@ export function deleteTemplateUndoableCommand(
 ): UndoableCommand<TransactionTemplate, null, void> {
   return {
     captureBefore: () => getTemplate(database, id),
-    execute: () => {
-      database.prepare('DELETE FROM transaction_templates WHERE id = ?').run(id)
-    },
+    execute: () => deleteTemplate(database, id),
     captureAfter: () => null,
     restoreBefore: (before) => storeTemplate(database, before),
   }
@@ -81,27 +68,7 @@ export function saveTransactionAsTemplateUndoableCommand(
 ): UndoableCommand<null, TransactionTemplate, TransactionTemplate> {
   return {
     captureBefore: () => null,
-    execute: () => {
-      const source = getTransaction(
-        database,
-        validateTransactionId(input.transactionId),
-      )
-      if (source.lines.length !== 1) throw new Error('templates.error.split')
-      return createTemplate(
-        database,
-        {
-          name: input.name,
-          kind: source.kind,
-          accountId: source.accountId,
-          totalMinor: source.totalMinor,
-          payeeName: source.payeeName,
-          categoryId: source.line.categoryId,
-          tagNames: source.line.tags.map((tag) => tag.name),
-          note: source.line.note,
-        },
-        clock,
-      )
-    },
+    execute: () => saveTransactionAsTemplate(database, input, clock),
     captureAfter: (result) => result,
     restoreBefore: (_before, after) => {
       database

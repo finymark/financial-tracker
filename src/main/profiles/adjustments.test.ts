@@ -235,48 +235,96 @@ test('appends the balance adjustment migration to an existing tagged transfer pr
   const registry = new ProfileRegistry({ userDataDirectory: directory, clock })
   const profile = registry.createProfile('Adjustment upgrade')
   const paths = registry.getProfilePaths(profile.id)
+  const accountId = '00000000-0000-4000-8000-000000000101'
+  const otherId = '00000000-0000-4000-8000-000000000102'
+  const migration10 = CURRENT_MIGRATIONS[9]
   const previous = await openProfileApplication({
     profile,
     paths,
     clock,
-    migrations: CURRENT_MIGRATIONS.slice(0, 10),
+    migrations: [
+      ...CURRENT_MIGRATIONS.slice(0, 9),
+      {
+        ...migration10,
+        apply(database) {
+          migration10.apply(database)
+          const insertAccount = database.prepare(
+            `INSERT INTO accounts
+             (id, name, currency, opening_balance, opening_date, created_at)
+             VALUES (?, ?, 'HUF', ?, '2025-10-01', ?)`,
+          )
+          insertAccount.run(accountId, 'Bank', 1_000, clock().toISOString())
+          insertAccount.run(otherId, 'Savings', 0, clock().toISOString())
+          const insertTransaction = database.prepare(
+            `INSERT INTO transactions
+             (id, account_id, kind, date, total_minor, payee_id, note,
+              excluded, created_at, updated_at)
+             VALUES (?, ?, 'expense', ?, ?, NULL, ?, 1, ?, ?)`,
+          )
+          const transactionId = '00000000-0000-4000-8000-000000000103'
+          const feeId = '00000000-0000-4000-8000-000000000104'
+          insertTransaction.run(
+            transactionId,
+            accountId,
+            '2025-10-05',
+            100,
+            'Before adjustments',
+            clock().toISOString(),
+            clock().toISOString(),
+          )
+          insertTransaction.run(
+            feeId,
+            accountId,
+            '2025-10-06',
+            10,
+            'Before adjustments',
+            clock().toISOString(),
+            clock().toISOString(),
+          )
+          const insertLine = database.prepare(
+            `INSERT INTO transaction_lines
+             (id, transaction_id, amount_minor, category_id)
+             VALUES (?, ?, ?, NULL)`,
+          )
+          const lineId = '00000000-0000-4000-8000-000000000105'
+          insertLine.run(lineId, transactionId, 100)
+          insertLine.run('00000000-0000-4000-8000-000000000106', feeId, 10)
+          database
+            .prepare(
+              `INSERT INTO transfers
+               (id, from_account_id, from_amount_minor, to_account_id,
+                to_amount_minor, date, note, fee_transaction_id,
+                created_at, updated_at)
+               VALUES (?, ?, 200, ?, 200, '2025-10-06',
+                'Before adjustments', ?, ?, ?)`,
+            )
+            .run(
+              '00000000-0000-4000-8000-000000000107',
+              accountId,
+              otherId,
+              feeId,
+              clock().toISOString(),
+              clock().toISOString(),
+            )
+          const tagId = '00000000-0000-4000-8000-000000000108'
+          database
+            .prepare(
+              `INSERT INTO tags (id, name, normalized_name, created_at)
+               VALUES (?, 'Trip', payee_key('Trip'), ?)`,
+            )
+            .run(tagId, clock().toISOString())
+          database
+            .prepare(
+              `INSERT INTO transaction_line_tags (line_id, tag_id)
+               VALUES (?, ?)`,
+            )
+            .run(lineId, tagId)
+        },
+      },
+    ],
   })
   applications.push(previous)
-  const account = previous.commands.createAccount({
-    name: 'Bank',
-    currency: 'HUF',
-    openingBalance: 1_000,
-    openingDate: '2025-10-01',
-  })
-  const other = previous.commands.createAccount({
-    name: 'Savings',
-    currency: 'HUF',
-    openingBalance: 0,
-    openingDate: '2025-10-01',
-  })
-  previous.commands.createTransaction({
-    accountId: account.id,
-    kind: 'expense',
-    date: '2025-10-05',
-    totalMinor: 100,
-    payeeName: 'Shop',
-    categoryId: null,
-    note: 'Before adjustments',
-    excluded: true,
-    tagNames: ['Trip'],
-  })
-  previous.commands.createTransfer({
-    fromAccountId: account.id,
-    fromAmountMinor: 200,
-    toAccountId: other.id,
-    toAmountMinor: 200,
-    date: '2025-10-06',
-    note: 'Before adjustments',
-    fee: { amountMinor: 10, excluded: true },
-  })
   expect(previous.queries.getProfileInfo().schemaVersion).toBe(10)
-  const before = previous.queries.listTransactions()
-  const tags = previous.queries.listTags()
   previous.close()
 
   const upgraded = await openProfileApplication({ profile, paths, clock })
@@ -284,12 +332,12 @@ test('appends the balance adjustment migration to an existing tagged transfer pr
   expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(
     CURRENT_MIGRATIONS.length,
   )
-  expect(upgraded.queries.getAccountBalance(account.id)).toBe(690)
-  expect(upgraded.queries.getAccountBalance(other.id)).toBe(200)
-  expect(upgraded.queries.listTransactions()).toEqual(before)
-  expect(upgraded.queries.listTags()).toEqual(tags)
+  expect(upgraded.queries.getAccountBalance(accountId)).toBe(690)
+  expect(upgraded.queries.getAccountBalance(otherId)).toBe(200)
+  const before = upgraded.queries.listTransactions()
+  const tags = upgraded.queries.listTags()
   const saved = upgraded.commands.createBalanceAdjustment({
-    accountId: account.id,
+    accountId,
     date: '2025-10-10',
     observedMinor: 900,
     note: '',
@@ -306,7 +354,7 @@ test('appends the balance adjustment migration to an existing tagged transfer pr
     ...before.rows,
   ])
   expect(reopened.queries.listTags()).toEqual(tags)
-  expect(reopened.queries.getAccountBalance(account.id)).toBe(900)
+  expect(reopened.queries.getAccountBalance(accountId)).toBe(900)
 })
 
 test('combines adjustment and transfer rows with tagged and excluded transactions without changing totals', async () => {

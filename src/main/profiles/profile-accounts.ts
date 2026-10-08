@@ -32,26 +32,6 @@ function getAccount(database: Database.Database, id: string): StoredAccount {
   return account
 }
 
-function hasTransfersTable(database: Database.Database): boolean {
-  return Boolean(
-    database
-      .prepare(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'transfers'",
-      )
-      .get(),
-  )
-}
-
-function hasAdjustmentsTable(database: Database.Database): boolean {
-  return Boolean(
-    database
-      .prepare(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'balance_adjustments'",
-      )
-      .get(),
-  )
-}
-
 export function hasAccountTransactions(
   database: Database.Database,
   id: string,
@@ -62,7 +42,7 @@ export function hasAccountTransactions(
       .prepare('SELECT 1 FROM transactions WHERE account_id = ? LIMIT 1')
       .get(account.id),
   )
-  if (transaction || !hasTransfersTable(database)) return transaction
+  if (transaction) return true
   const transfer = Boolean(
     database
       .prepare(
@@ -71,7 +51,7 @@ export function hasAccountTransactions(
       )
       .get(account.id, account.id),
   )
-  if (transfer || !hasAdjustmentsTable(database)) return transfer
+  if (transfer) return true
   return Boolean(
     database
       .prepare('SELECT 1 FROM balance_adjustments WHERE account_id = ? LIMIT 1')
@@ -99,16 +79,28 @@ function accountView(
   }
 }
 
-export function listAccounts(
-  database: Database.Database,
-  activeOnly = false,
-): Account[] {
+export function listAccounts(database: Database.Database): Account[] {
   const accounts = database
     .prepare(
-      `SELECT ${ACCOUNT_COLUMNS} FROM accounts ${activeOnly ? 'WHERE archived = 0' : ''} ORDER BY created_at, rowid`,
+      `SELECT ${ACCOUNT_COLUMNS} FROM accounts ORDER BY created_at, rowid`,
     )
     .all() as StoredAccount[]
   return accounts.map((account) => accountView(database, account))
+}
+
+export function listAccountOptions(database: Database.Database): Account[] {
+  const accounts = database
+    .prepare(
+      `SELECT id, name, currency, archived FROM accounts
+       WHERE archived = 0 ORDER BY created_at, rowid`,
+    )
+    .all() as (Pick<Account, 'id' | 'name' | 'currency'> & {
+    archived: number
+  })[]
+  return accounts.map((account) => ({
+    ...account,
+    archived: Boolean(account.archived),
+  })) as Account[]
 }
 
 export function createAccount(
@@ -170,22 +162,23 @@ export function archiveAccount(database: Database.Database, id: string): void {
     .run(account.id)
 }
 
+export function unarchiveAccount(
+  database: Database.Database,
+  id: string,
+): void {
+  const account = getAccount(database, id)
+  database
+    .prepare('UPDATE accounts SET archived = 0 WHERE id = ?')
+    .run(account.id)
+}
+
 export function deleteAccount(database: Database.Database, id: string): void {
   const account = getAccount(database, id)
   if (hasAccountTransactions(database, account.id)) {
     throw new Error('accounts.error.notEmpty')
   }
-  const rulesAvailable = Boolean(
-    database
-      .prepare(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'categorisation_rules'",
-      )
-      .get(),
-  )
-  if (rulesAvailable) {
-    database
-      .prepare('DELETE FROM categorisation_rules WHERE account_id = ?')
-      .run(account.id)
-  }
+  database
+    .prepare('DELETE FROM categorisation_rules WHERE account_id = ?')
+    .run(account.id)
   database.prepare('DELETE FROM accounts WHERE id = ?').run(account.id)
 }

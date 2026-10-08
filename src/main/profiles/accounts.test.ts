@@ -154,7 +154,14 @@ test('archiving preserves the account and balance but hides it from account pick
     { ...archived, archived: true },
     active,
   ])
-  expect(reopened.queries.listAccountOptions()).toEqual([active])
+  expect(reopened.queries.listAccountOptions()).toEqual([
+    {
+      id: active.id,
+      name: active.name,
+      currency: active.currency,
+      archived: false,
+    },
+  ])
   expect(reopened.queries.getAccountBalance(archived.id)).toBe(5099)
 })
 
@@ -214,4 +221,52 @@ test('accounts and their mutation commands stay isolated between profiles', asyn
     'accounts.error.notFound',
   )
   expect(application.queries.listAccounts()).toEqual([account])
+})
+
+test('create, edit, archive, unarchive, and delete account commands undo exact prior images', async () => {
+  const { application } = await setup()
+  const created = application.commands.createAccount({
+    name: 'Undo account',
+    currency: 'HUF',
+    openingBalance: 123,
+    openingDate: '2026-01-01',
+  })
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listAccounts()).toEqual([])
+
+  const account = application.commands.createAccount({
+    name: 'Original',
+    currency: 'HUF',
+    openingBalance: 123,
+    openingDate: '2026-01-01',
+  })
+  application.commands.renameAccount({ id: account.id, name: 'Renamed' })
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listAccounts()).toEqual([account])
+
+  application.commands.changeAccountCurrency({
+    id: account.id,
+    currency: 'CHF',
+  })
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listAccounts()).toEqual([account])
+
+  application.commands.archiveAccount(account.id)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listAccounts()).toEqual([account])
+
+  application.commands.archiveAccount(account.id)
+  application.commands.unarchiveAccount(account.id)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listAccounts()).toEqual([
+    { ...account, archived: true },
+  ])
+
+  application.commands.deleteAccount(account.id)
+  expect(application.queries.listAccounts()).toEqual([])
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listAccounts()).toEqual([
+    { ...account, archived: true },
+  ])
+  expect(created.id).not.toBe(account.id)
 })

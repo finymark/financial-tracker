@@ -8,7 +8,7 @@ import type {
   PayeeSuggestionInput,
   MergePayeesInput,
 } from '../../shared/payees'
-import { normalizePayeeAliasKey, normalizePayeeKey } from '../db'
+import { payeeAliasKey, payeeKey } from '../../shared/text-keys'
 import {
   parsePayeeSuggestionInput,
   validatePayeeAliasName,
@@ -66,7 +66,7 @@ export function suggestPayees(
   value: PayeeSuggestionInput,
 ): PayeeSuggestion[] {
   const input = parsePayeeSuggestionInput(value)
-  const key = normalizePayeeAliasKey(input.query)
+  const key = payeeAliasKey(input.query)
   return database
     .prepare(
       `SELECT payees.id, payees.name, payees.created_at AS createdAt,
@@ -94,46 +94,22 @@ export function resolvePayee(
   timestamp: string,
 ): string | null {
   if (name === null) return null
-  const aliasesAvailable = Boolean(
-    database
-      .prepare(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'payee_aliases'",
-      )
-      .get(),
-  )
-  const alias = aliasesAvailable
-    ? (database
-        .prepare(
-          'SELECT payee_id AS payeeId FROM payee_aliases WHERE normalized_name = ?',
-        )
-        .get(normalizePayeeAliasKey(name)) as { payeeId: string } | undefined)
-    : undefined
+  const alias = database
+    .prepare(
+      'SELECT payee_id AS payeeId FROM payee_aliases WHERE normalized_name = ?',
+    )
+    .get(payeeAliasKey(name)) as { payeeId: string } | undefined
   if (alias) return alias.payeeId
-  const normalizedNamesAvailable = (
-    database.pragma('table_info(payees)') as { name: string }[]
-  ).some((column) => column.name === 'normalized_name')
-  const existing = (
-    normalizedNamesAvailable
-      ? database
-          .prepare('SELECT id FROM payees WHERE normalized_name = ?')
-          .get(normalizePayeeKey(name))
-      : database
-          .prepare('SELECT id FROM payees WHERE name = ? COLLATE NOCASE')
-          .get(name)
-  ) as { id: string } | undefined
+  const existing = database
+    .prepare('SELECT id FROM payees WHERE normalized_name = ?')
+    .get(payeeKey(name)) as { id: string } | undefined
   if (existing) return existing.id
   const id = randomUUID()
-  if (normalizedNamesAvailable) {
-    database
-      .prepare(
-        'INSERT INTO payees (id, name, normalized_name, created_at) VALUES (?, ?, ?, ?)',
-      )
-      .run(id, name, normalizePayeeKey(name), timestamp)
-  } else {
-    database
-      .prepare('INSERT INTO payees (id, name, created_at) VALUES (?, ?, ?)')
-      .run(id, name, timestamp)
-  }
+  database
+    .prepare(
+      'INSERT INTO payees (id, name, normalized_name, created_at) VALUES (?, ?, ?, ?)',
+    )
+    .run(id, name, payeeKey(name), timestamp)
   return id
 }
 
@@ -149,7 +125,7 @@ export function findPayeeByName(
        JOIN payees ON payees.id = payee_aliases.payee_id
        WHERE payee_aliases.normalized_name = ?`,
     )
-    .get(normalizePayeeAliasKey(name)) as Payee | undefined
+    .get(payeeAliasKey(name)) as Payee | undefined
   if (alias) return alias
   return (
     (database
@@ -157,7 +133,7 @@ export function findPayeeByName(
         `SELECT id, name, created_at AS createdAt FROM payees
          WHERE normalized_name = ?`,
       )
-      .get(normalizePayeeKey(name)) as Payee | undefined) ?? null
+      .get(payeeKey(name)) as Payee | undefined) ?? null
   )
 }
 
@@ -169,7 +145,7 @@ export function addPayeeAlias(
   const payeeId = validatePayeeId(input.payeeId)
   getPayee(database, payeeId)
   const name = validatePayeeAliasName(input.name)
-  const normalizedName = normalizePayeeAliasKey(name)
+  const normalizedName = payeeAliasKey(name)
   const canonicalConflict = database
     .prepare('SELECT id FROM payees WHERE payee_alias_key(name) = ?')
     .get(normalizedName) as { id: string } | undefined
@@ -220,37 +196,39 @@ export function mergePayees(
   database
     .prepare('UPDATE payee_aliases SET payee_id = ? WHERE payee_id = ?')
     .run(survivor.id, source.id)
-  const rulesAvailable = Boolean(
-    database
-      .prepare(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'categorisation_rules'",
-      )
-      .get(),
-  )
-  if (rulesAvailable) {
-    database
-      .prepare(
-        'UPDATE categorisation_rules SET payee_id = ? WHERE payee_id = ?',
-      )
-      .run(survivor.id, source.id)
-  }
+  database
+    .prepare('UPDATE categorisation_rules SET payee_id = ? WHERE payee_id = ?')
+    .run(survivor.id, source.id)
+  database
+    .prepare(
+      `UPDATE categorisation_rules SET action_payee_id = ?
+       WHERE action_payee_id = ?`,
+    )
+    .run(survivor.id, source.id)
   database.prepare('DELETE FROM payees WHERE id = ?').run(source.id)
 
-  if (normalizePayeeKey(source.name) !== normalizePayeeKey(survivor.name)) {
+  if (payeeKey(source.name) !== payeeKey(survivor.name)) {
     const id = randomUUID()
-    database
-      .prepare(
-        `INSERT INTO payee_aliases
-          (id, payee_id, name, normalized_name, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
-      )
-      .run(
-        id,
-        survivor.id,
-        source.name,
-        normalizePayeeAliasKey(source.name),
-        clock().toISOString(),
-      )
+    try {
+      database
+        .prepare(
+          `INSERT INTO payee_aliases
+            (id, payee_id, name, normalized_name, created_at)
+           VALUES (?, ?, ?, ?, ?)`,
+        )
+        .run(
+          id,
+          survivor.id,
+          source.name,
+          payeeAliasKey(source.name),
+          clock().toISOString(),
+        )
+    } catch (error) {
+      if (String(error).includes('UNIQUE constraint failed')) {
+        throw new Error('payees.error.aliasConflict', { cause: error })
+      }
+      throw error
+    }
   }
   return getPayee(database, survivor.id)
 }

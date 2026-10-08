@@ -85,6 +85,19 @@ export function registerAccountIpc(
   )
   registerIpcHandler(
     ipcMain,
+    IPC_CHANNELS.accountsUnarchive,
+    (
+      _event,
+      value: unknown,
+    ): Awaited<ReturnType<AppBridge['accounts']['unarchive']>> => {
+      const input = inputRecord(value)
+      controller
+        .getActiveApplication()
+        .commands.unarchiveAccount(validateAccountId(input.id))
+    },
+  )
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.accountsDelete,
     (
       _event,

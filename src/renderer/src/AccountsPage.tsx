@@ -21,11 +21,12 @@ const errorKeys = [
 interface AccountsPageProps {
   language: Language
   t(key: MessageKey): string
+  onChanged(): void
 }
 
 type Editing = { id: string; kind: 'rename' | 'currency' | 'delete' } | null
 
-export function AccountsPage({ language, t }: AccountsPageProps) {
+export function AccountsPage({ language, t, onChanged }: AccountsPageProps) {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -57,13 +58,14 @@ export function AccountsPage({ language, t }: AccountsPageProps) {
     }
   }, [])
 
-  async function run(action: () => Promise<unknown>) {
+  async function run(action: () => Promise<unknown>, offerUndo = true) {
     setBusy(true)
     setError(null)
     try {
       await action()
       setAccounts(await window.app.accounts.list())
       setEditing(null)
+      if (offerUndo) onChanged()
     } catch (error) {
       setError(
         errorKeys.find((key) => String(error).includes(key)) ??
@@ -105,7 +107,7 @@ export function AccountsPage({ language, t }: AccountsPageProps) {
           <Button
             variant="ghost"
             disabled={busy || loading}
-            onClick={() => void run(async () => {})}
+            onClick={() => void run(async () => {}, false)}
           >
             {t('accounts.refresh')}
           </Button>
@@ -169,7 +171,7 @@ export function AccountsPage({ language, t }: AccountsPageProps) {
                 >
                   {t('accounts.changeCurrency')}
                 </Button>
-                {!account.archived && (
+                {!account.archived ? (
                   <Button
                     variant="ghost"
                     disabled={busy}
@@ -180,6 +182,18 @@ export function AccountsPage({ language, t }: AccountsPageProps) {
                     }
                   >
                     {t('accounts.archive')}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() =>
+                      void run(() =>
+                        window.app.accounts.unarchive({ id: account.id }),
+                      )
+                    }
+                  >
+                    {t('accounts.unarchive')}
                   </Button>
                 )}
                 <Button

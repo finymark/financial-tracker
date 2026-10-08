@@ -578,6 +578,10 @@ function Shell({
                 key={`${active.id}:${undoRevision}`}
                 language={language}
                 t={t}
+                onChanged={() => {
+                  setUndoError(false)
+                  setUndoOffered(true)
+                }}
               />
             )}
             {page === 'transactions' && (
@@ -761,6 +765,10 @@ function Shell({
               t={t}
               disabled={savingSettings || backupBusy || payeeBusy || ruleBusy}
               onBusyChange={setCategoryBusy}
+              onChanged={() => {
+                setUndoError(false)
+                setUndoOffered(true)
+              }}
             />
           )}
           {page === 'settings' && (

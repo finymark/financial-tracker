@@ -237,7 +237,14 @@ describe('profile application API', () => {
       })
       expect(controller.getActive()).toEqual(restored)
       expect(application.queries.listAccounts()).toEqual([account])
-      expect(application.queries.listAccountOptions()).toEqual([account])
+      expect(application.queries.listAccountOptions()).toEqual([
+        {
+          id: account.id,
+          name: account.name,
+          currency: account.currency,
+          archived: false,
+        },
+      ])
     } finally {
       controller.close()
     }

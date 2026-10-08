@@ -19,19 +19,51 @@ async function setup(migrations = CURRENT_MIGRATIONS) {
   const registry = new ProfileRegistry({ userDataDirectory: directory, clock })
   const profile = registry.createProfile('Templates test')
   const paths = registry.getProfilePaths(profile.id)
+  const legacyAccountId = '00000000-0000-4000-8000-000000000014'
+  const appliedMigrations =
+    migrations.length < CURRENT_MIGRATIONS.length
+      ? migrations.map((migration, index) =>
+          index === migrations.length - 1
+            ? {
+                ...migration,
+                apply(database: Parameters<typeof migration.apply>[0]) {
+                  migration.apply(database)
+                  database
+                    .prepare(
+                      `INSERT INTO accounts
+                        (id, name, currency, opening_balance, opening_date,
+                         created_at, archived)
+                       VALUES (?, ?, ?, ?, ?, ?, 0)`,
+                    )
+                    .run(
+                      legacyAccountId,
+                      'Cash',
+                      'CHF',
+                      0,
+                      '2026-01-01',
+                      clock().toISOString(),
+                    )
+                },
+              }
+            : migration,
+        )
+      : migrations
   const application = await openProfileApplication({
     profile,
     paths,
     clock,
-    migrations,
+    migrations: appliedMigrations,
   })
   applications.push(application)
-  const account = application.commands.createAccount({
-    name: 'Cash',
-    currency: 'CHF',
-    openingBalance: 0,
-    openingDate: '2026-01-01',
-  })
+  const account =
+    migrations.length < CURRENT_MIGRATIONS.length
+      ? application.queries.listAccounts()[0]
+      : application.commands.createAccount({
+          name: 'Cash',
+          currency: 'CHF',
+          openingBalance: 0,
+          openingDate: '2026-01-01',
+        })
   const input = {
     accountId: account.id,
     kind: 'expense' as const,
@@ -96,6 +128,7 @@ test('creates a named transaction template with every transaction field optional
     categoryId: null,
     tagNames: [],
     note: null,
+    excluded: false,
     createdAt: '2026-01-15T10:00:00.000Z',
     updatedAt: '2026-01-15T10:00:00.000Z',
   })
@@ -123,6 +156,7 @@ test('saves an unsplit transaction as a template, edits optional fields, and und
     categoryId: input.categoryId,
     tagNames: ['Project', 'Trip'],
     note: 'Repeat purchase',
+    excluded: true,
   })
   const edited = application.commands.updateTemplate({
     id: saved.id,
@@ -130,6 +164,7 @@ test('saves an unsplit transaction as a template, edits optional fields, and und
     payeeName: 'New payee',
     tagNames: ['New tag'],
     note: 'New note',
+    excluded: false,
   })
   expect(edited).toEqual({
     ...saved,
@@ -139,8 +174,9 @@ test('saves an unsplit transaction as a template, edits optional fields, and und
     totalMinor: null,
     categoryId: null,
     payeeName: 'New payee',
-    tagNames: ['New tag'],
+    tagNames: [],
     note: 'New note',
+    excluded: false,
   })
   application.commands.deleteTemplate(saved.id)
   expect(application.queries.listTemplates()).toEqual([])
@@ -237,7 +273,7 @@ test('templates accept independent optional fields and using a variable-amount p
   })
   expect(template.totalMinor).toBeNull()
   expect(template.payeeName).toBe('Cafe')
-  expect(template.tagNames).toEqual(['Trip'])
+  expect(template.tagNames).toEqual([])
   expect(application.queries.listPayees()).toEqual([])
   expect(application.queries.listTags()).toEqual([])
   expect(() =>
@@ -257,7 +293,7 @@ test('templates accept independent optional fields and using a variable-amount p
   })
   expect(recorded.totalMinor).toBe(375)
   expect(recorded.payeeName).toBe('Cafe')
-  expect(recorded.line.tags.map((tag) => tag.name)).toEqual(['Trip'])
+  expect(recorded.line.tags).toEqual([])
   expect(application.commands.undoLast()).toBe(true)
   expect(application.queries.listTemplates()).toEqual(
     expect.arrayContaining([categoryOnly, template]),
@@ -359,8 +395,9 @@ test('the appended template migration preserves the previous ledger and persists
   expect(reopened.commands.undoLast()).toBe(false)
 })
 
-test('template tags retain the first spelling when optional names repeat with normalized case', async () => {
-  const { application } = await setup()
+test('template tags retain the stored tag identity when optional names repeat with normalized case', async () => {
+  const { application, input } = await setup()
+  application.commands.createTransaction(input)
   const template = application.commands.createTemplate({
     name: 'Trip',
     tagNames: [' Trip ', 'trip', 'TRIP'],
@@ -486,7 +523,7 @@ test('duplicates income without exclusions and preserves the source when undoing
   expect(application.queries.getAccountBalance(input.accountId)).toBe(12345)
 })
 
-test('deleting unused account and category references clears only those template fields and creates an undo barrier', async () => {
+test('deleting unused account and category references is undoable with template links', async () => {
   const { application, input } = await setup()
   const category = application.commands.createCategory({
     name: 'Template category',
@@ -503,12 +540,17 @@ test('deleting unused account and category references clears only those template
   expect(application.queries.listTemplates()).toEqual([
     { ...template, accountId: null },
   ])
-  expect(application.commands.undoLast()).toBe(false)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTemplates()).toEqual([template])
+  application.commands.deleteAccount(input.accountId)
   application.commands.deleteCategory({ id: category.id })
   expect(application.queries.listTemplates()).toEqual([
     { ...template, accountId: null, categoryId: null },
   ])
-  expect(application.commands.undoLast()).toBe(false)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTemplates()).toEqual([
+    { ...template, accountId: null },
+  ])
 })
 
 test('template prefill resolves aliases and template undo coexists with transaction and alias undo', async () => {
@@ -632,10 +674,9 @@ test('duplicate preserves source category and tags despite a matching rule, and 
   expect(application.queries.listTemplates()).toEqual([])
   expect(application.commands.undoLast()).toBe(true)
   expect(application.queries.listTransactions().rows).toEqual([])
-  expect(application.commands.undoLast()).toBe(false)
 })
 
-test('tag deletion and rename keep rule references undoable while template tag names remain saved text', async () => {
+test('tag deletion and rename update template associations and undo restores them', async () => {
   const { application, input } = await setup()
   const source = application.commands.createTransaction(input)
   const tag = source.line.tags[0]
@@ -665,7 +706,14 @@ test('tag deletion and rename keep rule references undoable while template tag n
       .listCategorisationRules()
       .every((rule) => rule.tags[0].name === 'Renamed'),
   ).toBe(true)
-  expect(application.queries.listTemplates()).toEqual([template])
+  expect(application.queries.listTemplates()).toEqual([
+    {
+      ...template,
+      tagNames: template.tagNames.map((name) =>
+        name === tag.name ? 'Renamed' : name,
+      ),
+    },
+  ])
   expect(application.commands.undoLast()).toBe(true)
   expect(application.queries.listCategorisationRules()).toEqual([
     categoryRule,
@@ -675,12 +723,18 @@ test('tag deletion and rename keep rule references undoable while template tag n
   expect(application.queries.listCategorisationRules()).toEqual([
     { ...categoryRule, tags: [] },
   ])
-  expect(application.queries.listTemplates()).toEqual([template])
+  expect(application.queries.listTemplates()).toEqual([
+    {
+      ...template,
+      tagNames: template.tagNames.filter((name) => name !== tag.name),
+    },
+  ])
   expect(application.commands.undoLast()).toBe(true)
   expect(application.queries.listCategorisationRules()).toEqual([
     categoryRule,
     tagOnlyRule,
   ])
+  expect(application.queries.listTemplates()).toEqual([template])
   expect(application.queries.listTransactions()).toEqual(before)
   expect(application.commands.undoLast()).toBe(true)
   expect(application.queries.listCategorisationRules()).toEqual([categoryRule])
@@ -744,7 +798,10 @@ test('deleting shared account/category references preserves both template and ru
   expect(application.queries.listTemplates()).toEqual([
     { ...template, accountId: null },
   ])
-  expect(application.commands.undoLast()).toBe(false)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTemplates()).toEqual([template])
+  expect(application.queries.listCategorisationRules()).toHaveLength(3)
+  application.commands.deleteAccount(input.accountId)
   application.commands.deleteCategory({ id: category.id })
   expect(application.queries.listCategorisationRules()).toEqual([
     { ...taggedRule, categoryId: null, categoryKind: null },
@@ -753,7 +810,11 @@ test('deleting shared account/category references preserves both template and ru
     { ...template, accountId: null, categoryId: null },
   ])
   expect(application.queries.listTransactions().rows).toEqual([tagged])
-  expect(application.commands.undoLast()).toBe(false)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTemplates()).toEqual([
+    { ...template, accountId: null },
+  ])
+  expect(application.queries.listCategorisationRules()).toHaveLength(2)
 })
 
 test('category replacement retargets rules and transactions while deleted template references become empty', async () => {
@@ -795,25 +856,69 @@ test('category replacement retargets rules and transactions while deleted templa
   expect(application.queries.listTransactions().rows[0]).toMatchObject({
     line: { categoryId: replacement.id },
   })
-  expect(application.commands.undoLast()).toBe(false)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listCategorisationRules()).toEqual([rule])
+  expect(application.queries.listTemplates()).toEqual([template])
+  expect(application.queries.listTransactions().rows).toEqual([source])
 })
 
-test('rules migration 15 upgrades a version-14 template profile without changing templates or ledger', async () => {
-  const { application, input, profile, paths } = await setup(
-    CURRENT_MIGRATIONS.slice(0, 14),
-  )
+test('migration 16 upgrades version-14 template data without changing the ledger', async () => {
+  const legacyTemplateId = '00000000-0000-4000-8000-000000000016'
+  const migration14 = CURRENT_MIGRATIONS[13]
+  const { application, input, profile, paths } = await setup([
+    ...CURRENT_MIGRATIONS.slice(0, 13),
+    {
+      ...migration14,
+      apply(database) {
+        migration14.apply(database)
+        database
+          .prepare(
+            `INSERT INTO tags (id, name, normalized_name, created_at)
+               VALUES ('00000000-0000-4000-8000-000000000017',
+                 'Trip', payee_key('Trip'), ?)`,
+          )
+          .run(clock().toISOString())
+        database
+          .prepare(
+            `INSERT INTO transaction_templates
+                (id, name, kind, account_id, total_minor, payee_name,
+                 category_id, tag_names, note, created_at, updated_at)
+               VALUES (?, ?, NULL, NULL, NULL, NULL, NULL, ?, NULL, ?, ?)`,
+          )
+          .run(
+            legacyTemplateId,
+            'Before rules',
+            JSON.stringify(['trip', 'Missing tag']),
+            clock().toISOString(),
+            clock().toISOString(),
+          )
+      },
+    },
+  ])
   const source = application.commands.createTransaction(input)
-  const template = application.commands.saveTransactionAsTemplate({
-    transactionId: source.id,
-    name: 'Before rules',
-  })
   application.commands.duplicateTransaction(source.id)
   const before = application.queries.listTransactions()
   expect(application.queries.getProfileInfo().schemaVersion).toBe(14)
   application.close()
   const upgraded = await openProfileApplication({ profile, paths, clock })
   applications.push(upgraded)
-  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(15)
+  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(
+    CURRENT_MIGRATIONS.length,
+  )
+  const template = {
+    id: legacyTemplateId,
+    name: 'Before rules',
+    kind: null,
+    accountId: null,
+    totalMinor: null,
+    payeeName: null,
+    categoryId: null,
+    tagNames: ['Trip'],
+    note: null,
+    excluded: false,
+    createdAt: clock().toISOString(),
+    updatedAt: clock().toISOString(),
+  }
   expect(upgraded.queries.listTemplates()).toEqual([template])
   expect(upgraded.queries.listTransactions()).toEqual(before)
   expect(upgraded.queries.listCategorisationRules()).toEqual([])

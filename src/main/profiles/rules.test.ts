@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import {
+  CURRENT_MIGRATIONS,
   openProfileApplication,
   type ProfileApplication,
 } from './profile-application'
@@ -79,6 +80,7 @@ test('autofill uses first matching rule, then canonical-payee last-used values, 
     accountId: account.id,
     minAmountMinor: 1_000,
     maxAmountMinor: 3_000,
+    amountCurrency: 'HUF',
     categoryId: categories[1].id,
     tagIds: [ruleTag.id],
   })
@@ -103,6 +105,8 @@ test('autofill uses first matching rule, then canonical-payee last-used values, 
   expect(application.queries.getCategorisationAutofill(input)).toEqual({
     source: 'rule',
     ruleId: first.id,
+    payeeId: null,
+    payeeName: null,
     categoryId: categories[1].id,
     tags: [ruleTag],
   })
@@ -121,6 +125,8 @@ test('autofill uses first matching rule, then canonical-payee last-used values, 
   expect(application.queries.getCategorisationAutofill(input)).toEqual({
     source: 'lastUsed',
     ruleId: null,
+    payeeId: null,
+    payeeName: null,
     categoryId: categories[0].id,
     tags,
   })
@@ -132,6 +138,8 @@ test('autofill uses first matching rule, then canonical-payee last-used values, 
   ).toEqual({
     source: 'none',
     ruleId: null,
+    payeeId: null,
+    payeeName: null,
     categoryId: null,
     tags: [],
   })
@@ -189,67 +197,177 @@ test('rule CRUD and reorder commands are individually undoable', async () => {
   expect(first.id).not.toBe(restored.id)
 })
 
-test('previews and applies rules to only matching unsplit uncategorized transactions as one undoable command', async () => {
-  const { application, account, otherAccount, categories, payeeId, tags } =
-    await setup()
-  const input = {
+test('supports payee actions, single conditions, note-only text matching, and currency-specific amounts', async () => {
+  const { application, account, otherAccount, categories } = await setup()
+  const preferred = application.commands.createTransaction({
     accountId: account.id,
-    kind: 'expense' as const,
+    kind: 'expense',
     date: '2026-01-15',
-    totalMinor: 500,
-    payeeName: 'KÁVÉZÓ 0123',
+    totalMinor: 100,
+    payeeName: 'Preferred payee',
     categoryId: null,
-    note: 'Lunch',
-  }
-  const uncategorized = application.commands.createTransaction(input)
-  application.commands.createTransaction({
-    ...input,
-    accountId: otherAccount.id,
+    note: '',
   })
-  application.commands.createTransaction({
-    ...input,
-    categoryId: categories[0].id,
-  })
-  const split = application.commands.createTransaction({
-    ...input,
-    totalMinor: 1_000,
-    lines: [
-      { amountMinor: 400, categoryId: null, note: '', tagNames: [] },
-      { amountMinor: 600, categoryId: null, note: '', tagNames: [] },
-    ],
-  })
-  const ruleTag = tags.find((tag) => tag.name === 'Rule tag')!
-  application.commands.createCategorisationRule({
+  const accountOnly = application.commands.createCategorisationRule({
     enabled: true,
-    payeeId,
+    payeeId: null,
     textContains: null,
-    accountId: account.id,
+    accountId: otherAccount.id,
+    minAmountMinor: null,
+    maxAmountMinor: null,
+    actionPayeeId: preferred.payeeId,
+    categoryId: null,
+    tagIds: [],
+  })
+  expect(
+    application.queries.getCategorisationAutofill({
+      accountId: otherAccount.id,
+      kind: 'expense',
+      totalMinor: 500,
+      payeeName: null,
+      note: '',
+    }),
+  ).toMatchObject({
+    source: 'rule',
+    ruleId: accountOnly.id,
+    payeeId: preferred.payeeId,
+    payeeName: 'Preferred payee',
+  })
+
+  const noteRule = application.commands.createCategorisationRule({
+    enabled: true,
+    payeeId: null,
+    textContains: 'CAFE',
+    accountId: null,
     minAmountMinor: null,
     maxAmountMinor: null,
     categoryId: categories[1].id,
-    tagIds: [ruleTag.id],
-  })
-  const before = application.queries.listTransactions()
-
-  expect(application.queries.previewCategorisationRuleApplication()).toEqual({
-    count: 1,
-  })
-  expect(application.commands.applyCategorisationRules()).toEqual({ count: 1 })
-  const applied = application.queries
-    .listTransactions()
-    .rows.find((row) => row.id === uncategorized.id)
-  expect(applied).toMatchObject({
-    line: {
-      categoryId: categories[1].id,
-      tags: [ruleTag],
-    },
+    tagIds: [],
   })
   expect(
-    application.queries
-      .listTransactions()
-      .rows.find((row) => row.id === split.id),
-  ).toEqual(split)
+    application.queries.getCategorisationAutofill({
+      accountId: account.id,
+      kind: 'expense',
+      totalMinor: 500,
+      payeeName: 'Café Central',
+      note: 'unrelated',
+    }).ruleId,
+  ).not.toBe(noteRule.id)
+  expect(
+    application.queries.getCategorisationAutofill({
+      accountId: account.id,
+      kind: 'expense',
+      totalMinor: 500,
+      payeeName: null,
+      note: 'A café receipt',
+    }).ruleId,
+  ).toBe(noteRule.id)
 
-  expect(application.commands.undoLast()).toBe(true)
-  expect(application.queries.listTransactions()).toEqual(before)
+  const chf = application.commands.createAccount({
+    name: 'CHF account',
+    currency: 'CHF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  const amountRule = application.commands.createCategorisationRule({
+    enabled: true,
+    payeeId: null,
+    textContains: null,
+    accountId: null,
+    minAmountMinor: 400,
+    maxAmountMinor: 600,
+    amountCurrency: 'HUF',
+    categoryId: categories[2].id,
+    tagIds: [],
+  })
+  expect(
+    application.queries.getCategorisationAutofill({
+      accountId: chf.id,
+      kind: 'expense',
+      totalMinor: 500,
+      payeeName: null,
+      note: '',
+    }).ruleId,
+  ).not.toBe(amountRule.id)
+  expect(
+    application.queries.getCategorisationAutofill({
+      accountId: account.id,
+      kind: 'expense',
+      totalMinor: 500,
+      payeeName: null,
+      note: '',
+    }).ruleId,
+  ).toBe(amountRule.id)
+  expect(() =>
+    application.commands.createCategorisationRule({
+      enabled: true,
+      payeeId: null,
+      textContains: null,
+      accountId: account.id,
+      minAmountMinor: 1,
+      maxAmountMinor: null,
+      amountCurrency: 'CHF',
+      categoryId: categories[0].id,
+      tagIds: [],
+    }),
+  ).toThrow('rules.error.amount')
+})
+
+test('migration 16 gives existing amount rules the account or base currency', async () => {
+  const directory = mkdtempSync(
+    join(tmpdir(), 'financial-tracker-rule-upgrade-'),
+  )
+  directories.push(directory)
+  const registry = new ProfileRegistry({ userDataDirectory: directory, clock })
+  const profile = registry.createProfile('Rule upgrade')
+  const paths = registry.getProfilePaths(profile.id)
+  const migration15 = CURRENT_MIGRATIONS[14]
+  const ruleId = '00000000-0000-4000-8000-000000000151'
+  const old = await openProfileApplication({
+    profile,
+    paths,
+    clock,
+    migrations: [
+      ...CURRENT_MIGRATIONS.slice(0, 14),
+      {
+        ...migration15,
+        apply(database) {
+          migration15.apply(database)
+          const category = database
+            .prepare(
+              "SELECT id FROM categories WHERE seed_key = 'expense.food'",
+            )
+            .get() as { id: string }
+          database
+            .prepare(
+              `INSERT INTO categorisation_rules
+               (id, enabled, sort_order, payee_id, text_contains, account_id,
+                min_amount_minor, max_amount_minor, category_id,
+                created_at, updated_at)
+               VALUES (?, 1, 0, NULL, 'legacy', NULL, 100, 200, ?, ?, ?)`,
+            )
+            .run(
+              ruleId,
+              category.id,
+              clock().toISOString(),
+              clock().toISOString(),
+            )
+        },
+      },
+    ],
+  })
+  old.close()
+
+  const upgraded = await openProfileApplication({ profile, paths, clock })
+  applications.push(upgraded)
+  expect(upgraded.queries.listCategorisationRules()).toEqual([
+    expect.objectContaining({
+      id: ruleId,
+      minAmountMinor: 100,
+      maxAmountMinor: 200,
+      amountCurrency: 'HUF',
+      actionPayeeId: null,
+      actionPayeeName: null,
+    }),
+  ])
 })

@@ -3,7 +3,7 @@ import type {
   TransactionTemplate,
 } from '../../shared/templates'
 import { UUID_PATTERN } from '../../shared/validation'
-import { normalizePayeeKey } from '../db'
+import { tagKey } from '../../shared/text-keys'
 import { validateTagNames } from './tag-validation'
 import {
   validateTransactionAccountId,
@@ -12,6 +12,7 @@ import {
   validateTransactionNote,
   validateTransactionPayeeName,
   validateTransactionTotal,
+  validateTransactionExcluded,
 } from './transaction-validation'
 
 export function validateTemplateId(value: unknown): string {
@@ -32,7 +33,7 @@ export function templateFields(
   const names = validateTagNames(input.tagNames)
   const unique = new Map<string, string>()
   for (const name of names) {
-    const key = normalizePayeeKey(name)
+    const key = tagKey(name)
     if (!unique.has(key)) unique.set(key, name)
   }
   return {
@@ -50,5 +51,6 @@ export function templateFields(
     categoryId: validateTransactionCategoryId(input.categoryId),
     tagNames: [...unique.values()],
     note: input.note == null ? null : validateTransactionNote(input.note),
+    excluded: validateTransactionExcluded(input.excluded) ?? false,
   }
 }

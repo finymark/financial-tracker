@@ -310,9 +310,12 @@ not off-device copies or backups of the separate data folder.
   Changing currency changes the denomination, not the amount; it is not a
   currency conversion.
 - Archive an account to hide it from account pickers without deleting it. Archived
-  accounts remain visible on Accounts with their balance and opening date.
+  accounts remain visible on Accounts with their balance and opening date and can
+  be unarchived.
 - Delete an account after confirming in the page. An opening balance alone does
   not prevent deletion: "empty" means no transactions.
+- Account create, rename, currency change, archive/unarchive, and delete commands
+  offer the shared Undo toast and work with `Ctrl+Z`.
 - Balances walk the dated account history and include the opening balance, income,
   expenses (including linked transfer fees), both signed transfer legs, and the
   recomputed effects of balance adjustments. Accounts with any of those movements
@@ -343,6 +346,8 @@ not off-device copies or backups of the separate data folder.
 - Categories used by transaction lines require an active same-kind replacement
   when deleted. Reassignment and deletion happen atomically, so transaction
   lines are never orphaned.
+- Category create, rename, reorder, archive/unarchive, and delete commands use
+  the shared Undo toast and `Ctrl+Z`; delete undo restores replacement links.
 
 ## Transactions
 
@@ -394,7 +399,7 @@ not off-device copies or backups of the separate data folder.
   Transfer undo includes both legs and its linked fee.
   History is in memory for the open profile only and is cleared by profile
   switching, restart, restore, or another profile write that has no declared undo
-  aggregate. Account and category commands are not undoable yet.
+  aggregate. Account and category commands use the same undo history.
 - **Settings → Payees** lists each payee and its raw-name aliases. Alias keys are
   unique within the profile ignoring case and diacritics. Add and remove alias
   commands are undoable. Merging moves every transaction and alias to the chosen
@@ -402,12 +407,16 @@ not off-device copies or backups of the separate data folder.
   command. Payee aliases use appended migration 12 after the unchanged tag and
   target-based balance-adjustment migrations 10–11.
 - **Settings → Categorisation rules** manages profile-scoped, enabled/disabled
-  rules in explicit priority order. The first matching rule wins. A rule requires
-  a canonical payee (aliases resolve to it) and/or text contained in the canonical
-  payee name plus note, ignoring case and diacritics. Account and inclusive
-  amount bounds are optional. Actions set a category and/or add existing tags.
+  rules in explicit priority order. The first matching rule wins. A rule accepts
+  any nonempty combination of canonical payee (aliases resolve to it), text
+  contained in the note, account, and inclusive amount bounds. Note matching
+  ignores case and diacritics. Amount bounds carry a currency: an account-scoped
+  rule uses that account's currency; otherwise the editor defaults to the base
+  currency and lets it be chosen. Other-currency transactions do not match.
+  Actions set a payee, set a category, and/or add existing tags.
   Matching is deterministic and entirely local; it uses no AI or network service.
-  Create, edit, delete, reorder, and applying rules are undoable commands.
+  Create, edit, delete, and reorder are undoable commands. Rules prefill new
+  drafts only; applying them retrospectively is out of scope.
 - In a new unsplit expense/income drawer, category and tags are prefilled from
   the first matching rule, otherwise from the latest unsplit transaction for the
   canonical payee, otherwise left empty. This is prefill only: a category or tag
@@ -415,11 +424,9 @@ not off-device copies or backups of the separate data folder.
   reevaluation. A category or nonempty tag list supplied by a transaction template
   is treated like user-entered values and is also protected; omitted fields may
   still receive rule or last-used prefill. All values remain editable before save.
-- Settings can preview how many existing transactions would change, then apply
-  the current ordered rules as one undoable command. It touches only matching
-  unsplit lines that are still uncategorized; categorized and split transactions
-  are left unchanged. Categorisation rules use appended migration 15 after the
-  unchanged per-line-note migration 13 and transaction-template migration 14.
+- Categorisation rules use migration 15 for their original schema. Appended
+  migration 16 adds payee actions, currency-aware amount conditions, and the
+  broader condition constraint without changing migrations 1–15.
 
 ### Manual Categorisation rules check
 
@@ -427,14 +434,14 @@ Run `npm run dev` with synthetic payees, aliases, tags, categorized and
 uncategorized transactions. In **Settings → Categorisation rules**, create two
 rules that both match and move them up/down; verify only the first one prefills a
 new drawer. Check canonical and alias payee input, accented/unaccented text in
-the payee and note, account and inclusive amount boundaries, disabled rules,
-and category-only/tag-only actions. With no matching rule, verify the latest
+the note (and verify payee text alone does not satisfy it), account and inclusive
+amount boundaries in both currencies, disabled rules, and payee-only,
+category-only, and tag-only actions. With no matching rule, verify the latest
 unsplit category and tags for that payee are used; with no payee history, verify
 both stay empty. Change category/tags by hand, then alter amount, account, payee,
 or note and verify asynchronous reevaluation never overwrites those changes.
-Preview and apply existing rules: only matching unsplit uncategorized rows may
-change, and one Undo restores the whole batch. Also undo create, edit, reorder,
-enable/disable, and delete. Repeat in HU/EN/DE and light/dark themes.
+Also undo create, edit, reorder, enable/disable, and delete. Repeat in HU/EN/DE
+and light/dark themes.
 
 - Mark an expense or income as **Excluded** in the create/edit drawer when it
   should affect its account balance but not spending/income totals (for example,
@@ -481,10 +488,12 @@ enable/disable, and delete. Repeat in HU/EN/DE and light/dark themes.
   matching. Keyset paging would improve deep sequential scans and stability
   during external writes, but requires cursor state and cannot directly address
   arbitrary windows. At the v0.1 20 000-transaction scale, offset is sufficient;
-  local writes reset to the first page to avoid stale offsets. The performance
-  test times a filtered first page plus all aggregates with a generous 500 ms
-  bound, arranging the 20 000 transactions through application commands in one
-  fixture transaction (outside the measured query).
+  local writes reset to the first page to avoid stale offsets. Each list call
+  materializes the filtered movement identities once inside its read transaction,
+  batches row/line/tag loading, and computes adjustment history once per account.
+  The performance test includes transfers and adjustments and times a filtered
+  first page plus all aggregates with a generous 500 ms local bound, arranging
+  the fixture through application commands in one outer transaction.
 
 ### Duplicate and transaction templates
 
@@ -504,11 +513,13 @@ enable/disable, and delete. Repeat in HU/EN/DE and light/dark themes.
   template** is disabled for saved split transactions; use a new unsplit template
   instead. The main process also rejects split sources.
 - Only the template name is required (1–100 characters). Kind, account, positive
-  amount, payee, category, tags, and note are optional. The amount uses the shared
-  calculator and exact integer-hundredths storage. In the template editor, enter
-  one tag name per line. Payee and tag names are saved as prefill text: creating
-  or editing a template does not create payees, tags, transactions, or balances.
-  Later tag/payee renames do not rewrite this saved text.
+  amount, payee, category, tags, note, and the Excluded flag are optional. The
+  amount uses the shared calculator and exact integer-hundredths storage. Template
+  tags reference existing tag identities: renaming a tag updates the displayed
+  template value and deleting it removes it from templates; undo restores the
+  association. Entering an unknown tag name does not create a tag. Payee text
+  remains a prefill string. Creating or editing a template does not create
+  payees, tags, transactions, or balances.
 - Select a template and choose **Use template** to replace the drawer draft with
   a new transaction dated today. An omitted kind defaults to its category's kind
   (otherwise expense), and an omitted account uses the first active account.
@@ -521,11 +532,14 @@ enable/disable, and delete. Repeat in HU/EN/DE and light/dark themes.
   to save and add another. Payee text resolves through the same alias-aware
   transaction command as manual entry. Template-provided category/tags are
   protected from rule autofill just like manual choices; omitted fields can still
-  be suggested. Duplicate preserves the source category/tags without reapplying
+  be suggested. A template's Excluded flag is also prefilled. Duplicate preserves
+  the source category/tags without reapplying
   rules. Deleting a template does not alter categorisation rules or transactions.
 - Choose **Edit template**, or **Delete template** and confirm, in the same picker.
   Create, save-as-template, edit, and delete all offer the existing Undo toast and
   Ctrl+Z. Templates persist only in the active profile's database (migration 14);
+  migration 16 moves template tags into an identity-based join table and adds the
+  Excluded flag (unmatched legacy tag names are dropped);
   undo history remains session-only and clears on switching/reopening/restoring
   a profile or a successful write without an undo aggregate.
 
@@ -537,7 +551,9 @@ and totals, then use the toast and Ctrl+Z to remove just the copy. In the drawer
 create a name-only template, one with every optional field, and one without an
 amount; cancel another new template and verify no payees/tags or transactions
 were created. Save an existing transaction as a template and check unsaved edits
-are not included. Edit and clear individual template fields, confirm/cancel
+are not included. Include an excluded source/template and verify the flag is
+copied into the draft. Rename and delete a referenced tag, verify every template
+updates, then undo the deletion. Edit and clear individual template fields, confirm/cancel
 its deletion, and undo each template operation. With a matching categorisation
 rule, use a template with a different category and tags; change payee, note,
 account, and amount and verify the template values are not replaced. Verify

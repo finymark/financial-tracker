@@ -461,35 +461,59 @@ test('appends transfer migration 9 to an excluded version 8 profile without chan
   const registry = new ProfileRegistry({ userDataDirectory: directory, clock })
   const profile = registry.createProfile('Transfer upgrade')
   const paths = registry.getProfilePaths(profile.id)
+  const fromId = '00000000-0000-4000-8000-000000000081'
+  const toId = '00000000-0000-4000-8000-000000000082'
+  const originalId = '00000000-0000-4000-8000-000000000083'
+  const migration8 = CURRENT_MIGRATIONS[7]
   const previous = await openProfileApplication({
     profile,
     paths,
     clock,
-    migrations: CURRENT_MIGRATIONS.slice(0, 8),
+    migrations: [
+      ...CURRENT_MIGRATIONS.slice(0, 7),
+      {
+        ...migration8,
+        apply(database) {
+          migration8.apply(database)
+          const insertAccount = database.prepare(
+            `INSERT INTO accounts
+             (id, name, currency, opening_balance, opening_date, created_at)
+             VALUES (?, ?, ?, ?, '2026-01-01', ?)`,
+          )
+          insertAccount.run(
+            fromId,
+            'Bank',
+            'HUF',
+            500_000,
+            clock().toISOString(),
+          )
+          insertAccount.run(toId, 'Cash', 'CHF', 0, clock().toISOString())
+          database
+            .prepare(
+              `INSERT INTO transactions
+               (id, account_id, kind, date, total_minor, payee_id, note,
+                excluded, created_at, updated_at)
+               VALUES (?, ?, 'expense', '2026-01-15', 1000, NULL,
+                'Before transfers', 1, ?, ?)`,
+            )
+            .run(
+              originalId,
+              fromId,
+              clock().toISOString(),
+              clock().toISOString(),
+            )
+          database
+            .prepare(
+              `INSERT INTO transaction_lines
+               (id, transaction_id, amount_minor, category_id)
+               VALUES ('00000000-0000-4000-8000-000000000084', ?, 1000, NULL)`,
+            )
+            .run(originalId)
+        },
+      },
+    ],
   })
   applications.push(previous)
-  const from = previous.commands.createAccount({
-    name: 'Bank',
-    currency: 'HUF',
-    openingBalance: 500_000,
-    openingDate: '2026-01-01',
-  })
-  const to = previous.commands.createAccount({
-    name: 'Cash',
-    currency: 'CHF',
-    openingBalance: 0,
-    openingDate: '2026-01-01',
-  })
-  const original = previous.commands.createTransaction({
-    accountId: from.id,
-    kind: 'expense',
-    date: '2026-01-15',
-    totalMinor: 1_000,
-    payeeName: 'History',
-    categoryId: null,
-    note: 'Before transfers',
-    excluded: true,
-  })
   expect(previous.queries.getProfileInfo().schemaVersion).toBe(8)
   previous.close()
   const upgraded = await openProfileApplication({ profile, paths, clock })
@@ -497,16 +521,18 @@ test('appends transfer migration 9 to an excluded version 8 profile without chan
   expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(
     CURRENT_MIGRATIONS.length,
   )
-  expect(upgraded.queries.listTransactions().rows).toEqual([original])
-  expect(upgraded.queries.getAccountBalance(from.id)).toBe(499_000)
+  expect(upgraded.queries.listTransactions().rows).toEqual([
+    expect.objectContaining({ id: originalId, excluded: true }),
+  ])
+  expect(upgraded.queries.getAccountBalance(fromId)).toBe(499_000)
   const transfer = upgraded.commands.createTransfer({
-    fromAccountId: from.id,
+    fromAccountId: fromId,
     fromAmountMinor: parseAmountExpression(
       '1.234,5*2',
       'HUF',
       'transactions.error.amount',
     ),
-    toAccountId: to.id,
+    toAccountId: toId,
     toAmountMinor: parseAmountExpression(
       '1/3*3',
       'CHF',
@@ -537,6 +563,6 @@ test('appends transfer migration 9 to an excluded version 8 profile without chan
   expect(reopened.queries.listTransactions().totals).toEqual([
     { currency: 'HUF', expenseMinor: 0, incomeMinor: 0 },
   ])
-  expect(reopened.queries.getAccountBalance(from.id)).toBe(247_100)
-  expect(reopened.queries.getAccountBalance(to.id)).toBe(100)
+  expect(reopened.queries.getAccountBalance(fromId)).toBe(247_100)
+  expect(reopened.queries.getAccountBalance(toId)).toBe(100)
 })
