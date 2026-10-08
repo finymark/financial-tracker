@@ -38,6 +38,7 @@ import { openDatabase } from '../db'
 import {
   createStartupBackup,
   listBackupFiles,
+  restoreMissingAttachments,
   verifySqliteBackup,
 } from './profile-backups'
 import type {
@@ -205,6 +206,21 @@ import {
   skipPendingUndoableCommand,
   updateRecurringUndoableCommand,
 } from './recurring-undo'
+import type { Attachment, StagedAttachment } from '../../shared/attachments'
+import type { OpenAttachmentInput } from '../../shared/attachments'
+import type { DeleteTransactionInput } from '../../shared/transactions'
+import {
+  attachmentDirectory,
+  copyAttachments,
+  copyAttachmentForOpening,
+  importAttachment,
+  listAttachments,
+  sweepUnreferencedAttachments,
+} from './profile-attachments'
+import {
+  attachAttachmentUndoableCommand,
+  removeAttachmentUndoableCommand,
+} from './attachment-undo'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -263,6 +279,7 @@ export interface OpenProfileApplicationOptions {
 }
 
 export interface ProfileQueries {
+  listAttachments(transactionId: string): Attachment[]
   getDuePendingTransactionCount(): number
   listPendingTransactions(): PendingTransaction[]
   listRecurringTransactions(): RecurringTransaction[]
@@ -299,6 +316,16 @@ export interface ProfileQueries {
 }
 
 export interface ProfileCommands {
+  importAttachment(path: string): Promise<StagedAttachment>
+  attachAttachment(
+    transactionId: string,
+    attachment: StagedAttachment,
+  ): Attachment
+  removeAttachment(id: string): void
+  copyAttachmentForOpening(
+    input: OpenAttachmentInput,
+    temporaryDirectory: string,
+  ): string
   confirmPendingTransaction(input: ConfirmPendingTransactionInput): Transaction
   skipPendingTransaction(id: string): void
   generateRecurringTransactions(): void
@@ -329,7 +356,7 @@ export interface ProfileCommands {
   deleteCategorisationRule(id: string): void
   createTransaction(input: CreateTransactionInput): Transaction
   updateTransaction(input: UpdateTransactionInput): Transaction
-  deleteTransaction(id: string): void
+  deleteTransaction(input: string | DeleteTransactionInput): void
   renameTag(input: RenameTagInput): Tag
   deleteTag(id: string): void
   createTransfer(input: CreateTransferInput): Transfer
@@ -935,6 +962,26 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
       ON pending_transactions(status, due_date, created_at, id);
   `,
   ),
+  defineSqlMigration(
+    21,
+    'transaction attachments',
+    `
+    CREATE TABLE attachments (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      transaction_id TEXT NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+      original_file_name TEXT NOT NULL CHECK (length(original_file_name) BETWEEN 1 AND 255),
+      stored_name TEXT NOT NULL CHECK (length(stored_name) BETWEEN 68 AND 69),
+      media_type TEXT NOT NULL CHECK (media_type IN ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')),
+      byte_size INTEGER NOT NULL CHECK (typeof(byte_size) = 'integer' AND byte_size > 0),
+      position INTEGER NOT NULL CHECK (typeof(position) = 'integer' AND position >= 0),
+      created_at TEXT NOT NULL,
+      UNIQUE (transaction_id, position)
+    );
+    CREATE INDEX attachments_transaction_id_position
+      ON attachments(transaction_id, position);
+    CREATE INDEX attachments_stored_name ON attachments(stored_name);
+  `,
+  ),
 ]
 
 function validateMigrations(
@@ -1076,7 +1123,37 @@ class OpenProfileApplication implements ProfileApplication {
     this.#profile = { ...options.profile }
     this.#options = options
     this.#clock = options.clock ?? (() => new Date())
+    const attachmentsPath = attachmentDirectory(options.paths.dataDirectory)
     this.commands = {
+      importAttachment: async (path) => {
+        this.#assertAvailable()
+        return importAttachment(path, attachmentsPath)
+      },
+      attachAttachment: (transactionId, attachment) =>
+        this.#executeUndoableCommand(
+          attachAttachmentUndoableCommand(
+            this.#database,
+            transactionId,
+            attachment,
+            attachmentsPath,
+            this.#clock,
+          ),
+        ),
+      removeAttachment: (id) =>
+        this.#executeUndoableCommand(
+          removeAttachmentUndoableCommand(this.#database, id),
+        ),
+      copyAttachmentForOpening: (input, temporaryDirectory) => {
+        this.#assertAvailable()
+        return copyAttachmentForOpening(
+          this.#database,
+          typeof input.id === 'string'
+            ? { id: input.id }
+            : { attachment: input.attachment! },
+          attachmentsPath,
+          temporaryDirectory,
+        )
+      },
       generateRecurringTransactions: () =>
         this.#generateRecurringTransactions(),
       confirmPendingTransaction: (input) => {
@@ -1173,16 +1250,26 @@ class OpenProfileApplication implements ProfileApplication {
         ),
       createTransaction: (input) =>
         this.#executeAndRefreshRates(
-          createTransactionUndoableCommand(this.#database, input, this.#clock),
+          createTransactionUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+            attachmentsPath,
+          ),
         ),
       updateTransaction: (input) =>
         this.#executeAndRefreshRates(
           updateTransactionUndoableCommand(this.#database, input, this.#clock),
         ),
-      deleteTransaction: (id) =>
+      deleteTransaction: (value) => {
+        const input = typeof value === 'string' ? { id: value } : value
+        const attachments = listAttachments(this.#database, input.id)
+        if (input.saveAttachmentsTo !== undefined)
+          copyAttachments(attachments, attachmentsPath, input.saveAttachmentsTo)
         this.#executeAndRefreshRates(
-          deleteTransactionUndoableCommand(this.#database, id),
-        ),
+          deleteTransactionUndoableCommand(this.#database, input.id),
+        )
+      },
       deleteTag: (id) =>
         this.#executeUndoableCommand(
           deleteTagUndoableCommand(this.#database, id),
@@ -1325,6 +1412,10 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      listAttachments: (transactionId) => {
+        this.#assertAvailable()
+        return listAttachments(this.#database, transactionId)
+      },
       getDuePendingTransactionCount: () => {
         this.#assertAvailable()
         return getDuePendingTransactionCount(this.#database, this.#clock)
@@ -1617,6 +1708,11 @@ class OpenProfileApplication implements ProfileApplication {
         renameSync(stagedPath, paths.databasePath)
         this.#database = await openProfileDatabase(this.#options)
         this.#validateIdentity(this.#database)
+        restoreMissingAttachments(
+          this.#database,
+          paths.backupDirectory,
+          attachmentDirectory(paths.dataDirectory),
+        )
         recoveryNeeded = false
       } catch (error) {
         try {
@@ -1856,11 +1952,16 @@ export async function openProfileApplication(
   const application = new OpenProfileApplication(database, options)
   try {
     application.commands.ensureProfileIdentity()
+    sweepUnreferencedAttachments(
+      database,
+      attachmentDirectory(options.paths.dataDirectory),
+    )
     if (options.createStartupBackup !== false) {
       await createStartupBackup(
         database,
         options.paths.backupDirectory,
         options.clock ?? (() => new Date()),
+        attachmentDirectory(options.paths.dataDirectory),
       )
     }
     application.commands.generateRecurringTransactions()

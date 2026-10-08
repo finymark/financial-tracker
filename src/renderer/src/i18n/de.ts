@@ -469,6 +469,29 @@ export const de = {
   'transactions.deleteConfirmation':
     'Diese Transaktion endgültig löschen? Der Kontosaldo wird aktualisiert.',
   'transactions.confirmDelete': 'Transaktion löschen',
+  'attachments.title': 'Anhänge',
+  'attachments.add': 'Hinzufügen',
+  'attachments.drop': 'JPEG-, PNG-, WebP- oder PDF-Dateien hier ablegen.',
+  'attachments.empty': 'Keine Anhänge.',
+  'attachments.open': 'Öffnen',
+  'attachments.remove': 'Entfernen',
+  'attachments.deleteWithTransaction': 'Transaktion und ihre Anhänge löschen',
+  'attachments.saveCopiesAndDelete':
+    'Anhangkopien in einem Ordner speichern…, dann löschen',
+  'attachments.error.type':
+    'Wähle eine JPEG-, PNG-, WebP- oder PDF-Datei. Der Dateityp wird anhand des Inhalts geprüft.',
+  'attachments.error.size': 'Jeder Anhang darf höchstens 25 MB groß sein.',
+  'attachments.error.path':
+    'Die ausgewählte Datei konnte nicht gelesen werden.',
+  'attachments.error.store':
+    'Der Anhang konnte nicht in dieses Profil kopiert werden.',
+  'attachments.error.staged':
+    'Der vorbereitete Anhang ist nicht mehr verfügbar.',
+  'attachments.error.notFound':
+    'Der Anhang wurde nicht gefunden. Aktualisiere die Transaktion.',
+  'attachments.error.copy':
+    'Die Anhangkopien konnten nicht in diesem Ordner gespeichert werden.',
+  'attachments.error.open': 'Der Anhang konnte nicht geöffnet werden.',
   'transactions.cancel': 'Abbrechen',
   'transactions.close': 'Transaktionsleiste schließen',
   'transactions.save': 'Transaktion speichern',

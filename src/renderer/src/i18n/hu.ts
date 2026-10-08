@@ -452,6 +452,26 @@ export const hu = {
   'transactions.deleteConfirmation':
     'Végleg törlöd ezt a tranzakciót? A számla egyenlege frissülni fog.',
   'transactions.confirmDelete': 'Tranzakció törlése',
+  'attachments.title': 'Mellékletek',
+  'attachments.add': 'Hozzáadás',
+  'attachments.drop': 'Húzz ide JPEG-, PNG-, WebP- vagy PDF-fájlokat.',
+  'attachments.empty': 'Nincs melléklet.',
+  'attachments.open': 'Megnyitás',
+  'attachments.remove': 'Eltávolítás',
+  'attachments.deleteWithTransaction': 'Tranzakció és mellékleteinek törlése',
+  'attachments.saveCopiesAndDelete':
+    'Mellékletmásolatok mentése mappába…, majd törlés',
+  'attachments.error.type':
+    'JPEG-, PNG-, WebP- vagy PDF-fájlt válassz. A fájltípust a tartalom alapján ellenőrizzük.',
+  'attachments.error.size': 'Egy melléklet legfeljebb 25 MB lehet.',
+  'attachments.error.path': 'A kiválasztott fájl nem olvasható.',
+  'attachments.error.store': 'A melléklet nem másolható ebbe a profilba.',
+  'attachments.error.staged': 'Az előkészített melléklet már nem érhető el.',
+  'attachments.error.notFound':
+    'A melléklet nem található. Frissítsd a tranzakciót.',
+  'attachments.error.copy':
+    'A mellékletmásolatok nem menthetők ebbe a mappába.',
+  'attachments.error.open': 'A melléklet nem nyitható meg.',
   'transactions.cancel': 'Mégse',
   'transactions.close': 'Tranzakciós panel bezárása',
   'transactions.save': 'Tranzakció mentése',

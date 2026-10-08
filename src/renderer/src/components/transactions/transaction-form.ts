@@ -12,6 +12,10 @@ import { today } from '../../../../shared/date'
 import { amountInput } from '../../lib/amount-input-value'
 import type { MessageKey } from '../../i18n'
 import { ruleError } from '../rule-editor'
+import type {
+  Attachment,
+  StagedAttachment,
+} from '../../../../shared/attachments'
 
 interface CommonForm {
   id: string | null
@@ -29,6 +33,7 @@ export interface TransactionForm extends CommonForm {
   pendingTagName: string
   excluded: boolean
   splitLines: SplitLineForm[] | null
+  attachments: (Attachment | StagedAttachment)[]
 }
 
 export interface TransferForm extends CommonForm {
@@ -67,6 +72,14 @@ const errorKeys = [
   'transactions.error.lines',
   'transactions.error.filters',
   'transactions.error.totals',
+  'attachments.error.type',
+  'attachments.error.size',
+  'attachments.error.path',
+  'attachments.error.store',
+  'attachments.error.staged',
+  'attachments.error.notFound',
+  'attachments.error.copy',
+  'attachments.error.open',
   'tags.error.name',
   'tags.error.notFound',
   'tags.error.duplicate',
@@ -129,6 +142,7 @@ export function emptyForm(accountId = ''): TransactionForm {
     pendingTagName: '',
     excluded: false,
     splitLines: null,
+    attachments: [],
   }
 }
 
@@ -170,6 +184,14 @@ export function createTransactionInput(
     note: form.note,
     tagNames: tagNamesWithPending(form.tagNames, form.pendingTagName),
     excluded: form.excluded,
+    ...(form.attachments.some((attachment) => !('id' in attachment))
+      ? {
+          stagedAttachments: form.attachments.filter(
+            (attachment): attachment is StagedAttachment =>
+              !('id' in attachment),
+          ),
+        }
+      : {}),
     ...(form.splitLines
       ? {
           categoryId: null,
@@ -268,5 +290,6 @@ export function movementForm(
                   }),
                 )
               : null,
+          attachments: transaction.attachments,
         }
 }

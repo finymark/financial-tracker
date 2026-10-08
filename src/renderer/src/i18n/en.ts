@@ -449,6 +449,27 @@ export const en = {
   'transactions.deleteConfirmation':
     'Permanently delete this transaction? Its account balance will update.',
   'transactions.confirmDelete': 'Delete transaction',
+  'attachments.title': 'Attachments',
+  'attachments.add': 'Add',
+  'attachments.drop': 'Drop JPEG, PNG, WebP, or PDF files here.',
+  'attachments.empty': 'No attachments.',
+  'attachments.open': 'Open',
+  'attachments.remove': 'Remove',
+  'attachments.deleteWithTransaction': 'Delete transaction and its attachments',
+  'attachments.saveCopiesAndDelete':
+    'Save attachment copies to a folder…, then delete',
+  'attachments.error.type':
+    'Choose a JPEG, PNG, WebP, or PDF file. File types are checked from their contents.',
+  'attachments.error.size': 'Each attachment must be no larger than 25 MB.',
+  'attachments.error.path': 'The selected file could not be read.',
+  'attachments.error.store':
+    'The attachment could not be copied into this profile.',
+  'attachments.error.staged': 'The staged attachment is no longer available.',
+  'attachments.error.notFound':
+    'The attachment could not be found. Refresh the transaction.',
+  'attachments.error.copy':
+    'The attachment copies could not be saved to that folder.',
+  'attachments.error.open': 'The attachment could not be opened.',
   'transactions.cancel': 'Cancel',
   'transactions.close': 'Close transaction drawer',
   'transactions.save': 'Save transaction',

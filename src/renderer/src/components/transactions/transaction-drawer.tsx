@@ -39,6 +39,7 @@ import {
   emptyTransferForm,
   addPendingTag,
   createTransactionInput,
+  transactionError,
   type DrawerForm,
   type TransactionForm,
   type TransferForm,
@@ -48,6 +49,11 @@ import type { TransactionReferenceData } from './use-transaction-reference-data'
 import { useRuleAutofill } from './use-rule-autofill'
 import { SplitEditor } from './split-editor'
 import { TemplatePicker } from './template-picker'
+import { AttachmentEditor } from './attachment-editor'
+import type {
+  Attachment,
+  StagedAttachment,
+} from '../../../../shared/attachments'
 interface TransactionDrawerProps {
   draft: DrawerForm
   references: TransactionReferenceData
@@ -61,6 +67,7 @@ interface TransactionDrawerProps {
   onClose(): void
   onRuleOffer(prefill: CreateCategorisationRuleInput): void
   onCreateRecurring(prefill: RecurringPrefill): void
+  onAttachmentChanged(): void
   createRef: RefObject<HTMLButtonElement | null>
 }
 function commonFields(form: DrawerForm) {
@@ -86,6 +93,7 @@ export function TransactionDrawer({
   onClose,
   onRuleOffer,
   onCreateRecurring,
+  onAttachmentChanged,
   createRef,
 }: TransactionDrawerProps) {
   const {
@@ -141,14 +149,37 @@ export function TransactionDrawer({
   const amountRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const [focusRevision, setFocusRevision] = useState(0)
+  const [attachmentBusy, setAttachmentBusy] = useState(false)
+  const [attachmentError, setAttachmentError] = useState<MessageKey | null>(
+    null,
+  )
   useDialogFocus(true, dialogRef, amountRef, createRef)
   const [previousDraft, setPreviousDraft] = useState(draft)
+  const [previousSavedAttachments, setPreviousSavedAttachments] = useState(
+    draft.kind === 'expense' || draft.kind === 'income'
+      ? draft.attachments
+      : null,
+  )
   if (draft !== previousDraft) {
     setPreviousDraft(draft)
     setForm(draft)
+    setPreviousSavedAttachments(
+      draft.kind === 'expense' || draft.kind === 'income'
+        ? draft.attachments
+        : null,
+    )
     setTemplateEditor(null)
     setSelectedTemplateId('')
     setPickerRevision(pickerRevision + 1)
+  } else if (form?.id && (form.kind === 'expense' || form.kind === 'income')) {
+    const saved = rows.find(
+      (row): row is Transaction =>
+        row.id === form.id && (row.kind === 'expense' || row.kind === 'income'),
+    )
+    if (saved && saved.attachments !== previousSavedAttachments) {
+      setPreviousSavedAttachments(saved.attachments)
+      setForm({ ...form, attachments: saved.attachments })
+    }
   }
   useEffect(() => {
     manualCategorisation.current = { category: false, tags: false }
@@ -208,6 +239,7 @@ export function TransactionDrawer({
     focusRevision,
   )
   function closeDrawer() {
+    if (attachmentBusy) return
     autofillRequestRef.current += 1
     onClose()
   }
@@ -257,7 +289,7 @@ export function TransactionDrawer({
   }
 
   function save(addAnother = false) {
-    if (!form || busy) return
+    if (!form || busy || attachmentBusy) return
     const nextForm: DrawerForm | null =
       addAnother && form.kind !== 'adjustment'
         ? form.kind === 'transfer'
@@ -378,6 +410,64 @@ export function TransactionDrawer({
     markManual('tags')
     autofillProtected.current.tags = true
     setForm(addPendingTag(form))
+  }
+
+  async function addAttachments(paths: string[]) {
+    if (
+      !form ||
+      (form.kind !== 'expense' && form.kind !== 'income') ||
+      paths.length === 0 ||
+      attachmentBusy
+    )
+      return
+    setAttachmentBusy(true)
+    setAttachmentError(null)
+    const imported: (Attachment | StagedAttachment)[] = []
+    try {
+      for (const path of paths) {
+        const staged = await window.app.attachments.import({ path })
+        imported.push(
+          form.id
+            ? await window.app.attachments.attach({
+                transactionId: form.id,
+                attachment: staged,
+              })
+            : staged,
+        )
+      }
+      setForm({ ...form, attachments: [...form.attachments, ...imported] })
+    } catch (error) {
+      if (imported.length > 0)
+        setForm({ ...form, attachments: [...form.attachments, ...imported] })
+      setAttachmentError(transactionError(error))
+    } finally {
+      if (form.id && imported.length > 0) onAttachmentChanged()
+      setAttachmentBusy(false)
+    }
+  }
+
+  async function removeDrawerAttachment(
+    attachment: Attachment | StagedAttachment,
+  ) {
+    if (!form || (form.kind !== 'expense' && form.kind !== 'income')) return
+    setAttachmentBusy(true)
+    setAttachmentError(null)
+    try {
+      if ('id' in attachment) {
+        await window.app.attachments.remove({ id: attachment.id })
+        onAttachmentChanged()
+      }
+      setForm({
+        ...form,
+        attachments: form.attachments.filter(
+          (candidate) => candidate !== attachment,
+        ),
+      })
+    } catch (error) {
+      setAttachmentError(transactionError(error))
+    } finally {
+      setAttachmentBusy(false)
+    }
   }
 
   const savedTransaction = form?.id
@@ -506,7 +596,7 @@ export function TransactionDrawer({
                 variant="ghost"
                 size="icon"
                 aria-label={t('transactions.close')}
-                disabled={busy}
+                disabled={busy || attachmentBusy}
                 onClick={closeDrawer}
               >
                 <X aria-hidden="true" />
@@ -1032,13 +1122,44 @@ export function TransactionDrawer({
                     </p>
                   </div>
                 )}
+                {(form.kind === 'expense' || form.kind === 'income') && (
+                  <AttachmentEditor
+                    attachments={form.attachments}
+                    busy={busy || attachmentBusy}
+                    t={t}
+                    onAdd={(paths) => void addAttachments(paths)}
+                    onError={(error) =>
+                      setAttachmentError(transactionError(error))
+                    }
+                    onRemove={(attachment) =>
+                      void removeDrawerAttachment(attachment)
+                    }
+                    onOpen={(attachment) => {
+                      setAttachmentError(null)
+                      void window.app.attachments
+                        .open(
+                          'id' in attachment
+                            ? { id: attachment.id }
+                            : { attachment },
+                        )
+                        .catch((error: unknown) =>
+                          setAttachmentError(transactionError(error)),
+                        )
+                    }}
+                  />
+                )}
+                {attachmentError && (
+                  <p role="alert" className="text-sm font-medium text-error">
+                    {t(attachmentError)}
+                  </p>
+                )}
                 {error && (
                   <p role="alert" className="text-sm font-medium text-error">
                     {t(error)}
                   </p>
                 )}
                 <div className="flex flex-wrap gap-2 pt-2">
-                  <Button type="submit" disabled={busy}>
+                  <Button type="submit" disabled={busy || attachmentBusy}>
                     {t(
                       form.kind === 'adjustment'
                         ? 'adjustments.save'
@@ -1048,7 +1169,7 @@ export function TransactionDrawer({
                   {form.kind !== 'adjustment' && (
                     <Button
                       variant="ghost"
-                      disabled={busy}
+                      disabled={busy || attachmentBusy}
                       onClick={() => {
                         if (formRef.current?.reportValidity()) save(true)
                       }}
@@ -1056,7 +1177,11 @@ export function TransactionDrawer({
                       {t('transactions.saveAndAddAnother')}
                     </Button>
                   )}
-                  <Button variant="ghost" disabled={busy} onClick={closeDrawer}>
+                  <Button
+                    variant="ghost"
+                    disabled={busy || attachmentBusy}
+                    onClick={closeDrawer}
+                  >
                     {t('transactions.cancel')}
                   </Button>
                 </div>

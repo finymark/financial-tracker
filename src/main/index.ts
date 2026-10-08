@@ -46,6 +46,8 @@ import { buildTrayMenu, trayLanguage } from './tray-menu'
 import { desktopMessages } from '../shared/desktop-translations'
 import { startsHidden } from '../shared/desktop'
 import { QuickAddShortcut } from './global-shortcut'
+import { registerAttachmentIpc } from './profiles/attachment-ipc'
+import sharp from 'sharp'
 
 let mainWindow: BrowserWindow | null = null
 let quickAddWindow: BrowserWindow | null = null
@@ -166,7 +168,7 @@ function showQuickAddWindow(created: boolean): void {
   }
 }
 
-function smokeTest(): void {
+async function smokeTest(): Promise<void> {
   const directory = mkdtempSync(join(tmpdir(), 'financial-tracker-smoke-'))
   let exitCode = 1
   try {
@@ -177,12 +179,23 @@ function smokeTest(): void {
       }
       if (result.result !== 'ok') throw new Error('SQLite query failed')
       console.log('SQLite smoke test OK')
-      exitCode = 0
     } finally {
       database.close()
     }
+    const image = Buffer.from([255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255])
+    const processed = await sharp(image, {
+      raw: { width: 2, height: 2, channels: 3 },
+    })
+      .resize(1, 1)
+      .png()
+      .toBuffer()
+    const metadata = await sharp(processed).metadata()
+    if (metadata.width !== 1 || metadata.height !== 1)
+      throw new Error('Image processing failed')
+    console.log('Image smoke test OK')
+    exitCode = 0
   } catch {
-    console.error('SQLite smoke test FAILED')
+    console.error('Smoke test FAILED')
   } finally {
     rmSync(directory, { recursive: true, force: true })
     app.exit(exitCode)
@@ -225,7 +238,7 @@ if (!ownsInstance) {
 
 function startApplication(): void {
   if (isSmokeTest) {
-    smokeTest()
+    void smokeTest()
     return
   }
   let settings: AppSettingsFile
@@ -376,6 +389,7 @@ function startApplication(): void {
   registerAccountIpc(ipcMain, profiles)
   registerCategoryIpc(ipcMain, profiles)
   registerTransactionIpc(ipcMain, profiles)
+  const disposeAttachmentIpc = registerAttachmentIpc(ipcMain, profiles)
   registerTransactionCsvIpc(ipcMain, profiles)
   registerPayeeIpc(ipcMain, profiles)
   registerTransferIpc(ipcMain, profiles)
@@ -422,6 +436,7 @@ function startApplication(): void {
   tray.on('double-click', showMainWindow)
   updateTray()
   app.on('will-quit', () => {
+    disposeAttachmentIpc()
     quickAddShortcut.dispose()
     tray?.destroy()
   })
