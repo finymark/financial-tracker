@@ -18,6 +18,7 @@ import type {
   ReportDateRangeInput,
   ReportPeriod,
 } from '../../shared/reports'
+import { SpendingPaceSection } from './SpendingPaceSection'
 import { Button } from './components/ui/button'
 import { CardContent } from './components/ui/card'
 import { Input } from './components/ui/input'
@@ -50,7 +51,7 @@ export function ReportsPage({
   onOpenTransactions,
 }: ReportsPageProps) {
   const format = createFormatters(language)
-  const [tab, setTab] = useState<'category' | 'trend'>('category')
+  const [tab, setTab] = useState<'category' | 'trend' | 'pace'>('category')
   const [filters, setFilters] = useState({
     period: 'thisMonth' as ReportPeriod,
     from: '',
@@ -146,6 +147,7 @@ export function ReportsPage({
     <CardContent className="space-y-6">
       <div
         className="flex flex-wrap gap-2"
+        role="group"
         aria-label={t('navigation.reports')}
       >
         <Button
@@ -164,69 +166,79 @@ export function ReportsPage({
         >
           {t('reports.trend.title')}
         </Button>
-      </div>
-      <form
-        className="flex flex-wrap items-end gap-3 rounded-md border p-3"
-        onSubmit={apply}
-        aria-label={t('reports.dateRange')}
-      >
-        <label className="min-w-40 space-y-1 text-xs font-medium">
-          {t('transactions.period')}
-          <NativeSelect
-            value={filters.period}
-            onChange={(event) =>
-              setFilters({
-                ...filters,
-                period: event.target.value as ReportPeriod,
-              })
-            }
-          >
-            {(
-              [
-                'thisMonth',
-                'lastMonth',
-                'thisYear',
-                'last12Months',
-                'custom',
-              ] as const
-            ).map((period) => (
-              <option key={period} value={period}>
-                {t(`reports.period.${period}`)}
-              </option>
-            ))}
-          </NativeSelect>
-        </label>
-        {filters.period === 'custom' && (
-          <>
-            <label className="space-y-1 text-xs font-medium">
-              {t('transactions.from')}
-              <Input
-                type="date"
-                value={filters.from}
-                required
-                onChange={(event) =>
-                  setFilters({ ...filters, from: event.target.value })
-                }
-              />
-            </label>
-            <label className="space-y-1 text-xs font-medium">
-              {t('transactions.to')}
-              <Input
-                type="date"
-                value={filters.to}
-                min={filters.from || undefined}
-                required
-                onChange={(event) =>
-                  setFilters({ ...filters, to: event.target.value })
-                }
-              />
-            </label>
-          </>
-        )}
-        <Button type="submit" disabled={loading}>
-          {t('reports.apply')}
+        <Button
+          type="button"
+          variant={tab === 'pace' ? 'default' : 'ghost'}
+          aria-pressed={tab === 'pace'}
+          onClick={() => setTab('pace')}
+        >
+          {t('reports.pace.title')}
         </Button>
-      </form>
+      </div>
+      {tab !== 'pace' && (
+        <form
+          className="flex flex-wrap items-end gap-3 rounded-md border p-3"
+          onSubmit={apply}
+          aria-label={t('reports.dateRange')}
+        >
+          <label className="min-w-40 space-y-1 text-xs font-medium">
+            {t('transactions.period')}
+            <NativeSelect
+              value={filters.period}
+              onChange={(event) =>
+                setFilters({
+                  ...filters,
+                  period: event.target.value as ReportPeriod,
+                })
+              }
+            >
+              {(
+                [
+                  'thisMonth',
+                  'lastMonth',
+                  'thisYear',
+                  'last12Months',
+                  'custom',
+                ] as const
+              ).map((period) => (
+                <option key={period} value={period}>
+                  {t(`reports.period.${period}`)}
+                </option>
+              ))}
+            </NativeSelect>
+          </label>
+          {filters.period === 'custom' && (
+            <>
+              <label className="space-y-1 text-xs font-medium">
+                {t('transactions.from')}
+                <Input
+                  type="date"
+                  value={filters.from}
+                  required
+                  onChange={(event) =>
+                    setFilters({ ...filters, from: event.target.value })
+                  }
+                />
+              </label>
+              <label className="space-y-1 text-xs font-medium">
+                {t('transactions.to')}
+                <Input
+                  type="date"
+                  value={filters.to}
+                  min={filters.from || undefined}
+                  required
+                  onChange={(event) =>
+                    setFilters({ ...filters, to: event.target.value })
+                  }
+                />
+              </label>
+            </>
+          )}
+          <Button type="submit" disabled={loading}>
+            {t('reports.apply')}
+          </Button>
+        </form>
+      )}
 
       {tab === 'trend' && (
         <MonthlyTrendReport request={request} language={language} t={t} />
@@ -476,6 +488,7 @@ export function ReportsPage({
           </section>
         </>
       )}
+      {tab === 'pace' && <SpendingPaceSection language={language} t={t} />}
     </CardContent>
   )
 }

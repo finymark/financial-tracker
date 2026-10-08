@@ -225,6 +225,21 @@ export const hu = {
   'reports.trend.expenses': 'Kiadások',
   'reports.trend.incomes': 'Bevételek',
   'reports.trend.net': 'Egyenleg',
+  'reports.pace.title': 'Költési ütem',
+  'reports.pace.description':
+    'Az eddigi havi kiadások összehasonlítása az előző három naptári hónap azonos napig számított átlagával, a hónap hosszához igazítva.',
+  'reports.pace.current': 'Eddigi havi kiadások',
+  'reports.pace.average': 'Háromhavi átlag',
+  'reports.pace.difference': 'A szokásos költéshez képest',
+  'reports.pace.ahead': 'Előrébb',
+  'reports.pace.behind': 'Lemaradva',
+  'reports.pace.onPace': 'Azonos ütemben',
+  'reports.pace.noBaseline': 'Nincs alap a százalékhoz',
+  'reports.pace.partial':
+    'Részleges összehasonlítás: egyes összegek nem válthatók át. Az érintett hónapok alább láthatók.',
+  'reports.pace.months': 'Összehasonlított hónapok',
+  'reports.pace.refresh': 'Ütem frissítése',
+  'reports.pace.chartLabel': 'Eddigi havi kiadások a háromhavi átlaghoz képest',
   'reports.title': 'Kiadások kategóriánként',
   'reports.description':
     'Hasonlítsa össze a kategóriák összegeit az alapdevizában, és tekintse meg a mögöttes tranzakciókat.',

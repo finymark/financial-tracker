@@ -168,6 +168,7 @@ import {
 } from './profile-exchange-rates'
 import type {
   CategoryBreakdownReport,
+  SpendingPaceReport,
   MonthlyTrendReport,
   ReportDateRangeInput,
 } from '../../shared/reports'
@@ -176,6 +177,7 @@ import {
   resolveReportDateRange,
 } from './report-validation'
 import { getCategoryBreakdown } from './profile-reports'
+import { getSpendingPace } from './profile-report-pace'
 import { getOverviewDashboard } from './profile-report-overview'
 import type { OverviewDashboard } from '../../shared/report-overview'
 import { getMonthlyTrend } from './profile-report-trend'
@@ -233,6 +235,7 @@ export interface OpenProfileApplicationOptions {
 }
 
 export interface ProfileQueries {
+  getSpendingPace(): SpendingPaceReport
   getOverviewDashboard(): OverviewDashboard
   getMonthlyTrend(input: ReportDateRangeInput): MonthlyTrendReport
   getCategoryBreakdown(input: ReportDateRangeInput): CategoryBreakdownReport
@@ -1147,6 +1150,12 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      getSpendingPace: () => {
+        this.#assertAvailable()
+        return this.#database.transaction(() =>
+          getSpendingPace(this.#database, this.#clock),
+        )()
+      },
       getOverviewDashboard: () => {
         this.#assertAvailable()
         return this.#database.transaction(() =>

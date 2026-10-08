@@ -3,6 +3,7 @@ import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 
 const bridge: AppBridge = {
   reports: {
+    spendingPace: () => ipcRenderer.invoke(IPC_CHANNELS.reportsSpendingPace),
     overviewDashboard: () =>
       ipcRenderer.invoke(IPC_CHANNELS.reportsOverviewDashboard),
     monthlyTrend: (input) =>

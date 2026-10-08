@@ -239,6 +239,22 @@ export const de = {
   'reports.trend.expenses': 'Ausgaben',
   'reports.trend.incomes': 'Einnahmen',
   'reports.trend.net': 'Saldo',
+  'reports.pace.title': 'Ausgabentempo',
+  'reports.pace.description':
+    'Bisherige Ausgaben dieses Monats im Vergleich zum Durchschnitt der drei vorherigen Kalendermonate bis zum gleichen Tag, begrenzt auf die jeweilige Monatslänge.',
+  'reports.pace.current': 'Dieser Monat bisher',
+  'reports.pace.average': 'Dreimonatsdurchschnitt',
+  'reports.pace.difference': 'Im Vergleich zu den üblichen Ausgaben',
+  'reports.pace.ahead': 'Voraus',
+  'reports.pace.behind': 'Zurück',
+  'reports.pace.onPace': 'Im üblichen Tempo',
+  'reports.pace.noBaseline': 'Keine Basis für einen Prozentsatz',
+  'reports.pace.partial':
+    'Teilweiser Vergleich: Einige Beträge konnten nicht umgerechnet werden. Die betroffenen Monate stehen unten.',
+  'reports.pace.months': 'Vergleichsmonate',
+  'reports.pace.refresh': 'Tempo aktualisieren',
+  'reports.pace.chartLabel':
+    'Bisherige Monatsausgaben im Vergleich zum Dreimonatsdurchschnitt',
   'reports.title': 'Ausgaben nach Kategorie',
   'reports.description':
     'Vergleichen Sie Kategoriesummen in Ihrer Basiswährung und öffnen Sie die zugehörigen Transaktionen.',

@@ -223,6 +223,22 @@ export const en = {
   'reports.trend.expenses': 'Expenses',
   'reports.trend.incomes': 'Incomes',
   'reports.trend.net': 'Net',
+  'reports.pace.title': 'Spending pace',
+  'reports.pace.description':
+    'This month so far compared with the average of the previous three calendar months up to the same day, clamped to each month’s length.',
+  'reports.pace.current': 'This month so far',
+  'reports.pace.average': 'Three-month average',
+  'reports.pace.difference': 'Compared with usual spending',
+  'reports.pace.ahead': 'Ahead',
+  'reports.pace.behind': 'Behind',
+  'reports.pace.onPace': 'On pace',
+  'reports.pace.noBaseline': 'No baseline for a percentage',
+  'reports.pace.partial':
+    'Partial comparison: some amounts could not be converted. See the affected months below.',
+  'reports.pace.months': 'Comparison months',
+  'reports.pace.refresh': 'Refresh pace',
+  'reports.pace.chartLabel':
+    'This month’s expenses so far versus the three-month average',
   'reports.title': 'Expenses by category',
   'reports.description':
     'Compare category totals in your base currency and drill down to the transactions behind them.',
