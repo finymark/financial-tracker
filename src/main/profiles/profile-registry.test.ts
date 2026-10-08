@@ -1,7 +1,13 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { openProfileApplication } from './profile-application'
 import { ProfileRegistry } from './profile-registry'
 
@@ -20,6 +26,135 @@ afterEach(() => {
 })
 
 describe('profile registry', () => {
+  test('retries a transient lock when first creating the registry', () => {
+    const userData = temporaryUserData()
+    const lock = Object.assign(new Error('Synthetic lock'), { code: 'EPERM' })
+    const rename = vi
+      .fn<typeof renameSync>()
+      .mockImplementationOnce(() => {
+        throw lock
+      })
+      .mockImplementation(renameSync)
+    const wait = vi.fn()
+
+    const registry = new ProfileRegistry({
+      userDataDirectory: userData,
+      rename,
+      wait,
+    })
+
+    expect(registry.listProfiles()).toEqual([])
+    expect(rename).toHaveBeenCalledTimes(2)
+    expect(wait.mock.calls).toEqual([[10]])
+    expect(existsSync(join(userData, 'profiles.json.tmp'))).toBe(false)
+  })
+
+  test.each(['EPERM', 'EACCES', 'EBUSY'])(
+    'retries %s without changing the original until atomic replacement succeeds',
+    (code) => {
+      const userData = temporaryUserData()
+      const rename = vi.fn(renameSync)
+      const wait = vi.fn()
+      const registry = new ProfileRegistry({
+        userDataDirectory: userData,
+        rename,
+        wait,
+      })
+      const first = registry.createProfile('First profile')
+      registry.rememberLastUsed(first.id)
+      const registryPath = join(userData, 'profiles.json')
+      const original = readFileSync(registryPath, 'utf8')
+      const lock = Object.assign(new Error('Synthetic lock'), { code })
+      rename.mockClear()
+      rename
+        .mockImplementationOnce(() => {
+          throw lock
+        })
+        .mockImplementationOnce(() => {
+          throw lock
+        })
+      wait.mockImplementation(() => {
+        expect(readFileSync(registryPath, 'utf8')).toBe(original)
+        expect(
+          JSON.parse(readFileSync(`${registryPath}.tmp`, 'utf8')).profiles[0]
+            .name,
+        ).toBe('Renamed profile')
+      })
+
+      const renamed = registry.renameProfile(first.id, 'Renamed profile')
+
+      expect(rename.mock.calls).toEqual(
+        Array(3).fill([`${registryPath}.tmp`, registryPath]),
+      )
+      expect(wait.mock.calls).toEqual([[10], [20]])
+      expect(registry.listProfiles()).toEqual([renamed])
+      const reopened = new ProfileRegistry({ userDataDirectory: userData })
+      expect(reopened.listProfiles()).toEqual([renamed])
+      expect(reopened.getLastUsedProfileId()).toBe(first.id)
+      expect(existsSync(`${registryPath}.tmp`)).toBe(false)
+    },
+  )
+
+  test.each(['EPERM', 'EACCES', 'EBUSY'])(
+    'bounds retries for persistent %s and rolls back failed profile creation',
+    (code) => {
+      const userData = temporaryUserData()
+      const rename = vi.fn(renameSync)
+      const wait = vi.fn()
+      const id = '00000000-0000-4000-8000-000000000001'
+      const registry = new ProfileRegistry({
+        userDataDirectory: userData,
+        createId: () => id,
+        rename,
+        wait,
+      })
+      const registryPath = join(userData, 'profiles.json')
+      const original = readFileSync(registryPath, 'utf8')
+      const lock = Object.assign(new Error('Synthetic lock'), { code })
+      rename.mockClear()
+      rename.mockImplementation(() => {
+        throw lock
+      })
+
+      expect(() => registry.createProfile('Failed profile')).toThrow(lock)
+
+      expect(rename).toHaveBeenCalledTimes(6)
+      expect(wait.mock.calls).toEqual([[10], [20], [40], [80], [160]])
+      expect(readFileSync(registryPath, 'utf8')).toBe(original)
+      expect(registry.listProfiles()).toEqual([])
+      expect(existsSync(registry.getProfilePaths(id).profileDirectory)).toBe(
+        false,
+      )
+    },
+  )
+
+  test.each(['EIO', 'ENOENT'])(
+    'propagates non-transient %s without retrying',
+    (code) => {
+      const userData = temporaryUserData()
+      const registryPath = join(userData, 'profiles.json')
+      const rename = vi.fn(renameSync)
+      const wait = vi.fn()
+      const registry = new ProfileRegistry({
+        userDataDirectory: userData,
+        rename,
+        wait,
+      })
+      const original = readFileSync(registryPath, 'utf8')
+      const failure = Object.assign(new Error('Synthetic failure'), { code })
+      rename.mockClear()
+      rename.mockImplementation(() => {
+        throw failure
+      })
+
+      expect(() => registry.createProfile('Failed profile')).toThrow(failure)
+
+      expect(rename).toHaveBeenCalledTimes(1)
+      expect(wait).not.toHaveBeenCalled()
+      expect(readFileSync(registryPath, 'utf8')).toBe(original)
+    },
+  )
+
   test('lists profiles and remembers the last profile used', () => {
     const userData = temporaryUserData()
     const registry = new ProfileRegistry({
