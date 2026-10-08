@@ -18,6 +18,7 @@ import type {
   ReportDateRangeInput,
   ReportPeriod,
 } from '../../shared/reports'
+import { CashFlowReport } from './CashFlowReport'
 import { Button } from './components/ui/button'
 import { CardContent } from './components/ui/card'
 import { Input } from './components/ui/input'
@@ -67,6 +68,9 @@ export function ReportsPage({
   const report = currentResult?.report ?? null
   const loading = currentResult === null
   const error = currentResult?.error ?? false
+  const [reportView, setReportView] = useState<'categories' | 'cashFlow'>(
+    'categories',
+  )
   const [chartKind, setChartKind] = useState<ChartKind>('pie')
   const [selectedId, setSelectedId] = useState<string | null | undefined>()
 
@@ -141,6 +145,24 @@ export function ReportsPage({
 
   return (
     <CardContent className="space-y-6">
+      <div className="flex gap-2" role="group" aria-label={t('reports.view')}>
+        <Button
+          type="button"
+          variant={reportView === 'categories' ? 'default' : 'ghost'}
+          aria-pressed={reportView === 'categories'}
+          onClick={() => setReportView('categories')}
+        >
+          {t('reports.title')}
+        </Button>
+        <Button
+          type="button"
+          variant={reportView === 'cashFlow' ? 'default' : 'ghost'}
+          aria-pressed={reportView === 'cashFlow'}
+          onClick={() => setReportView('cashFlow')}
+        >
+          {t('reports.cashFlow.title')}
+        </Button>
+      </div>
       <form
         className="flex flex-wrap items-end gap-3 rounded-md border p-3"
         onSubmit={apply}
@@ -199,22 +221,25 @@ export function ReportsPage({
             </label>
           </>
         )}
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" disabled={reportView === 'categories' && loading}>
           {t('reports.apply')}
         </Button>
       </form>
 
-      {loading && (
+      {reportView === 'cashFlow' && (
+        <CashFlowReport request={request} language={language} t={t} />
+      )}
+      {reportView === 'categories' && loading && (
         <p role="status" className="text-sm text-muted-foreground">
           {t('reports.loading')}
         </p>
       )}
-      {error && (
+      {reportView === 'categories' && error && (
         <p role="alert" className="text-sm font-medium text-error">
           {t('reports.error')}
         </p>
       )}
-      {!loading && !error && report && (
+      {reportView === 'categories' && !loading && !error && report && (
         <>
           <section className="space-y-3" aria-labelledby="report-total">
             <div className="flex flex-wrap items-center justify-between gap-3">

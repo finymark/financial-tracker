@@ -340,6 +340,43 @@ not off-device copies or backups of the separate data folder.
 - Switch between pie and bar charts. Choose a main category to see its direct
   lines and subcategories, then open Transactions with that category and the
   inclusive report range applied.
+- Choose **Cash flow** to draw income main categories (including uncategorized
+  income) through **Income** to expense main categories. A **From savings / deficit**
+  source or **Saved / surplus** sink balances unequal flows. These are balancing
+  amounts for the selected range, not account balances or actual savings transfers.
+- Cash-flow data comes from the profile application query. Each category converts
+  exactly and rounds once to base-currency hundredths; links reuse that value.
+  The central node and balancing amount sum those rounded flows, so they can differ
+  slightly from a whole-period aggregate rounded once. Unconverted income and
+  expenses remain separate by currency and never enter the diagram.
+
+### Manual Reports charts check
+
+Run `npm run dev` with synthetic HUF and CHF accounts, income and expense main
+categories/subcategories, split parts, uncategorized lines, excluded transactions,
+transfers (with and without ordinary fees), and balance adjustments. Repeat in
+HU/EN/DE and light/dark themes. Apply every preset and an inclusive custom range;
+verify the category pie/bar charts, drill-down and Transactions link still work.
+Switch to **Cash flow** and verify the same applied range is retained. Check equal
+income/expense, surplus, deficit, income-only, expense-only, empty and missing-rate-only
+ranges: categories flow through Income and the balancing source/sink appears only
+when needed. Check both kinds of uncategorized group, split parts grouped by their
+own main category, archived category history, and exclusions. Only ordinary transfer
+fees count, never transfer legs or balance adjustments.
+
+Hover nodes and links and check locale-formatted base-currency tooltips, translated
+seeded/balancing labels, preserved custom names, readable theme colors, and the
+text table (including full long names). Resize the window and check horizontal
+scrolling without clipped chart controls. Change base currency and verify dated
+conversion and previous-published-day fallback. With missing or stale cached rates,
+verify separate unconverted income/expense amounts and the provisional indicator;
+neither bucket enters the diagram. Use small fractional conversions to check links
+match rounded category values and central inflow equals outflow; the rounding note
+explains differences from whole-period totals. Check loading/error/empty messages,
+keyboard navigation of view/range controls, and switching views/languages while a
+query is pending. Charts remain manual checks; temporary SQLite application-API
+tests cover cash-flow values, balancing, exclusions, splits, cached conversion,
+missing buckets, staleness, range validation and empty data.
 
 ## Accounts
 

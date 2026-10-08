@@ -202,6 +202,23 @@ export const hu = {
   'reports.title': 'Kiadások kategóriánként',
   'reports.description':
     'Hasonlítsa össze a kategóriák összegeit az alapdevizában, és tekintse meg a mögöttes tranzakciókat.',
+  'reports.heading': 'Kimutatások az alapdevizában',
+  'reports.introduction':
+    'Kategóriák és pénzáramlás a választott dátumtartományban.',
+  'reports.view': 'Kimutatás nézete',
+  'reports.cashFlow.title': 'Pénzáramlás',
+  'reports.cashFlow.income': 'Bevétel',
+  'reports.cashFlow.expense': 'Kiadások',
+  'reports.cashFlow.uncategorizedIncome': 'Kategorizálatlan bevétel',
+  'reports.cashFlow.uncategorizedExpense': 'Kategorizálatlan kiadás',
+  'reports.cashFlow.deficit': 'Megtakarításból / hiány',
+  'reports.cashFlow.surplus': 'Megtakarítva / többlet',
+  'reports.cashFlow.empty':
+    'Ebben a dátumtartományban nincs átváltott bevétel vagy kiadás.',
+  'reports.cashFlow.description':
+    'A bevételi kategóriák a Bevétel csomóponton át a kiadási kategóriákhoz áramlanak. A megtakarítás kiegyenlíti az átváltott összegeket; a nem átváltott összegek külön szerepelnek.',
+  'reports.cashFlow.rounding':
+    'Az áramlások kerekített kategóriaösszegeket használnak; összegük kissé eltérhet az egyszer kerekített teljes időszaki összegtől.',
   'reports.dateRange': 'Kimutatás dátumtartománya',
   'reports.period.thisMonth': 'Ez a hónap',
   'reports.period.lastMonth': 'Előző hónap',

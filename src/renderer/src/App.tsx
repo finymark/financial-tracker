@@ -638,8 +638,16 @@ function Shell({
           </header>
           <Card>
             <CardHeader>
-              <CardTitle>{t(`${page}.title`)}</CardTitle>
-              <CardDescription>{t(`${page}.description`)}</CardDescription>
+              <CardTitle>
+                {t(page === 'reports' ? 'reports.heading' : `${page}.title`)}
+              </CardTitle>
+              <CardDescription>
+                {t(
+                  page === 'reports'
+                    ? 'reports.introduction'
+                    : `${page}.description`,
+                )}
+              </CardDescription>
             </CardHeader>
             {page === 'accounts' && (
               <AccountsPage

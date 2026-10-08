@@ -175,6 +175,8 @@ import {
   resolveReportDateRange,
 } from './report-validation'
 import { getCategoryBreakdown } from './profile-reports'
+import type { CashFlowReport } from '../../shared/report-cash-flow'
+import { getCashFlow } from './profile-report-cash-flow'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -229,6 +231,7 @@ export interface OpenProfileApplicationOptions {
 }
 
 export interface ProfileQueries {
+  getCashFlow(input: ReportDateRangeInput): CashFlowReport
   getCategoryBreakdown(input: ReportDateRangeInput): CategoryBreakdownReport
   convertToBaseCurrency(
     lines: readonly ConversionLine[],
@@ -1141,6 +1144,16 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      getCashFlow: (input) => {
+        this.#assertAvailable()
+        const range = resolveReportDateRange(
+          parseReportDateRangeInput(input),
+          this.#clock,
+        )
+        return this.#database.transaction(() =>
+          getCashFlow(this.#database, range, this.#clock),
+        )()
+      },
       getCategoryBreakdown: (input) => {
         this.#assertAvailable()
         const range = resolveReportDateRange(
