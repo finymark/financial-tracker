@@ -19,7 +19,7 @@ export function confirmPendingFields(
   input: Record<string, unknown>,
 ): ConfirmPendingTransactionInput {
   return {
-    id: validateRecurringId(input.id),
+    id: validatePendingId(input.id),
     ...(input.amountMinor === undefined
       ? {}
       : { amountMinor: validateTransactionTotal(input.amountMinor) }),
@@ -27,6 +27,12 @@ export function confirmPendingFields(
       ? {}
       : { date: validateTransactionDateShape(input.date) }),
   }
+}
+
+export function validatePendingId(value: unknown): string {
+  if (typeof value !== 'string' || !UUID_PATTERN.test(value))
+    throw new Error('pending.error.notFound')
+  return value
 }
 
 export function validateRecurringId(value: unknown): string {

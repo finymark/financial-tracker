@@ -1,9 +1,13 @@
 import type {
+  CreateTransactionInput,
   Transaction,
   TransactionKind,
 } from '../../../../shared/transactions'
+import type { Currency } from '../../../../shared/accounts'
 import type { Transfer } from '../../../../shared/transfers'
 import type { BalanceAdjustment } from '../../../../shared/adjustments'
+import { parseAmountExpression } from '../../../../shared/amount-expression'
+import { tagKey } from '../../../../shared/text-keys'
 import { today } from '../../../../shared/date'
 import { amountInput } from '../../lib/amount-input-value'
 import type { MessageKey } from '../../i18n'
@@ -125,6 +129,64 @@ export function emptyForm(accountId = ''): TransactionForm {
     pendingTagName: '',
     excluded: false,
     splitLines: null,
+  }
+}
+
+function tagNamesWithPending(
+  tagNames: readonly string[],
+  pendingTagName: string,
+): string[] {
+  const pending = pendingTagName.trim()
+  return pending ? [...tagNames, pending] : [...tagNames]
+}
+
+export function addPendingTag(form: TransactionForm): TransactionForm {
+  const name = form.pendingTagName.trim()
+  if (!name) return form
+  return {
+    ...form,
+    tagNames: form.tagNames.some((tag) => tagKey(tag) === tagKey(name))
+      ? form.tagNames
+      : [...form.tagNames, name],
+    pendingTagName: '',
+  }
+}
+
+export function createTransactionInput(
+  form: TransactionForm,
+  currency: Currency,
+): CreateTransactionInput {
+  return {
+    accountId: form.accountId,
+    kind: form.kind,
+    date: form.date,
+    totalMinor: parseAmountExpression(
+      form.amount,
+      currency,
+      'transactions.error.amount',
+    ),
+    payeeName: form.payeeName,
+    categoryId: form.categoryId || null,
+    note: form.note,
+    tagNames: tagNamesWithPending(form.tagNames, form.pendingTagName),
+    excluded: form.excluded,
+    ...(form.splitLines
+      ? {
+          categoryId: null,
+          note: '',
+          tagNames: [],
+          lines: form.splitLines.map((line) => ({
+            amountMinor: parseAmountExpression(
+              line.amount,
+              currency,
+              'transactions.error.amount',
+            ),
+            categoryId: line.categoryId || null,
+            note: line.note,
+            tagNames: tagNamesWithPending(line.tagNames, line.pendingTagName),
+          })),
+        }
+      : {}),
   }
 }
 

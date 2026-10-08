@@ -323,9 +323,9 @@ not off-device copies or backups of the separate data folder.
   Recurring sidebar badge counts pending occurrences due today or earlier.
   Confirming posts the snapshotted payee, account, category, tags, and note as a
   normal transaction; its amount and non-future date can be adjusted first.
-  Skipping consumes only that occurrence. Confirm and skip are undoable, and an
-  archived snapshot account must be replaced on the recurring definition before
-  confirmation.
+  Skipping consumes only that occurrence. Confirm and skip are undoable. If a
+  pending snapshot's account is archived, unarchive the account or skip that
+  occurrence.
 - Editing changes only occurrences not yet created. Pausing stops generation;
   resuming starts from yesterday, so dates passed during the pause are skipped.
   Deleting removes still-pending occurrences. Create, edit, pause, resume and
@@ -363,7 +363,8 @@ the action on a split transaction must be disabled with an explanatory hint.
   last used active account, payee and alias suggestions, categorisation-rule and
   last-used autofill, category, tags, note, and today's date. Enter saves, Esc
   closes, and Ctrl+Enter saves and starts another transaction. Transfers, splits,
-  and templates stay in the full transaction drawer.
+  templates, and the post-save **Create rule** offer stay in the full transaction
+  drawer.
 - The shortcut is an app-level setting shared by all profiles on the Windows
   account. Change it by pressing a new combination in **Settings**, or reset it to
   Ctrl+Alt+N. If Windows or another program has reserved a combination, the app
@@ -1352,15 +1353,15 @@ navigation, focus indicators, and validation errors. UI checks are manual.
 
 Closing the main window always hides it to the tray; it does **not** quit.
 Left-click or double-click the tray icon, or choose **Open**, to restore and focus
-it. **Quick add** currently opens the main window's new-transaction drawer
-(ticket #81 will replace this entry point with a small quick-add window). With
-no profile open, choose a profile first; without active accounts the existing
-no-accounts guidance appears. An already open drawer/dialog and its unsaved
-input are preserved. **Quit** stops the scheduler and closes the profile through
-the existing shutdown path. Starting the app again restores/focuses the existing
-window, even if the second launch includes `--hidden`; it never opens a second
-app instance. A standalone `--hidden` launch creates only the tray icon and keeps
-the main window hidden until requested.
+it. **Quick add** opens the separate compact quick-add window and opens the last
+used profile when necessary. Without a profile or active account, that window
+shows the corresponding guidance. An already open main-window drawer/dialog and
+its unsaved input are preserved. **Quit** stops the scheduler and closes the
+profile through the existing shutdown path. Starting the app again normally
+restores/focuses the existing window; a second launch with `--hidden` leaves its
+current visibility unchanged. It never opens a second app instance. A standalone
+`--hidden` launch creates only the tray icon and keeps the main window hidden
+until requested.
 
 The tooltip, menu, and first-close native notice use the active profile language,
 falling back to the Windows locale and then English. Changing language, switching
@@ -1397,11 +1398,14 @@ window lifecycle are manual checks, not covered by the unit suite.
    Acknowledge it, restore, close again, switch profiles, quit/relaunch and close:
    the notice must not repeat. Check the Task Manager process is still running.
 3. Restore via tray left-click, double-click and **Open**; each must show/focus
-   the same window. Minimize and repeat. Choose **Quick add** from Overview and
-   Settings: verify Transactions opens with a new drawer and Amount focused.
-   Save a synthetic transaction and check its account balance and Undo. Repeat
-   without an open profile (select one), without accounts (normal guidance), and
-   while a drawer/dialog already has unsaved input (it must remain intact).
+   the same window. Minimize and repeat. Choose **Quick add** from the tray while
+   the main window is on Overview and Settings: verify the separate compact window
+   opens with Amount focused. Save a synthetic transaction and check its account
+   balance and Undo. Repeat without an open profile (the last used profile opens),
+   without any profiles or accounts (translated guidance), and while a main-window
+   drawer/dialog has unsaved input (it must remain intact). Switch profiles while
+   quick add is open and verify its profile settings, accounts, categories, payees,
+   tags, and saves all change to the newly active profile.
 4. Change the active profile language through HU/EN/DE. Check tray tooltip,
    **Open**, **Quick add**, and **Quit** immediately update. Switch to a profile
    with another language and restore a backup with another language. Before
@@ -1410,9 +1414,10 @@ window lifecycle are manual checks, not covered by the unit suite.
    synthetic app-data installations. Verify light/dark Settings and keyboard
    access to the startup toggle. In `npm run dev`, verify the toggle is disabled
    and the explanatory text appears.
-5. Hide to tray or minimize, then launch the installed app again from its shortcut
-   (and once with `--hidden`). Verify the same window restores/focuses and there
-   is still one tray icon and one main application instance. Also test a rapid
+5. Hide to tray or minimize, then launch the installed app again from its shortcut.
+   Verify the same window restores/focuses and there is still one tray icon and
+   one main application instance. Launch again with `--hidden` and verify it does
+   not show a hidden window or change a visible window. Also test a rapid ordinary
    second launch during initial startup; it must show the existing window.
 6. Enable **Start with Windows**, switch profiles and restart normally: verify
    the shared toggle remains on. Quit, sign out and sign in to Windows: verify

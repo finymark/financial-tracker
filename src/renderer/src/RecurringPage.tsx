@@ -18,6 +18,7 @@ import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
 import type { RecurringPrefill } from './lib/recurring-prefill'
+import { today } from '../../shared/date'
 
 interface Props {
   language: Language
@@ -28,14 +29,6 @@ interface Props {
   onPrefillHandled?(): void
 }
 
-function localToday(): string {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 function futureLimit(from: string): string {
   const date = new Date(`${from}T00:00:00`)
   date.setFullYear(date.getFullYear() + 100)
@@ -44,7 +37,7 @@ function futureLimit(from: string): string {
 
 function nextDue(item: RecurringTransaction): string | null {
   if (item.paused) return null
-  const from = localToday()
+  const from = today()
   return (
     dueDates(
       item.schedule,
@@ -116,7 +109,7 @@ function RecurringEditor({
         : initialSchedule.type === 'weekly'
           ? initialSchedule.intervalWeeks
           : 1,
-    startDate: item?.startDate ?? prefill?.startDate ?? localToday(),
+    startDate: item?.startDate ?? prefill?.startDate ?? today(),
     endDate: item?.endDate ?? prefill?.endDate ?? '',
   })
   const [error, setError] = useState(false)
@@ -474,7 +467,7 @@ function PendingEditor({
           <Input
             type="date"
             value={date}
-            max={localToday()}
+            max={today()}
             required
             disabled={busy}
             onChange={(event) => setDate(event.target.value)}
@@ -521,6 +514,7 @@ export function RecurringPage({
   )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<MessageKey | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const format = new Intl.DateTimeFormat(
     language === 'hu' ? 'hu-HU' : language === 'de' ? 'de-DE' : 'en-GB',
     { dateStyle: 'medium', timeZone: 'UTC' },
@@ -564,6 +558,16 @@ export function RecurringPage({
       )
       .catch(() => setError('recurring.error'))
   }, [undoRevision])
+  useEffect(
+    () =>
+      window.app.recurring.onPendingChanged(() => {
+        void window.app.recurring
+          .pending()
+          .then(setPending)
+          .catch(() => setError('recurring.error'))
+      }),
+    [],
+  )
   async function run(action: () => Promise<unknown>) {
     setBusy(true)
     setError(null)
@@ -656,7 +660,7 @@ export function RecurringPage({
           <ul className="space-y-3">
             {pending.map((item) => {
               const account = accounts.find(({ id }) => id === item.accountId)
-              const overdue = item.dueDate < localToday()
+              const overdue = item.dueDate < today()
               return (
                 <li
                   key={item.id}
@@ -775,18 +779,41 @@ export function RecurringPage({
                           item.paused ? 'recurring.resume' : 'recurring.pause',
                         )}
                       </Button>
-                      <Button
-                        variant="ghost"
-                        disabled={busy}
-                        onClick={() => {
-                          if (confirm(t('recurring.deleteConfirmation')))
-                            void run(() =>
-                              window.app.recurring.delete({ id: item.id }),
-                            )
-                        }}
-                      >
-                        {t('recurring.delete')}
-                      </Button>
+                      {deletingId === item.id ? (
+                        <span
+                          role="alert"
+                          className="flex flex-wrap items-center gap-2 text-sm"
+                        >
+                          {t('recurring.deleteConfirmation')}
+                          <Button
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() => {
+                              setDeletingId(null)
+                              void run(() =>
+                                window.app.recurring.delete({ id: item.id }),
+                              )
+                            }}
+                          >
+                            {t('recurring.delete')}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() => setDeletingId(null)}
+                          >
+                            {t('transactions.cancel')}
+                          </Button>
+                        </span>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() => setDeletingId(item.id)}
+                        >
+                          {t('recurring.delete')}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </li>

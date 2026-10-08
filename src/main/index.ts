@@ -8,6 +8,7 @@ import {
   nativeImage,
   screen,
   Tray,
+  type BrowserWindowConstructorOptions,
 } from 'electron'
 import { join } from 'node:path'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -67,12 +68,12 @@ export function openQuickAdd(): void {
 const APP_ID = 'com.finymark.financial-tracker'
 const APP_NAME = 'Financial Tracker'
 
-function createWindow(hidden: boolean): BrowserWindow {
+function createAppWindow(
+  options: Omit<BrowserWindowConstructorOptions, 'webPreferences'>,
+  view?: 'quick-add',
+): BrowserWindow {
   const window = new BrowserWindow({
-    show: false,
-    width: 900,
-    height: 600,
-    title: 'Financial Tracker',
+    ...options,
     webPreferences: {
       preload: join(import.meta.dirname, '../preload/index.cjs'),
       contextIsolation: true,
@@ -80,19 +81,33 @@ function createWindow(hidden: boolean): BrowserWindow {
       sandbox: true,
     },
   })
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  window.webContents.on('will-navigate', (event) => event.preventDefault())
+
+  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
+    const url = new URL(process.env.ELECTRON_RENDERER_URL)
+    if (view) url.searchParams.set('view', view)
+    void window.loadURL(url.href)
+  } else {
+    void window.loadFile(join(import.meta.dirname, '../renderer/index.html'), {
+      ...(view ? { query: { view } } : {}),
+    })
+  }
+  return window
+}
+
+function createWindow(hidden: boolean): BrowserWindow {
+  const window = createAppWindow({
+    show: false,
+    width: 900,
+    height: 600,
+    title: 'Financial Tracker',
+  })
 
   window.once('ready-to-show', () => {
     if ((!hidden || pendingSecondLaunch) && !quitting) showMainWindow()
     pendingSecondLaunch = false
   })
-  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-  window.webContents.on('will-navigate', (event) => event.preventDefault())
-
-  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
-    void window.loadURL(process.env.ELECTRON_RENDERER_URL)
-  } else {
-    void window.loadFile(join(import.meta.dirname, '../renderer/index.html'))
-  }
   return window
 }
 
@@ -110,24 +125,19 @@ function positionOnActiveDisplay(window: BrowserWindow): void {
 }
 
 function createQuickAddWindow(): BrowserWindow {
-  const window = new BrowserWindow({
-    show: false,
-    width: 560,
-    height: 720,
-    minWidth: 460,
-    minHeight: 560,
-    title: 'Financial Tracker — Quick add',
-    alwaysOnTop: true,
-    autoHideMenuBar: true,
-    webPreferences: {
-      preload: join(import.meta.dirname, '../preload/index.cjs'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
+  const window = createAppWindow(
+    {
+      show: false,
+      width: 560,
+      height: 720,
+      minWidth: 460,
+      minHeight: 560,
+      title: 'Financial Tracker — Quick add',
+      alwaysOnTop: true,
+      autoHideMenuBar: true,
     },
-  })
-  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-  window.webContents.on('will-navigate', (event) => event.preventDefault())
+    'quick-add',
+  )
   window.on('close', (event) => {
     if (quitting) return
     event.preventDefault()
@@ -136,15 +146,6 @@ function createQuickAddWindow(): BrowserWindow {
   window.on('closed', () => {
     if (quickAddWindow === window) quickAddWindow = null
   })
-  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
-    const url = new URL(process.env.ELECTRON_RENDERER_URL)
-    url.searchParams.set('view', 'quick-add')
-    void window.loadURL(url.href)
-  } else {
-    void window.loadFile(join(import.meta.dirname, '../renderer/index.html'), {
-      query: { view: 'quick-add' },
-    })
-  }
   return window
 }
 
@@ -199,11 +200,27 @@ const ownsInstance = isSmokeTest || app.requestSingleInstanceLock()
 if (!ownsInstance) {
   app.quit()
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, commandLine) => {
+    if (startsHidden(commandLine)) return
     pendingSecondLaunch = true
     showMainWindow()
   })
-  void app.whenReady().then(startApplication)
+  void app
+    .whenReady()
+    .then(startApplication)
+    .catch((error: unknown) => {
+      console.error('Application startup failed', error)
+      const detail =
+        error instanceof Error ? error.message : 'An unknown error occurred.'
+      try {
+        dialog.showErrorBox(
+          APP_NAME,
+          `Financial Tracker could not start.\n\n${detail}`,
+        )
+      } finally {
+        app.exit(1)
+      }
+    })
 }
 
 function startApplication(): void {
@@ -211,7 +228,14 @@ function startApplication(): void {
     smokeTest()
     return
   }
-  const settings = new AppSettingsFile(app.getPath('userData'))
+  let settings: AppSettingsFile
+  try {
+    settings = new AppSettingsFile(app.getPath('userData'))
+  } catch (error) {
+    throw new Error('Could not read or create app-settings.json.', {
+      cause: error,
+    })
+  }
   let trayNoticeShown = settings.isTrayNoticeShown()
   let tray: Tray | null = null
   const rateSource = new MnbExchangeRateSource(createElectronNetTransport())
@@ -271,6 +295,8 @@ function startApplication(): void {
     updateTray()
     if (mainWindow && !mainWindow.isDestroyed())
       mainWindow.webContents.send(IPC_CHANNELS.desktopProfileChanged)
+    if (quickAddWindow && !quickAddWindow.isDestroyed())
+      quickAddWindow.webContents.send(IPC_CHANNELS.desktopProfileChanged)
   }
   let openingQuickAdd = false
   openQuickAddImplementation = async () => {
@@ -293,6 +319,10 @@ function startApplication(): void {
       showQuickAddWindow(created)
     } catch (error) {
       console.error('Could not open quick add.', error)
+      dialog.showErrorBox(
+        APP_NAME,
+        desktopMessages[activeLanguage()]['quickAdd.openError'],
+      )
       showMainWindow()
     } finally {
       openingQuickAdd = false
@@ -337,7 +367,11 @@ function startApplication(): void {
       exchangeRates.stop()
       recurring.stop()
     },
-    updateTray,
+    () => {
+      updateTray()
+      if (quickAddWindow && !quickAddWindow.isDestroyed())
+        quickAddWindow.webContents.send(IPC_CHANNELS.desktopProfileChanged)
+    },
   )
   registerAccountIpc(ipcMain, profiles)
   registerCategoryIpc(ipcMain, profiles)
@@ -368,7 +402,14 @@ function startApplication(): void {
     quitting = true
     if (shutdownComplete) return
     event.preventDefault()
-    void shutdown().then(() => app.quit())
+    void shutdown().then(
+      () => app.quit(),
+      (error: unknown) => {
+        console.error('Application shutdown failed', error)
+        shutdownPromise = null
+        app.exit(1)
+      },
+    )
   })
   const iconPath = app.isPackaged
     ? join(process.resourcesPath, 'icon.png')

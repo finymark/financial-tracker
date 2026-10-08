@@ -5,6 +5,7 @@ import type { ProfileController } from './profile-controller'
 import {
   confirmPendingFields,
   recurringFields,
+  validatePendingId,
   validateRecurringId,
 } from './recurring-validation'
 
@@ -44,7 +45,7 @@ export function registerRecurringIpc(
     controller
       .getActiveApplication()
       .commands.skipPendingTransaction(
-        validateRecurringId(inputRecord(value).id),
+        validatePendingId(inputRecord(value).id),
       ),
   )
   registerIpcHandler(

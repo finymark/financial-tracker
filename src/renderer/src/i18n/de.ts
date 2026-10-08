@@ -197,7 +197,7 @@ export const de = {
   'pending.overdue': 'Überfällig',
   'pending.dueCount': 'Fällige ausstehende Transaktionen',
   'pending.error.accountArchived':
-    'Dieses Konto ist archiviert. Bearbeiten Sie die wiederkehrende Transaktion und wählen Sie vor der Bestätigung ein aktives Konto.',
+    'Dieses Konto ist archiviert. Hebe die Archivierung des Kontos auf oder überspringe dieses Vorkommen.',
   'recurring.description':
     'Regelmäßige Ausgaben und Einnahmen als Schätzung anlegen. Fällige Vorkommen bleiben ausstehend und wirken sich noch nicht auf die Finanzen aus.',
   'recurring.create': 'Wiederkehrende Transaktion erstellen',

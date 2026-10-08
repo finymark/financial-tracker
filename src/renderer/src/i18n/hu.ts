@@ -187,7 +187,7 @@ export const hu = {
   'pending.overdue': 'Lejárt',
   'pending.dueCount': 'Esedékes függő tranzakciók',
   'pending.error.accountArchived':
-    'Ez a számla archivált. Megerősítés előtt módosítsa az ismétlődő tranzakciót, és válasszon aktív számlát.',
+    'Ez a számla archivált. Állítsd vissza a számlát az archívumból, vagy hagyd ki ezt az előfordulást.',
   'recurring.description':
     'Rendszeres kiadások és bevételek becslései. Az esedékes alkalmak függőben maradnak, és még nem módosítják a pénzügyi adatokat.',
   'recurring.create': 'Ismétlődő tranzakció létrehozása',

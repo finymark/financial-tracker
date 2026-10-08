@@ -11,7 +11,11 @@ import {
 } from '../../shared/recurring'
 import type { Transaction } from '../../shared/transactions'
 import { today } from '../../shared/date'
-import { recurringFields, validateRecurringId } from './recurring-validation'
+import {
+  recurringFields,
+  validatePendingId,
+  validateRecurringId,
+} from './recurring-validation'
 import {
   validateTransactionDate,
   validateTransactionTotal,
@@ -305,8 +309,10 @@ export function deleteRecurringTransaction(
     .run(recurring.id)
 }
 
-export function listPendingTransactions(
+function pendingTransactionViews(
   database: Database.Database,
+  where: string,
+  parameters: readonly string[],
 ): PendingTransaction[] {
   const rows = database
     .prepare(
@@ -315,9 +321,9 @@ export function listPendingTransactions(
     payee_name AS payeeName, category_id AS categoryId, note,
     status, confirmed_transaction_id AS confirmedTransactionId,
     created_at AS createdAt FROM pending_transactions
-    WHERE status = 'pending' ORDER BY due_date, created_at, id`,
+    WHERE ${where} ORDER BY due_date, created_at, id`,
     )
-    .all() as Omit<PendingTransaction, 'tagIds'>[]
+    .all(...parameters) as Omit<PendingTransaction, 'tagIds'>[]
   const tags = tagsByOwner(
     database,
     'pending_transaction_tags',
@@ -327,11 +333,24 @@ export function listPendingTransactions(
   return rows.map((row) => ({ ...row, tagIds: tags.get(row.id) ?? [] }))
 }
 
+export function listPendingTransactions(
+  database: Database.Database,
+): PendingTransaction[] {
+  return pendingTransactionViews(database, "status = 'pending'", [])
+}
+
+export function listRecurringTransactionOccurrences(
+  database: Database.Database,
+  recurringId: string,
+): PendingTransaction[] {
+  return pendingTransactionViews(database, 'recurring_id = ?', [recurringId])
+}
+
 export function getPendingTransaction(
   database: Database.Database,
   id: string,
 ): PendingTransaction {
-  const validatedId = validateRecurringId(id)
+  const validatedId = validatePendingId(id)
   const row = database
     .prepare(
       `SELECT id, recurring_id AS recurringId, due_date AS dueDate, kind,

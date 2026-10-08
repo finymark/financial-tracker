@@ -2,7 +2,6 @@ import type { App, IpcMain } from 'electron'
 import { IPC_CHANNELS } from '../shared/ipc'
 import type { AutostartStatus, SetAutostartInput } from '../shared/desktop'
 import type {
-  QuickAddSavedInput,
   SetQuickAddShortcutInput,
   ShortcutStatus,
 } from '../shared/desktop'
@@ -29,22 +28,12 @@ export function parseShortcutInput(value: unknown): SetQuickAddShortcutInput {
   return { accelerator: normaliseAccelerator(input.accelerator) }
 }
 
-function parseQuickAddSavedInput(value: unknown): QuickAddSavedInput {
-  const input = inputRecord(value)
-  if (
-    typeof input.keepOpen !== 'boolean' ||
-    Object.keys(input).some((key) => key !== 'keepOpen')
-  )
-    throw new TypeError('Invalid quick-add saved input')
-  return { keepOpen: input.keepOpen }
-}
-
 interface DesktopIpcOptions {
   shortcutStatus(): ShortcutStatus
   setShortcut(accelerator: string): ShortcutStatus
   showMain(): void
   closeQuickAdd(): void
-  quickAddSaved(input: QuickAddSavedInput): void
+  quickAddSaved(): void
 }
 
 export function registerDesktopIpc(
@@ -93,6 +82,6 @@ export function registerDesktopIpc(
   registerIpcHandler(
     ipcMain,
     IPC_CHANNELS.desktopQuickAddSaved,
-    (_event, value) => options.quickAddSaved(parseQuickAddSavedInput(value)),
+    options.quickAddSaved,
   )
 }
