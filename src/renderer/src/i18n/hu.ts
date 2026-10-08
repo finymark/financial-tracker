@@ -2,6 +2,21 @@ import { categoryNames } from '../../../shared/category-translations'
 import type { MessageCatalog } from './en'
 
 export const hu = {
+  'shortcuts.closeHelp': 'Billentyűsúgó bezárása',
+  'transactions.saveAndAddAnother': 'Mentés és újabb hozzáadása',
+  'shortcuts.scope':
+    'Nyitott profilban: az új tranzakció és a visszavonás szövegbevitelen kívül működik. A típusváltás és a mentés a tranzakcióablakban használható.',
+  'shortcuts.navigation':
+    'A Tab / Shift+Tab a mezők között lépked, és a nyitott párbeszédablakban marad.',
+  'shortcuts.undo':
+    'Legutóbbi tranzakcióművelet visszavonása (szövegbevitelen kívül)',
+  'shortcuts.close': 'Mégse / tranzakcióablak vagy billentyűsúgó bezárása',
+  'shortcuts.help': 'Billentyűparancsok',
+  'shortcuts.save':
+    'Mentés (többsoros jegyzetben nem; a gombok saját művelete megmarad)',
+  'shortcuts.saveAndAddAnother':
+    'Mentés és újabb hozzáadása (dátum, számlák és típus megtartása)',
+  'shortcuts.newTransaction': 'Új tranzakció (szövegbevitelen kívül)',
   ...categoryNames.hu,
   'categories.title': 'Kategóriák',
   'categories.description':

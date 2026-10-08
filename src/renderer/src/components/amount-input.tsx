@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type Ref } from 'react'
 import type { Currency } from '../../../shared/accounts'
 import {
   MAX_AMOUNT_EXPRESSION_LENGTH,
@@ -8,6 +8,7 @@ import { createFormatters, type Language, type MessageKey } from '../i18n'
 import { Input } from './ui/input'
 
 interface AmountInputProps {
+  ref?: Ref<HTMLInputElement>
   id: string
   value: string
   onChange(value: string): void
@@ -24,6 +25,7 @@ interface AmountInputProps {
 }
 
 export function AmountInput({
+  ref,
   id,
   value,
   onChange,
@@ -68,6 +70,7 @@ export function AmountInput({
   return (
     <>
       <Input
+        ref={ref}
         id={id}
         inputMode="decimal"
         value={value}
@@ -80,7 +83,11 @@ export function AmountInput({
         onChange={(event) => onChange(event.target.value)}
         onBlur={evaluate}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+          if (
+            event.key === 'Enter' &&
+            !event.nativeEvent.isComposing &&
+            !event.defaultPrevented
+          ) {
             event.preventDefault()
             evaluate()
           }

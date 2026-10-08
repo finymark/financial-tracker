@@ -2,6 +2,22 @@ import { categoryNames } from '../../../shared/category-translations'
 import type { MessageCatalog } from './en'
 
 export const de = {
+  'shortcuts.closeHelp': 'Tastaturhilfe schließen',
+  'transactions.saveAndAddAnother': 'Speichern und weitere hinzufügen',
+  'shortcuts.scope':
+    'Bei geöffnetem Profil: Neue Transaktion und Rückgängig funktionieren außerhalb von Eingabefeldern. Typ- und Speicherkürzel gelten im Transaktionsfenster.',
+  'shortcuts.navigation':
+    'Tab / Shift+Tab wechseln zwischen Feldern und bleiben im geöffneten Dialog.',
+  'shortcuts.undo':
+    'Letzte Transaktionsänderung rückgängig machen (außerhalb von Eingabefeldern)',
+  'shortcuts.close':
+    'Abbrechen / Transaktionsfenster oder Tastaturhilfe schließen',
+  'shortcuts.help': 'Tastenkürzel',
+  'shortcuts.save':
+    'Speichern (nicht in mehrzeiligen Notizen; Schaltflächen behalten ihre eigene Aktion)',
+  'shortcuts.saveAndAddAnother':
+    'Speichern und weitere hinzufügen (Datum, Konten und Typ behalten)',
+  'shortcuts.newTransaction': 'Neue Transaktion (außerhalb von Eingabefeldern)',
   ...categoryNames.de,
   'categories.title': 'Kategorien',
   'categories.description':

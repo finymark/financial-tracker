@@ -415,6 +415,76 @@ not off-device copies or backups of the separate data folder.
   bound, arranging the 20 000 transactions through application commands in one
   fixture transaction (outside the measured query).
 
+### Keyboard-first transaction entry
+
+With a profile open and at least one active account, **N** or **Ctrl+N** opens a
+new transaction drawer from any shell page and focuses Amount. These shortcuts
+and **?** (shortcut help) do not interrupt typing in inputs, notes, selects, or
+editable content. A **Keyboard shortcuts** button also opens the translated
+HU/EN/DE cheat sheet. Shortcut definitions and pure matching live together in
+`src/renderer/src/lib/shortcuts.ts`, including the existing Ctrl+Z command.
+
+Inside the drawer:
+
+- **Alt+1 / Alt+2 / Alt+3** select expense / income / transfer. New transactions
+  support all three; existing expenses/income can switch between those two.
+  Existing transfers cannot be converted to expenses/income or vice versa.
+- **Tab / Shift+Tab** follow the displayed order: amount, date, type, account,
+  the remaining type-specific fields, note, exclusion flag, and save/cancel
+  actions. Focus stays inside the drawer or shortcut-help dialog and returns
+  to the previous control on close (or Record transaction after changing pages).
+- **Enter** saves from a field, including calculator amounts; in a multiline
+  note it inserts a newline. Focused buttons retain their own Enter action, so
+  Cancel and Close can still be activated normally. Native validation and the
+  existing amount parser run before any write; failures keep the drawer open
+  and show the translated error inside it.
+- **Esc** cancels/closes without saving. Closing is disabled during a save.
+- **Ctrl+Enter** saves and starts another new transaction, also from a note.
+  Date, account(s), and type are retained; amounts, payee, category, note, and
+  exclusion flags are cleared. A transfer's fee category resets to Fees.
+  Amount receives focus again. The same action is available as a button.
+
+Saving and adding another uses the same validated, undoable transaction/transfer
+commands as ordinary Save. There is no new database command or migration.
+
+### Manual keyboard-only entry check
+
+Run `npm run dev` with a synthetic profile and active HUF and CHF accounts. Use
+only the keyboard for the following, repeating in HU/EN/DE and light/dark themes:
+
+1. From Overview, Accounts, and Settings, press N and Ctrl+N. Verify Transactions
+   opens with Amount focused. Type an expression such as `12000/2`; Tab previews
+   it. Walk every field and action with Tab/Shift+Tab and verify focus cannot
+   escape the drawer. Change date/account, enter a payee/category/note, and save
+   with Enter. Verify the transaction and account balance.
+2. Open again; use Alt+1/2/3 to select each type. Complete an income, a
+   same-currency transfer, and a HUF-to-CHF transfer, including destination amount
+   and an optional fee, using only Tab, arrow keys, and typing. Check each save.
+3. Enter a multiline note; Enter must add a newline, not save. Press Ctrl+Enter:
+   verify exactly one transaction is saved, the drawer stays open on a new blank
+   amount, and date/account(s)/type remain. Enter a second amount and repeat;
+   verify amounts, payee, category, note, and flags did not carry over. Try a
+   transfer batch as well, and then save normally to close.
+4. Try `1+`, `1/0`, a missing required amount, tomorrow's date, and mismatched
+   same-currency transfer amounts. Enter and Ctrl+Enter must not create records
+   or reset the form. Fix the inputs and save once; check the Undo toast and
+   Ctrl+Z after closing. Text-field Ctrl+Z must still edit text.
+5. Open the drawer and press Esc; verify no write and focus restoration. Tab to
+   Cancel and press Enter; it must cancel rather than save. Repeat with Close.
+   While typing in payee, note, amount, and filter search, verify N, Ctrl+N, and
+   ? do not open another drawer/help or replace the draft.
+6. Outside typing controls, press ? and verify the translated cheat sheet opens.
+   Cycle Tab/Shift+Tab, then Esc to close and restore focus. Also open help from
+   the drawer's Close button with ?; closing help must return to that button,
+   leave the draft unchanged, and keep subsequent Tab inside the drawer.
+   With no active accounts, N must not open an unusable drawer; show the normal
+   no-accounts guidance instead.
+
+Renderer focus and full keyboard flow remain manual checks. Automated tests
+cover the pure matcher (scope, modifiers, typing exclusions, multiline notes,
+button activation, repeats, composition, and already-handled events) and the
+existing profile-application SQLite seam covers persistence and undo.
+
 ### Amount calculator
 
 Accounts opening balances, expense/income amounts, both transfer amounts, and
@@ -440,9 +510,11 @@ Division by zero, malformed expressions, unsafe integer-hundredth results, and
 non-positive transaction results are rejected. Opening balances may be negative
 or zero.
 
-Leaving the field or pressing Enter evaluates it and shows a translated result
-preview before save. Enter in the amount field evaluates only; it does not save
-the form. The original expression stays editable. Changing it or the currency
+Leaving the field evaluates it and shows a translated result preview before
+save. In Accounts, Enter in the amount field evaluates only; it does not save
+the form. In the transaction drawer, Enter evaluates and saves the transaction,
+matching the keyboard-first entry flow above. The original expression stays
+editable. Changing it or the currency
 hides the previous preview until reevaluation. Previews use the existing money
 formatter: CHF shows two decimals, while HUF rounds to whole units for display
 only; the stored result still retains hundredths.
@@ -451,8 +523,10 @@ only; the stored result still retains hundredths.
 
 Run `npm run dev`. In Accounts and in the transaction create/edit drawer, enter
 `12000/2`, `4490*3`, `100+250-30`, `1,5`, `1.234`, `1 234,50`, `1.234,5`, and
-`1,234.5` for HUF and CHF. Blur or press Enter: verify the preview appears and
-Enter does not save. Check `1/3`, `2/3`, and `1/3*3` for final-only rounding
+`1,234.5` for HUF and CHF. Blur: verify the preview appears. In Accounts,
+Enter also previews without saving; in the transaction drawer, Enter saves a
+valid expression (use Tab to preview first). Check `1/3`, `2/3`, and `1/3*3` for
+final-only rounding
 (CHF previews `0.33`, `0.67`, and `1.00`). Change the expression or currency and
 verify the old preview disappears. Try `1+`, `1/0`, and `90071992547409.92`:
 check the inline validation and that saving does not create a record. Verify
@@ -478,8 +552,9 @@ German and check translated validation, keyboard focus, and light/dark themes.
 Verify the transfer row shows both accounts and the actual cross-currency rate,
 account filters include either leg, transfer legs do not alter expense/income
 totals, and an optional fee defaults to Fees. Try the calculator on both transfer
-amounts and the optional fee, including Enter without saving and leaving the fee
-blank. Mark a fee Excluded, check balances stay unchanged while expense totals
+amounts and the optional fee, using Tab to preview before saving with Enter and
+leaving the fee blank. Mark a fee Excluded, check balances stay unchanged while
+expense totals
 omit it, then edit/delete/undo the transfer and verify the fee flag is restored.
 After create, edit, and delete, use
 both the toast action and `Ctrl+Z` and verify

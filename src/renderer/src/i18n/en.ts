@@ -1,5 +1,20 @@
 import { categoryNames } from '../../../shared/category-translations'
 export const en = {
+  'shortcuts.closeHelp': 'Close shortcut help',
+  'transactions.saveAndAddAnother': 'Save and add another',
+  'shortcuts.scope':
+    'With an open profile: new transaction and undo work outside text editing controls. Type and save shortcuts work in the transaction drawer.',
+  'shortcuts.navigation':
+    'Tab / Shift+Tab move between fields and stay inside the open dialog.',
+  'shortcuts.undo':
+    'Undo latest transaction command (outside text editing controls)',
+  'shortcuts.close': 'Cancel / close drawer or shortcut help',
+  'shortcuts.help': 'Keyboard shortcuts',
+  'shortcuts.save':
+    'Save (except in multiline notes; buttons keep their own action)',
+  'shortcuts.saveAndAddAnother':
+    'Save and add another (keep date, accounts and type)',
+  'shortcuts.newTransaction': 'New transaction (outside text editing controls)',
   ...categoryNames.en,
   'categories.title': 'Categories',
   'categories.description':
