@@ -624,10 +624,23 @@ export const hu = {
     'A számlán vannak tranzakciók, ezért nem törölhető. Archiváld helyette.',
   'settings.title': 'Érezd magad otthon',
   'settings.description':
-    'A nyelv, a megjelenés és az alap pénznem a profilhoz mentődik, és azonnal érvényesül.',
+    'A nyelv, a megjelenés, az alap pénznem és a nyugtaátvétel a profilhoz mentődik, és azonnal érvényesül.',
   'settings.baseCurrency': 'Alap pénznem',
   'settings.version': 'Alkalmazásverzió',
   'settings.error': 'A beállításokat nem sikerült menteni. Próbáld újra.',
+  'watchedFolder.title': 'Figyelt mappa',
+  'watchedFolder.hint':
+    'Bármely helyi mappa használható, például a Google Drive asztali alkalmazással vagy a OneDrive-val szinkronizált mappa. A teljesen átmásolt nyugtafotók a feldolgozott almappába kerülnek.',
+  'watchedFolder.current': 'Jelenlegi mappa',
+  'watchedFolder.none': 'Nincs kiválasztott mappa',
+  'watchedFolder.status': 'Állapot',
+  'watchedFolder.status.watching': 'Figyelés alatt',
+  'watchedFolder.status.unavailable': 'A mappa nem érhető el',
+  'watchedFolder.choose': 'Mappa kiválasztása',
+  'watchedFolder.clear': 'Törlés',
+  'watchedFolder.intakeFailure':
+    'Egy figyelt nyugtafotót nem sikerült hozzáadni',
+  'watchedFolder.dismissFailure': 'Bezárás',
   'backups.title': 'Biztonsági mentések',
   'backups.description':
     'A profil minden megnyitásakor adatbázismentés készül. Az utolsó 10 indítási mentés marad meg; a migráció előtti mentések külön tárolódnak.',

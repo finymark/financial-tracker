@@ -7,19 +7,33 @@ import type {
   ProfileSummary,
 } from '../../shared/profiles'
 import type { ProfileSettings } from '../../shared/settings'
-import type { Language } from '../../shared/settings'
+import type {
+  Language,
+  WatchedFolderFailure,
+  WatchedFolderStatus,
+} from '../../shared/settings'
 import {
   openProfileApplication,
   type ProfileApplication,
 } from './profile-application'
 import { ProfileRegistry } from './profile-registry'
 import type { ExchangeRateSource } from '../exchange-rates/exchange-rate-source'
+import {
+  WatchedFolderIntake,
+  type WatchedFolderIntakeOptions,
+} from '../watched-folder-intake'
 
 interface ProfileControllerOptions {
   exchangeRateSource?: ExchangeRateSource
   onRateStatusChanged?: () => void
   onPendingTransactionsChanged?: () => void
   onReceiptInboxChanged?: () => void
+  watchedFolderOptions?: Omit<
+    WatchedFolderIntakeOptions,
+    'onStatusChanged' | 'onFailure'
+  >
+  onWatchedFolderStatusChanged?: (status: WatchedFolderStatus | null) => void
+  onWatchedFolderFailure?: (failure: WatchedFolderFailure) => void
   logger?: Pick<Console, 'error'>
   clock?: () => Date
 }
@@ -28,11 +42,14 @@ export class ProfileController {
   readonly #registry: ProfileRegistry
   readonly #defaultLanguage: Language
   readonly #options: ProfileControllerOptions
+  readonly #watchedFolder: WatchedFolderIntake
   #changing = false
   #shuttingDown = false
   #pending: Promise<unknown> | null = null
   #active: { id: string; application: ProfileApplication } | null = null
   #shutdownProfileId: string | null = null
+  #watchedFolderStatus: WatchedFolderStatus | null = null
+  #watchedFolderOperation: Promise<void> = Promise.resolve()
 
   constructor(
     registry: ProfileRegistry,
@@ -44,6 +61,19 @@ export class ProfileController {
     const language = systemLocale.toLowerCase().split(/[-_]/)[0]
     this.#defaultLanguage =
       language === 'hu' || language === 'de' ? language : 'en'
+    this.#watchedFolder = new WatchedFolderIntake(
+      (input) => {
+        const application = this.#active?.application
+        if (!application) return Promise.reject(new Error('No profile is open'))
+        return application.commands.intakeReceipt(input, 'folder')
+      },
+      {
+        ...options.watchedFolderOptions,
+        logger: options.watchedFolderOptions?.logger ?? options.logger,
+        onStatusChanged: (status) => this.#setWatchedFolderStatus(status),
+        onFailure: (failure) => options.onWatchedFolderFailure?.(failure),
+      },
+    )
   }
 
   list(): ProfileRegistrySnapshot {
@@ -87,7 +117,7 @@ export class ProfileController {
         throw new Error('profiles.error.confirmation')
       }
       const wasActive = this.#active?.id === id
-      if (wasActive) this.#closeActive()
+      if (wasActive) await this.#closeActive()
       try {
         this.#registry.deleteProfile(id, confirmation)
       } catch (error) {
@@ -99,6 +129,7 @@ export class ProfileController {
             ...this.#applicationOptions(),
           })
           this.#active = { id, application }
+          await this.#startWatchedFolder()
         }
         throw error
       }
@@ -107,20 +138,24 @@ export class ProfileController {
 
   async open(id: string): Promise<ActiveProfileInfo> {
     return this.#changeProfile(async () => {
-      const profile = this.#registry.getProfile(id)
-      const application = await openProfileApplication({
-        profile,
-        paths: this.#registry.getProfilePaths(id),
-        ...this.#applicationOptions(),
-      })
+      await this.#stopWatchedFolder()
+      let application: ProfileApplication | null = null
       try {
+        const profile = this.#registry.getProfile(id)
+        application = await openProfileApplication({
+          profile,
+          paths: this.#registry.getProfilePaths(id),
+          ...this.#applicationOptions(),
+        })
         this.#registry.rememberLastUsed(id)
       } catch (error) {
-        application.close()
+        application?.close()
+        await this.#startWatchedFolder()
         throw error
       }
-      this.#closeActive()
+      this.#active?.application.close()
       this.#active = { id, application }
+      await this.#startWatchedFolder()
       return this.getActive() as ActiveProfileInfo
     })
   }
@@ -143,12 +178,22 @@ export class ProfileController {
     }
   }
 
-  updateSettings(input: UpdateProfileSettingsInput): ProfileSettings {
+  updateSettings(input: UpdateProfileSettingsInput): Promise<ProfileSettings> {
     this.#assertIdle()
     if (!this.#active || this.#active.id !== input.id) {
       throw new Error('Settings can only be changed for the active profile')
     }
-    return this.#active.application.commands.updateSettings(input.settings)
+    const settings = this.#active.application.commands.updateSettings(
+      input.settings,
+    )
+    if (!Object.hasOwn(input.settings, 'watchedFolder'))
+      return Promise.resolve(settings)
+    return this.#restartWatchedFolder().then(() => settings)
+  }
+
+  getWatchedFolderStatus(): WatchedFolderStatus | null {
+    this.#assertIdle()
+    return this.#watchedFolderStatus
   }
 
   getActiveApplication(): ProfileApplication {
@@ -166,8 +211,13 @@ export class ProfileController {
   async restoreBackup(input: RestoreBackupInput): Promise<ActiveProfileInfo> {
     return this.#changeProfile(async () => {
       if (!this.#active) throw new Error('No profile is open')
-      await this.#active.application.commands.restoreBackup(input)
-      return this.getActive() as ActiveProfileInfo
+      await this.#stopWatchedFolder()
+      try {
+        await this.#active.application.commands.restoreBackup(input)
+        return this.getActive() as ActiveProfileInfo
+      } finally {
+        await this.#startWatchedFolder()
+      }
     })
   }
 
@@ -199,7 +249,7 @@ export class ProfileController {
     }
     this.#shuttingDown = true
     this.#shutdownProfileId = this.#active?.id ?? null
-    this.#closeActive()
+    await this.#closeActive()
   }
 
   async recoverFromFailedShutdown(): Promise<void> {
@@ -210,17 +260,62 @@ export class ProfileController {
     if (profileId) await this.open(profileId)
   }
 
-  close(): void {
-    this.#assertIdle()
-    this.#closeActive()
+  close(): Promise<void> {
+    return this.#changeProfile(() => this.#closeActive())
   }
 
-  #closeActive(): void {
+  async #closeActive(): Promise<void> {
+    await this.#stopWatchedFolder()
     this.#active?.application.close()
     this.#active = null
   }
 
-  #applicationOptions(): ProfileControllerOptions {
-    return this.#options
+  #restartWatchedFolder(): Promise<void> {
+    return this.#queueWatchedFolder(async () => {
+      await this.#watchedFolder.stop()
+      this.#setWatchedFolderStatus(null)
+      const folder =
+        this.#active?.application.queries.getSettings().watchedFolder
+      if (folder) await this.#watchedFolder.start(folder)
+    })
+  }
+
+  #startWatchedFolder(): Promise<void> {
+    return this.#queueWatchedFolder(async () => {
+      const folder =
+        this.#active?.application.queries.getSettings().watchedFolder
+      if (folder) await this.#watchedFolder.start(folder)
+      else this.#setWatchedFolderStatus(null)
+    })
+  }
+
+  #stopWatchedFolder(): Promise<void> {
+    return this.#queueWatchedFolder(async () => {
+      await this.#watchedFolder.stop()
+      this.#setWatchedFolderStatus(null)
+    })
+  }
+
+  #queueWatchedFolder(operation: () => Promise<void>): Promise<void> {
+    const next = this.#watchedFolderOperation.then(operation, operation)
+    this.#watchedFolderOperation = next.catch(() => {})
+    return next
+  }
+
+  #setWatchedFolderStatus(status: WatchedFolderStatus | null): void {
+    if (this.#watchedFolderStatus === status) return
+    this.#watchedFolderStatus = status
+    this.#options.onWatchedFolderStatusChanged?.(status)
+  }
+
+  #applicationOptions() {
+    return {
+      exchangeRateSource: this.#options.exchangeRateSource,
+      onRateStatusChanged: this.#options.onRateStatusChanged,
+      onPendingTransactionsChanged: this.#options.onPendingTransactionsChanged,
+      onReceiptInboxChanged: this.#options.onReceiptInboxChanged,
+      logger: this.#options.logger,
+      clock: this.#options.clock,
+    }
   }
 }

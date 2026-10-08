@@ -1,3 +1,5 @@
+import { statSync } from 'node:fs'
+import { isAbsolute } from 'node:path'
 import {
   baseCurrencies,
   languages,
@@ -34,6 +36,25 @@ export function parseSettingsChanges(value: unknown): ProfileSettingsChanges {
         const baseCurrency = baseCurrencies.find((item) => item === setting)
         if (!baseCurrency) throw new TypeError('Invalid profile base currency')
         changes.baseCurrency = baseCurrency
+        break
+      }
+      case 'watchedFolder': {
+        if (setting === null) {
+          changes.watchedFolder = null
+          break
+        }
+        if (typeof setting !== 'string' || !isAbsolute(setting)) {
+          throw new TypeError('Invalid watched folder')
+        }
+        try {
+          if (!statSync(setting).isDirectory()) {
+            throw new TypeError('Invalid watched folder')
+          }
+        } catch (error) {
+          if (error instanceof TypeError) throw error
+          throw new TypeError('Invalid watched folder', { cause: error })
+        }
+        changes.watchedFolder = setting
         break
       }
       default:

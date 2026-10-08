@@ -833,6 +833,16 @@ successfully.
 - Inbox intake is a background write and does not replace or clear the existing
   Undo history. Active inbox photos are retained by the attachment sweep and are
   included in the incremental attachment backup pool and restore process.
+- Each profile can choose a watched folder in **Settings**. Any local folder,
+  including one synced by Google Drive for Desktop or OneDrive, can feed JPEG,
+  PNG, and WebP photos into that profile's inbox. The app checks only top-level
+  files, ignores hidden and temporary sync files, and retries unavailable folders
+  every 30 seconds.
+- A photo is accepted only after its size and modification time remain unchanged
+  for at least two seconds and Windows allows it to be moved. Accepted files move
+  into a `feldolgozott` subfolder and are never deleted. Existing names gain
+  ` (2)`, ` (3)`, and so on before the extension. Photos added while the app is
+  closed are scanned when the profile next opens.
 
 ### Manual receipt-inbox check
 
@@ -873,6 +883,21 @@ verify its URL no longer connects; repeat and leave it open for 10 minutes to
 verify automatic shutdown. If the phone cannot connect, confirm both devices
 use the same Wi-Fi and Windows marks the network as Private. Repeat in HU/EN/DE
 and, where available, choose each listed private network interface.
+
+### Manual watched-folder check
+
+Choose a synthetic Google Drive for Desktop folder as the watched folder and
+verify Settings shows **Watching**. Add a photo while the app is running and one
+while the profile is closed; both must enter the inbox after the profile opens.
+Simulate a half-synced file by continuing to append bytes and verify it is not
+moved until its size and modification time stay stable for two seconds. Hold a
+photo open so Windows locks it, verify intake waits, then release it and verify a
+later scan succeeds. Confirm every accepted photo moves to `feldolgozott`, files
+already there are ignored, and a same-named destination produces ` (2)` without
+overwriting either file. Temporarily disconnect or rename the folder and verify
+the status changes to **Folder unavailable**, then returns to **Watching** when
+the folder is available again. Clear the setting and verify new photos remain in
+place.
 
 ### Manual Categorisation rules check
 

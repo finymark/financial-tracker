@@ -622,10 +622,22 @@ export const en = {
     'This account has transactions and cannot be deleted. Archive it instead.',
   'settings.title': 'Make yourself at home',
   'settings.description':
-    'Language, appearance and base currency are saved for this profile and apply immediately.',
+    'Language, appearance, base currency and receipt intake are saved for this profile and apply immediately.',
   'settings.baseCurrency': 'Base currency',
   'settings.version': 'App version',
   'settings.error': 'The settings could not be saved. Please try again.',
+  'watchedFolder.title': 'Watched folder',
+  'watchedFolder.hint':
+    'Any local folder works, including one synced by Google Drive for Desktop or OneDrive. Complete receipt photos are moved into its feldolgozott subfolder.',
+  'watchedFolder.current': 'Current folder',
+  'watchedFolder.none': 'No folder selected',
+  'watchedFolder.status': 'Status',
+  'watchedFolder.status.watching': 'Watching',
+  'watchedFolder.status.unavailable': 'Folder unavailable',
+  'watchedFolder.choose': 'Choose folder',
+  'watchedFolder.clear': 'Clear',
+  'watchedFolder.intakeFailure': 'A watched receipt photo could not be added',
+  'watchedFolder.dismissFailure': 'Dismiss',
   'backups.title': 'Backups',
   'backups.description':
     'A database backup is taken whenever you open this profile. The last 10 startup backups are kept; pre-migration backups are stored separately.',

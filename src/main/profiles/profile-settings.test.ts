@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, test } from 'vitest'
@@ -39,6 +39,7 @@ test('a new profile starts with English, the system theme and HUF base currency'
       language: 'en',
       theme: 'system',
       privacyMode: false,
+      watchedFolder: null,
       baseCurrency: 'HUF',
     })
   } finally {
@@ -66,12 +67,14 @@ test('setting changes apply immediately and survive closing and reopening the pr
       language: 'hu',
       theme: 'dark',
       privacyMode: false,
+      watchedFolder: null,
       baseCurrency: 'CHF',
     })
     expect(application.queries.getSettings()).toEqual({
       language: 'hu',
       theme: 'dark',
       privacyMode: false,
+      watchedFolder: null,
       baseCurrency: 'CHF',
     })
   } finally {
@@ -83,6 +86,7 @@ test('setting changes apply immediately and survive closing and reopening the pr
       language: 'hu',
       theme: 'dark',
       privacyMode: false,
+      watchedFolder: null,
       baseCurrency: 'CHF',
     })
   } finally {
@@ -129,6 +133,7 @@ test.each(
         language: 'hu',
         theme: 'dark',
         privacyMode: false,
+        watchedFolder: null,
         baseCurrency: 'CHF',
       })
     } finally {
@@ -167,6 +172,7 @@ test('switching between reopened profiles restores only their own settings', asy
       language: 'en',
       theme: 'system',
       privacyMode: false,
+      watchedFolder: null,
       baseCurrency: 'HUF',
     })
     secondApplication.commands.updateSettings({ language: 'hu', theme: 'dark' })
@@ -181,6 +187,7 @@ test('switching between reopened profiles restores only their own settings', asy
         theme: 'light',
         baseCurrency: 'CHF',
         privacyMode: false,
+        watchedFolder: null,
       },
     ],
     [
@@ -190,6 +197,7 @@ test('switching between reopened profiles restores only their own settings', asy
         theme: 'dark',
         baseCurrency: 'HUF',
         privacyMode: false,
+        watchedFolder: null,
       },
     ],
   ] as const) {
@@ -220,12 +228,14 @@ test('changing one setting preserves the other saved choices', async () => {
       language: 'de',
       theme: 'dark',
       privacyMode: false,
+      watchedFolder: null,
       baseCurrency: 'CHF',
     })
     expect(application.commands.updateSettings({ theme: 'light' })).toEqual({
       language: 'de',
       theme: 'light',
       privacyMode: false,
+      watchedFolder: null,
       baseCurrency: 'CHF',
     })
     expect(
@@ -239,6 +249,7 @@ test('changing one setting preserves the other saved choices', async () => {
       theme: 'system',
       baseCurrency: 'HUF',
       privacyMode: false,
+      watchedFolder: null,
     })
   } finally {
     application.close()
@@ -268,6 +279,7 @@ test('an existing profile gains default settings when upgraded from the identity
       language: 'en',
       theme: 'system',
       privacyMode: false,
+      watchedFolder: null,
       baseCurrency: 'HUF',
     })
   } finally {
@@ -288,6 +300,7 @@ test('privacy persists per profile without invalidating undo; other settings sti
   try {
     expect(application.queries.getSettings()).toMatchObject({
       privacyMode: false,
+      watchedFolder: null,
     })
     const account = application.commands.createAccount({
       name: 'Synthetic cash',
@@ -340,5 +353,89 @@ test('privacy persists per profile without invalidating undo; other settings sti
     })
   } finally {
     reopened.close()
+  }
+})
+
+test('watched folder persists across reopen and changing or clearing it does not invalidate undo', async () => {
+  const registry = setup()
+  const profile = registry.createProfile('Watched profile')
+  const watchedFolder = mkdtempSync(
+    join(tmpdir(), 'financial-tracker-watched-setting-'),
+  )
+  temporaryDirectories.push(watchedFolder)
+  const options = {
+    profile,
+    paths: registry.getProfilePaths(profile.id),
+    clock,
+  }
+  const application = await openProfileApplication(options)
+  try {
+    const first = application.commands.createAccount({
+      name: 'First synthetic cash',
+      currency: 'HUF',
+      openingBalance: 0,
+      openingDate: '2026-01-01',
+    })
+    expect(
+      application.commands.updateSettings({ watchedFolder }),
+    ).toMatchObject({ watchedFolder })
+    expect(application.commands.undoLast()).toBe(true)
+    expect(
+      application.queries
+        .listAccounts()
+        .some((account) => account.id === first.id),
+    ).toBe(false)
+
+    const second = application.commands.createAccount({
+      name: 'Second synthetic cash',
+      currency: 'HUF',
+      openingBalance: 0,
+      openingDate: '2026-01-01',
+    })
+    application.commands.updateSettings({ watchedFolder: null })
+    expect(application.commands.undoLast()).toBe(true)
+    expect(
+      application.queries
+        .listAccounts()
+        .some((account) => account.id === second.id),
+    ).toBe(false)
+    application.commands.updateSettings({ watchedFolder })
+  } finally {
+    application.close()
+  }
+
+  const reopened = await openProfileApplication(options)
+  try {
+    expect(reopened.queries.getSettings()).toMatchObject({ watchedFolder })
+  } finally {
+    reopened.close()
+  }
+})
+
+test('watched folder must be null or an existing absolute directory', async () => {
+  const registry = setup()
+  const profile = registry.createProfile('Validated watched folder')
+  const application = await openProfileApplication({
+    profile,
+    paths: registry.getProfilePaths(profile.id),
+    clock,
+  })
+  const file = join(temporaryDirectories[0], 'not-a-directory.jpg')
+  writeFileSync(file, 'not an image fixture')
+  try {
+    for (const watchedFolder of [
+      'relative-folder',
+      join(temporaryDirectories[0], 'missing'),
+      file,
+    ]) {
+      expect(() =>
+        application.commands.updateSettings({ watchedFolder }),
+      ).toThrow('Invalid watched folder')
+    }
+    expect(application.queries.getSettings()).toMatchObject({
+      watchedFolder: null,
+    })
+  } finally {
+    application.close()
   }
 })

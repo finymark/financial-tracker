@@ -6,12 +6,19 @@ export type ThemeMode = (typeof themeModes)[number]
 
 export const baseCurrencies = ['HUF', 'CHF'] as const
 export type BaseCurrency = (typeof baseCurrencies)[number]
+export type WatchedFolderStatus = 'watching' | 'unavailable'
+
+export interface WatchedFolderFailure {
+  fileName: string
+  reasonKey: string
+}
 
 export interface ProfileSettings {
   language: Language
   theme: ThemeMode
   privacyMode: boolean
   baseCurrency: BaseCurrency
+  watchedFolder: string | null
 }
 
 export type ProfileSettingsChanges = Partial<ProfileSettings>
@@ -22,4 +29,5 @@ export const DEFAULT_PROFILE_SETTINGS: Readonly<ProfileSettings> = {
   language: 'en',
   theme: 'system',
   baseCurrency: 'HUF',
+  watchedFolder: null,
 }

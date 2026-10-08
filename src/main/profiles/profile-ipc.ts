@@ -1,4 +1,4 @@
-import type { IpcMain } from 'electron'
+import { BrowserWindow, dialog, type IpcMain } from 'electron'
 import { IPC_CHANNELS, type AppBridge } from '../../shared/ipc'
 import type {
   CreateProfileInput,
@@ -64,6 +64,14 @@ function parseUpdateSettingsInput(value: unknown): UpdateProfileSettingsInput {
     id: stringProperty(input, 'id'),
     settings: parseSettingsChanges(input.settings),
   }
+}
+
+function parentWindow(
+  event: Electron.IpcMainInvokeEvent,
+): Electron.BrowserWindow {
+  const parent = BrowserWindow.fromWebContents(event.sender)
+  if (!parent) throw new Error('Folder picker requires the application window')
+  return parent
 }
 
 export function registerProfileIpc(
@@ -160,21 +168,44 @@ export function registerProfileIpc(
   registerIpcHandler(
     ipcMain,
     IPC_CHANNELS.profilesUpdateSettings,
-    (
+    async (
       _event,
       value: unknown,
-    ): Awaited<ReturnType<AppBridge['profiles']['updateSettings']>> => {
+    ): Promise<
+      Awaited<ReturnType<AppBridge['profiles']['updateSettings']>>
+    > => {
       const input = parseUpdateSettingsInput(value)
-      const settings = controller.updateSettings(input)
+      const settings = await controller.updateSettings(input)
       if (input.settings.language) onProfileLanguageChanged()
       if (input.settings.baseCurrency) onProfileNeedsRateRefresh()
       return settings
     },
   )
-  registerIpcHandler(ipcMain, IPC_CHANNELS.profilesClose, async () => {
-    if (controller.getActive()) await beforeActiveProfileChange()
-    controller.close()
-    onProfileClosed()
-    onProfileLanguageChanged()
-  })
+  registerIpcHandler(
+    ipcMain,
+    IPC_CHANNELS.profilesPickWatchedFolder,
+    async (event): ReturnType<AppBridge['profiles']['pickWatchedFolder']> => {
+      if (!controller.getActive()) throw new Error('No profile is open')
+      const result = await dialog.showOpenDialog(parentWindow(event), {
+        properties: ['openDirectory'],
+      })
+      return result.canceled ? null : (result.filePaths[0] ?? null)
+    },
+  )
+  registerIpcHandler(
+    ipcMain,
+    IPC_CHANNELS.profilesWatchedFolderStatus,
+    (): Awaited<ReturnType<AppBridge['profiles']['watchedFolderStatus']>> =>
+      controller.getWatchedFolderStatus(),
+  )
+  registerIpcHandler(
+    ipcMain,
+    IPC_CHANNELS.profilesClose,
+    async (): Promise<void> => {
+      if (controller.getActive()) await beforeActiveProfileChange()
+      await controller.close()
+      onProfileClosed()
+      onProfileLanguageChanged()
+    },
+  )
 }
