@@ -5,7 +5,7 @@ TypeScript, and SQLite. The app opens to a collapsible sidebar with Overview,
 Transactions, Accounts, and Settings pages. On start you pick or create a
 profile; each profile has its own SQLite database and data folder. Financial
 data stays local. Accounts now track opening balances; transactions are not
-implemented yet.
+implemented yet. Settings includes two-level expense/income category management.
 
 ## Requirements
 
@@ -116,9 +116,9 @@ net, not a substitute for review or CI: Git's `--no-verify` and `HUSKY=0` can by
 them, and pattern matching cannot detect every possible form of sensitive data.
 
 The renderer has no Node access; a sandboxed, isolated preload exposes only the
-typed app, profile (including settings), account, and backup commands/queries.
+typed app, profile (including settings), account, category, and backup commands/queries.
 Every IPC input is validated
-in the main process. Account writes use the profile application API, with each
+in the main process. Account and category writes use the profile application API, with each
 command executed in one SQLite transaction. SQLite is used only in the main
 process. Profiles are listed in `profiles.json` under the app's user-data folder; each
 profile lives in `profiles/<id>/` (database, data folder, and backups). Migrations are forward-only and run after a verified backup; a
@@ -198,6 +198,48 @@ not off-device copies or backups of the separate data folder.
   points for #56, which will add signed transaction totals and transaction
   existence checks. Deletion and currency-change guards already use the same
   existence check; its positive cases will be tested when transactions arrive.
+
+## Categories
+
+- **Settings → Categories** lists expense and income categories separately, with
+  main categories followed by their subcategories. New and existing profiles get
+  translated defaults through migration 4: Food (Groceries, Restaurants), Housing
+  (Rent, Utilities), Transport (Public transport, Car), Health, Entertainment,
+  Clothing, Subscriptions, Other expenses, Fees, Salary, and Other income.
+  Fees is reserved as a sensible default for later transfer fees; transfers are
+  not implemented yet.
+- Default names follow the profile language immediately (HU/EN/DE). Renaming
+  stores a custom name that always wins over translation. User-created categories
+  always have a custom name. UUIDs and immutable default seed keys stay stable;
+  reopening never overwrites names, ordering, archive flags, or deleted defaults.
+- Add a main category or a subcategory under an active main category of the same
+  kind. A third level and cross-kind parents are rejected. Move up/down reorders
+  siblings without changing the hierarchy or the other kind's ordering.
+- Archive a category to hide it from pickers while keeping it in Settings.
+  Archiving a main category also hides its subcategories from pickers, without
+  changing the subcategories' own archive flags.
+- Deletion requires confirmation. Delete subcategories before their main category;
+  deletion does not cascade. A replacement must be a different active category
+  of the same kind, not hidden by an archived parent.
+- `hasCategoryTransactions` is the #56 integration point, matching accounts:
+  until transactions exist, categories are unused. The delete command already
+  requires a replacement when used, but actual transaction-line reassignment and
+  its positive-case tests belong to #56. Until that integration is complete, the
+  command fails closed if the existence query reports usage, preserving data.
+
+### Manual Categories check
+
+Run `npm run dev`, open a profile, and go to Settings → Categories. Change language
+among Hungarian, English, and German and check default names change immediately.
+Rename a default and create custom main/subcategories; check their names survive
+language changes, profile switches, and restart. Move categories up/down; confirm
+only siblings move. Archive a main category and verify its subcategories are
+marked hidden too. Try deletion, cancel, then confirm with an optional same-kind
+replacement. Delete subcategories before deleting their parent. Restore a backup
+and verify the category list refreshes to the restored state. Repeat in light/dark
+appearance and with keyboard navigation. UI checks are manual; application-API
+SQLite tests cover defaults, language/custom-name precedence, hierarchy, ordering,
+replacement validation, isolation, migration, and persistence.
 
 ### Manual shell check
 

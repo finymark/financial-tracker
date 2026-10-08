@@ -1,6 +1,53 @@
+import { categoryNames } from '../../../shared/category-translations'
 import type { MessageCatalog } from './en'
 
 export const de = {
+  ...categoryNames.de,
+  'categories.title': 'Kategorien',
+  'categories.description':
+    'Ausgaben- und Einnahmenkategorien haben höchstens zwei Ebenen. Standardnamen folgen der Sprache; eigene Namen bleiben unverändert. Das Archivieren einer Hauptkategorie blendet auch ihre Unterkategorien in Auswahllisten aus.',
+  'categories.expense': 'Ausgabe',
+  'categories.income': 'Einnahme',
+  'categories.loading': 'Kategorien werden geladen…',
+  'categories.name': 'Kategoriename',
+  'categories.kind': 'Ausgabe oder Einnahme',
+  'categories.parent': 'Hauptkategorie',
+  'categories.main': 'Keine übergeordnete Kategorie (Hauptkategorie)',
+  'categories.create': 'Kategorie erstellen',
+  'categories.rename': 'Umbenennen',
+  'categories.archive': 'Archivieren',
+  'categories.archived': 'Archiviert — in Kategorieauswahllisten ausgeblendet',
+  'categories.delete': 'Löschen',
+  'categories.deleteConfirmation': 'Diese Kategorie endgültig löschen?',
+  'categories.confirmDelete': 'Kategorie endgültig löschen',
+  'categories.replacement': 'Ersatzkategorie',
+  'categories.chooseReplacement': 'Ersatz auswählen',
+  'categories.noReplacement': 'Kein Ersatz (unbenutzte Kategorie)',
+  'categories.save': 'Speichern',
+  'categories.cancel': 'Abbrechen',
+  'categories.refresh': 'Aktualisieren',
+  'categories.up': 'Nach oben',
+  'categories.down': 'Nach unten',
+  'categories.error':
+    'Die Kategorieaktion konnte nicht abgeschlossen werden. Aktualisiere die Liste und versuche es erneut.',
+  'categories.error.name':
+    'Gib einen Kategorienamen mit 1 bis 100 Zeichen ein.',
+  'categories.error.kind': 'Wähle Ausgabe oder Einnahme.',
+  'categories.error.notFound':
+    'Die Kategorie wurde nicht gefunden. Aktualisiere die Liste.',
+  'categories.error.parent':
+    'Wähle eine aktive Hauptkategorie derselben Art. Kategorien haben höchstens zwei Ebenen.',
+  'categories.error.order':
+    'Wähle eine gültige Position unter gleichgeordneten Kategorien.',
+  'categories.error.children':
+    'Lösche zuerst die Unterkategorien, bevor du ihre Hauptkategorie löschst.',
+  'categories.error.replacementRequired':
+    'Diese Kategorie hat Transaktionen. Wähle einen Ersatz, um sie zu erhalten.',
+  'categories.error.replacement':
+    'Wähle eine andere aktive Ersatzkategorie derselben Art.',
+  'categories.error.transactionIntegration':
+    'Die Neuzuordnung von Transaktionen ist in dieser Version noch nicht verfügbar. Die Kategorie wurde nicht gelöscht.',
+
   'app.name': 'Financial Tracker',
   'app.tagline': 'Deine Finanzen auf deinem PC.',
   'navigation.label': 'Hauptnavigation',

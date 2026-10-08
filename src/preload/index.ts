@@ -8,6 +8,18 @@ const bridge: AppBridge = {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.backupsList),
     restore: (input) => ipcRenderer.invoke(IPC_CHANNELS.backupsRestore, input),
   },
+  categories: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.categoriesList),
+    listOptions: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.categoriesListOptions, input),
+    create: (input) => ipcRenderer.invoke(IPC_CHANNELS.categoriesCreate, input),
+    rename: (input) => ipcRenderer.invoke(IPC_CHANNELS.categoriesRename, input),
+    reorder: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.categoriesReorder, input),
+    archive: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.categoriesArchive, input),
+    delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.categoriesDelete, input),
+  },
   accounts: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.accountsList),
     listOptions: () => ipcRenderer.invoke(IPC_CHANNELS.accountsListOptions),

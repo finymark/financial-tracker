@@ -1,4 +1,13 @@
 import type {
+  Category,
+  CategoryIdInput,
+  CategoryOptionsInput,
+  CreateCategoryInput,
+  RenameCategoryInput,
+  ReorderCategoryInput,
+  DeleteCategoryInput,
+} from './categories'
+import type {
   Account,
   AccountIdInput,
   CreateAccountInput,
@@ -31,6 +40,13 @@ export const IPC_CHANNELS = {
   profilesClose: 'profiles:close',
   backupsList: 'backups:list',
   backupsRestore: 'backups:restore',
+  categoriesList: 'categories:list',
+  categoriesListOptions: 'categories:list-options',
+  categoriesCreate: 'categories:create',
+  categoriesRename: 'categories:rename',
+  categoriesReorder: 'categories:reorder',
+  categoriesArchive: 'categories:archive',
+  categoriesDelete: 'categories:delete',
   accountsList: 'accounts:list',
   accountsListOptions: 'accounts:list-options',
   accountsCreate: 'accounts:create',
@@ -49,6 +65,15 @@ export interface AppBridge {
   backups: {
     list(): Promise<ProfileBackup[]>
     restore(input: RestoreBackupInput): Promise<ActiveProfileInfo>
+  }
+  categories: {
+    list(): Promise<Category[]>
+    listOptions(input: CategoryOptionsInput): Promise<Category[]>
+    create(input: CreateCategoryInput): Promise<Category>
+    rename(input: RenameCategoryInput): Promise<Category>
+    reorder(input: ReorderCategoryInput): Promise<void>
+    archive(input: CategoryIdInput): Promise<void>
+    delete(input: DeleteCategoryInput): Promise<void>
   }
   accounts: {
     list(): Promise<Account[]>

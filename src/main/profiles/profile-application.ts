@@ -14,6 +14,25 @@ import type {
   ProfileSummary,
   RestoreBackupInput,
 } from '../../shared/profiles'
+import type {
+  Category,
+  CategoryKind,
+  CreateCategoryInput,
+  RenameCategoryInput,
+  ReorderCategoryInput,
+  DeleteCategoryInput,
+} from '../../shared/categories'
+import { validateCategoryKind } from './category-validation'
+import { CATEGORIES_SCHEMA_SQL } from './category-schema'
+import {
+  listCategories,
+  createCategory,
+  renameCategory,
+  archiveCategory,
+  reorderCategory,
+  deleteCategory,
+  hasCategoryTransactions,
+} from './profile-categories'
 import { openDatabase } from '../db'
 import {
   createStartupBackup,
@@ -101,6 +120,9 @@ export interface OpenProfileApplicationOptions {
 }
 
 export interface ProfileQueries {
+  hasCategoryTransactions(id: string): boolean
+  listCategories(): Category[]
+  listCategoryOptions(kind: CategoryKind): Category[]
   listBackups(): ProfileBackup[]
   getProfileInfo(): ProfileInfo
   listAccounts(): Account[]
@@ -111,6 +133,11 @@ export interface ProfileQueries {
 }
 
 export interface ProfileCommands {
+  createCategory(input: CreateCategoryInput): Category
+  renameCategory(input: RenameCategoryInput): Category
+  archiveCategory(id: string): void
+  reorderCategory(input: ReorderCategoryInput): void
+  deleteCategory(input: DeleteCategoryInput): void
   restoreBackup(input: RestoreBackupInput): Promise<void>
   ensureProfileIdentity(): void
   createAccount(input: CreateAccountInput): Account
@@ -185,6 +212,11 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
   `,
   ),
   defineSqlMigration(3, 'accounts', ACCOUNTS_SCHEMA_SQL),
+  defineSqlMigration(
+    4,
+    'two-level categories with translated defaults',
+    CATEGORIES_SCHEMA_SQL,
+  ),
 ]
 
 function validateMigrations(
@@ -328,6 +360,26 @@ class OpenProfileApplication implements ProfileApplication {
     this.#options = options
     this.#clock = options.clock ?? (() => new Date())
     this.commands = {
+      deleteCategory: (input) =>
+        this.#executeCommand(() => deleteCategory(this.#database, input)),
+      reorderCategory: (input) =>
+        this.#executeCommand(() => reorderCategory(this.#database, input)),
+      archiveCategory: (id) =>
+        this.#executeCommand(() => archiveCategory(this.#database, id)),
+      createCategory: (input) =>
+        this.#executeCommand(() => {
+          const id = createCategory(this.#database, input)
+          return this.queries
+            .listCategories()
+            .find((category) => category.id === id)!
+        }),
+      renameCategory: (input) =>
+        this.#executeCommand(() => {
+          const id = renameCategory(this.#database, input)
+          return this.queries
+            .listCategories()
+            .find((category) => category.id === id)!
+        }),
       restoreBackup: (input) => this.#restoreBackup(input),
       ensureProfileIdentity: () => this.#ensureProfileIdentity(),
       createAccount: (input) => this.#createAccount(input),
@@ -338,6 +390,26 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      hasCategoryTransactions: (id) => {
+        this.#assertAvailable()
+        return hasCategoryTransactions(this.#database, id)
+      },
+      listCategoryOptions: (kind) => {
+        const validatedKind = validateCategoryKind(kind)
+        const categories = this.queries.listCategories()
+        return categories.filter(
+          (category) =>
+            category.kind === validatedKind &&
+            !category.archived &&
+            (category.parentId === null ||
+              !categories.find((parent) => parent.id === category.parentId)!
+                .archived),
+        )
+      },
+      listCategories: () => {
+        this.#assertAvailable()
+        return listCategories(this.#database, this.#getSettings().language)
+      },
       listBackups: () => {
         this.#assertAvailable()
         return listBackupFiles(options.paths.backupDirectory).map(

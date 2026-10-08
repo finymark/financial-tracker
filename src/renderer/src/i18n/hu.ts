@@ -1,6 +1,51 @@
+import { categoryNames } from '../../../shared/category-translations'
 import type { MessageCatalog } from './en'
 
 export const hu = {
+  ...categoryNames.hu,
+  'categories.title': 'Kategóriák',
+  'categories.description':
+    'A kiadási és bevételi kategóriák legfeljebb kétszintűek. Az alapértelmezett nevek követik a nyelvet; az egyéni nevek változatlanok maradnak. A főkategória archiválása az alkategóriáit is elrejti a választókból.',
+  'categories.expense': 'Kiadás',
+  'categories.income': 'Bevétel',
+  'categories.loading': 'Kategóriák betöltése…',
+  'categories.name': 'Kategória neve',
+  'categories.kind': 'Kiadás vagy bevétel',
+  'categories.parent': 'Főkategória',
+  'categories.main': 'Nincs szülő (főkategória)',
+  'categories.create': 'Kategória létrehozása',
+  'categories.rename': 'Átnevezés',
+  'categories.archive': 'Archiválás',
+  'categories.archived': 'Archivált — nem jelenik meg a kategóriaválasztókban',
+  'categories.delete': 'Törlés',
+  'categories.deleteConfirmation': 'Végleg törlöd ezt a kategóriát?',
+  'categories.confirmDelete': 'Kategória végleges törlése',
+  'categories.replacement': 'Helyettesítő kategória',
+  'categories.chooseReplacement': 'Válassz helyettesítő kategóriát',
+  'categories.noReplacement': 'Nincs helyettesítés (nem használt kategória)',
+  'categories.save': 'Mentés',
+  'categories.cancel': 'Mégse',
+  'categories.refresh': 'Frissítés',
+  'categories.up': 'Mozgatás felfelé',
+  'categories.down': 'Mozgatás lefelé',
+  'categories.error':
+    'A kategóriaművelet nem sikerült. Frissíts és próbáld újra.',
+  'categories.error.name': 'Adj meg egy 1–100 karakter hosszú kategórianevet.',
+  'categories.error.kind': 'Válassz kiadást vagy bevételt.',
+  'categories.error.notFound': 'A kategória nem található. Frissítsd a listát.',
+  'categories.error.parent':
+    'Válassz azonos típusú, aktív főkategóriát. A kategóriák legfeljebb kétszintűek.',
+  'categories.error.order':
+    'Válassz érvényes pozíciót az azonos szintű kategóriák között.',
+  'categories.error.children':
+    'A főkategória törlése előtt töröld az alkategóriáit.',
+  'categories.error.replacementRequired':
+    'Ehhez a kategóriához tranzakciók tartoznak. Válassz helyettesítőt a megőrzésükhöz.',
+  'categories.error.replacement':
+    'Válassz másik, azonos típusú, aktív helyettesítő kategóriát.',
+  'categories.error.transactionIntegration':
+    'A tranzakciók átsorolása ebben a verzióban még nem érhető el. A kategória nem lett törölve.',
+
   'app.name': 'Financial Tracker',
   'app.tagline': 'Pénzügyeid a saját számítógépeden.',
   'navigation.label': 'Fő navigáció',
