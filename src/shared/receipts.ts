@@ -1,4 +1,4 @@
-import type { Currency } from './accounts'
+import type { ReceiptCurrency } from './receipt-parser'
 import type { CreateTransactionInput, Transaction } from './transactions'
 
 export type ReceiptStatus = 'received' | 'read' | 'confirmed' | 'discarded'
@@ -16,7 +16,7 @@ export interface Receipt {
   ocrPayeeName: string | null
   ocrDate: string | null
   ocrTotalMinor: number | null
-  ocrCurrency: Currency | null
+  ocrCurrency: ReceiptCurrency | null
   ocrConfidence: number | null
   createdTransactionId: string | null
 }
@@ -32,6 +32,18 @@ export interface IntakeReceiptInput {
 
 export interface ReceiptIdInput {
   id: string
+}
+
+export interface ReceiptPrefill {
+  accountId: string
+  payeeName: string
+  date: string
+  totalMinor: number | null
+  detectedCurrency: ReceiptCurrency | null
+  currencyAccountMismatch: boolean
+  categoryId: string
+  tagNames: string[]
+  confidence: 'high' | 'low'
 }
 
 export interface ReceiptPreviewInput extends ReceiptIdInput {

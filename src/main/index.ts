@@ -288,6 +288,7 @@ function startApplication(): void {
   let trayNoticeShown = settings.isTrayNoticeShown()
   let tray: Tray | null = null
   const rateSource = new MnbExchangeRateSource(createElectronNetTransport())
+  const receiptOcr = new TesseractOcrEngine()
   const onRateStatusChanged = () => {
     if (mainWindow && !mainWindow.isDestroyed())
       mainWindow.webContents.send(IPC_CHANNELS.ratesStatusChanged)
@@ -324,6 +325,7 @@ function startApplication(): void {
       onReceiptInboxChanged,
       onWatchedFolderStatusChanged,
       onWatchedFolderFailure,
+      ocrEngine: receiptOcr,
     },
   )
   const exchangeRates = new ExchangeRateScheduler(profiles, rateSource, {
@@ -528,6 +530,7 @@ function startApplication(): void {
   tray.on('double-click', showMainWindow)
   updateTray()
   app.on('will-quit', () => {
+    void receiptOcr.dispose()
     disposeAttachmentIpc()
     disposeDesktopIntegrations()
   })

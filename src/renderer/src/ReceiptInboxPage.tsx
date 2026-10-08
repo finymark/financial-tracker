@@ -20,6 +20,9 @@ import { matchShortcut } from './lib/shortcuts'
 import { shortcutTargetContext } from './lib/shortcut-context'
 import { today } from '../../shared/date'
 import { PhoneUploadDialog } from './components/phone-upload-dialog'
+import { amountInput } from './lib/amount-input-value'
+
+type OcrField = 'amount' | 'date' | 'account' | 'payee' | 'category' | 'tags'
 
 interface Props {
   language: Language
@@ -90,10 +93,17 @@ export function ReceiptInboxPage({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<MessageKey | null>(null)
   const [showPhoneUpload, setShowPhoneUpload] = useState(false)
-  const amountRef = useRef<HTMLInputElement>(null)
   const phoneUploadRef = useRef<HTMLButtonElement>(null)
+  const [ocrFields, setOcrFields] = useState<Set<OcrField>>(new Set())
+  const [lowConfidence, setLowConfidence] = useState(false)
+  const [currencyMismatch, setCurrencyMismatch] = useState<string | null>(null)
+  const amountRef = useRef<HTMLInputElement>(null)
+  const manuallyEdited = useRef(new Set<OcrField>())
+  const prefetchedReceiptId = useRef<string | null>(null)
   const references = useTransactionReferenceData(0, language, undoRevision)
   const format = createFormatters(language)
+  const selectedId = selected?.id
+  const selectedStatus = selected?.status
 
   const load = useCallback(() => {
     void Promise.all([
@@ -102,6 +112,11 @@ export function ReceiptInboxPage({
     ])
       .then(([receipts, accountId]) => {
         setItems(receipts)
+        setSelected((current) =>
+          current
+            ? (receipts.find((receipt) => receipt.id === current.id) ?? null)
+            : null,
+        )
         setDefaultAccountId(accountId ?? '')
         setError(null)
       })
@@ -112,13 +127,95 @@ export function ReceiptInboxPage({
   useEffect(load, [load, undoRevision])
   useEffect(() => window.app.receipts.onChanged(load), [load])
   useEffect(() => {
-    if (selected) amountRef.current?.focus()
-  }, [selected])
+    if (selectedId) amountRef.current?.focus()
+  }, [selectedId])
+  useEffect(() => {
+    if (
+      !selectedId ||
+      selectedStatus !== 'read' ||
+      prefetchedReceiptId.current === selectedId
+    )
+      return
+    prefetchedReceiptId.current = selectedId
+    let ignore = false
+    void window.app.receipts
+      .prefill({ id: selectedId })
+      .then((prefill) => {
+        if (ignore) return
+        const fields = new Set<OcrField>()
+        if (
+          prefill.totalMinor !== null &&
+          !manuallyEdited.current.has('amount')
+        )
+          fields.add('amount')
+        if (prefill.date && !manuallyEdited.current.has('date'))
+          fields.add('date')
+        if (
+          prefill.accountId &&
+          prefill.detectedCurrency &&
+          !manuallyEdited.current.has('account')
+        )
+          fields.add('account')
+        if (prefill.payeeName && !manuallyEdited.current.has('payee'))
+          fields.add('payee')
+        if (prefill.categoryId && !manuallyEdited.current.has('category'))
+          fields.add('category')
+        if (prefill.tagNames.length && !manuallyEdited.current.has('tags'))
+          fields.add('tags')
+        setForm((current) => {
+          if (!current || selectedId !== prefetchedReceiptId.current)
+            return current
+          const next = { ...current }
+          if (fields.has('amount') && prefill.totalMinor !== null) {
+            next.amount = amountInput(prefill.totalMinor)
+          }
+          if (fields.has('date')) {
+            next.date = prefill.date
+          }
+          if (prefill.accountId && !manuallyEdited.current.has('account')) {
+            next.accountId = prefill.accountId
+          }
+          if (fields.has('payee')) {
+            next.payeeName = prefill.payeeName
+          }
+          if (fields.has('category')) {
+            next.categoryId = prefill.categoryId
+          }
+          if (fields.has('tags')) {
+            next.tagNames = prefill.tagNames
+          }
+          return next
+        })
+        setOcrFields(fields)
+        setLowConfidence(prefill.confidence === 'low')
+        setCurrencyMismatch(
+          prefill.currencyAccountMismatch ? prefill.detectedCurrency : null,
+        )
+      })
+      .catch(() => setLowConfidence(true))
+    return () => {
+      ignore = true
+    }
+  }, [selectedId, selectedStatus])
 
   function open(receipt: Receipt) {
     setSelected(receipt)
     setForm(emptyForm(defaultAccountId))
+    manuallyEdited.current.clear()
+    prefetchedReceiptId.current = null
+    setOcrFields(new Set())
+    setLowConfidence(false)
+    setCurrencyMismatch(null)
     setError(null)
+  }
+
+  function markManual(field: OcrField) {
+    manuallyEdited.current.add(field)
+    setOcrFields((current) => {
+      const next = new Set(current)
+      next.delete(field)
+      return next
+    })
   }
 
   function back() {
@@ -224,10 +321,30 @@ export function ReceiptInboxPage({
               }
             }}
           >
+            {selected.status === 'received' && (
+              <p role="status" className="text-sm text-muted-foreground">
+                {t('receipts.reading')}
+              </p>
+            )}
+            {lowConfidence && (
+              <p className="text-sm text-muted-foreground">
+                {t('receipts.ocrLowConfidence')}
+              </p>
+            )}
+            {currencyMismatch && (
+              <p className="text-sm text-muted-foreground">
+                {t('receipts.currencyMismatch')} {currencyMismatch}
+              </p>
+            )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <label htmlFor="receipt-amount" className="text-sm font-medium">
                   {t('transactions.amount')}
+                  {ocrFields.has('amount') && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {t('receipts.ocrPrefilled')}
+                    </span>
+                  )}
                 </label>
                 <AmountInput
                   id="receipt-amount"
@@ -239,12 +356,20 @@ export function ReceiptInboxPage({
                   errorKey="transactions.error.amount"
                   hintKey="transactions.amountHint"
                   disabled={busy}
-                  onChange={(amount) => setForm({ ...form, amount })}
+                  onChange={(amount) => {
+                    markManual('amount')
+                    setForm({ ...form, amount })
+                  }}
                 />
               </div>
               <div className="space-y-2">
                 <label htmlFor="receipt-date" className="text-sm font-medium">
                   {t('transactions.date')}
+                  {ocrFields.has('date') && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {t('receipts.ocrPrefilled')}
+                    </span>
+                  )}
                 </label>
                 <Input
                   id="receipt-date"
@@ -253,9 +378,10 @@ export function ReceiptInboxPage({
                   value={form.date}
                   required
                   disabled={busy}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    markManual('date')
                     setForm({ ...form, date: event.target.value })
-                  }
+                  }}
                 />
               </div>
             </div>
@@ -278,13 +404,19 @@ export function ReceiptInboxPage({
             </label>
             <label className="block space-y-2 text-sm font-medium">
               {t('transactions.account')}
+              {ocrFields.has('account') && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  {t('receipts.ocrPrefilled')}
+                </span>
+              )}
               <NativeSelect
                 value={form.accountId}
                 required
                 disabled={busy}
-                onChange={(event) =>
+                onChange={(event) => {
+                  markManual('account')
                   setForm({ ...form, accountId: event.target.value })
-                }
+                }}
               >
                 <option value="" disabled>
                   {t('transactions.chooseAccount')}
@@ -298,15 +430,21 @@ export function ReceiptInboxPage({
             </label>
             <label className="block space-y-2 text-sm font-medium">
               {t('transactions.payee')}
+              {ocrFields.has('payee') && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  {t('receipts.ocrPrefilled')}
+                </span>
+              )}
               <Input
                 data-native-enter
                 list="receipt-payees"
                 value={form.payeeName}
                 maxLength={100}
                 disabled={busy}
-                onChange={(event) =>
+                onChange={(event) => {
+                  markManual('payee')
                   setForm({ ...form, payeeName: event.target.value })
-                }
+                }}
               />
               <datalist id="receipt-payees">
                 {references.payees.map((payee) => (
@@ -317,6 +455,11 @@ export function ReceiptInboxPage({
             <div className="space-y-2">
               <label htmlFor="receipt-tag" className="text-sm font-medium">
                 {t('tags.title')}
+                {ocrFields.has('tags') && (
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {t('receipts.ocrPrefilled')}
+                  </span>
+                )}
               </label>
               <div className="flex gap-2">
                 <Input
@@ -326,19 +469,24 @@ export function ReceiptInboxPage({
                   value={form.pendingTagName}
                   maxLength={100}
                   disabled={busy}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    markManual('tags')
                     setForm({ ...form, pendingTagName: event.target.value })
-                  }
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') {
                       event.preventDefault()
+                      markManual('tags')
                       setForm(addPendingTag(form))
                     }
                   }}
                 />
                 <Button
                   disabled={busy || !form.pendingTagName.trim()}
-                  onClick={() => setForm(addPendingTag(form))}
+                  onClick={() => {
+                    markManual('tags')
+                    setForm(addPendingTag(form))
+                  }}
                 >
                   {t('tags.add')}
                 </Button>
@@ -361,14 +509,15 @@ export function ReceiptInboxPage({
                       className="size-7"
                       aria-label={`${t('tags.remove')}: ${name}`}
                       disabled={busy}
-                      onClick={() =>
+                      onClick={() => {
+                        markManual('tags')
                         setForm({
                           ...form,
                           tagNames: form.tagNames.filter(
                             (candidate) => candidate !== name,
                           ),
                         })
-                      }
+                      }}
                     >
                       ×
                     </Button>
@@ -378,12 +527,18 @@ export function ReceiptInboxPage({
             </div>
             <label className="block space-y-2 text-sm font-medium">
               {t('transactions.category')}
+              {ocrFields.has('category') && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  {t('receipts.ocrPrefilled')}
+                </span>
+              )}
               <NativeSelect
                 value={form.categoryId}
                 disabled={busy}
-                onChange={(event) =>
+                onChange={(event) => {
+                  markManual('category')
                   setForm({ ...form, categoryId: event.target.value })
-                }
+                }}
               >
                 <option value="">{t('transactions.noCategory')}</option>
                 {categories.map((category) => (
@@ -492,6 +647,11 @@ export function ReceiptInboxPage({
                     {format.date(new Date(receipt.receivedAt))} ·{' '}
                     {t(`receipts.source.${receipt.source}`)}
                   </span>
+                  {receipt.status === 'received' && (
+                    <span className="block text-sm text-muted-foreground">
+                      {t('receipts.reading')}
+                    </span>
+                  )}
                 </span>
               </button>
               <Button

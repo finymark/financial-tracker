@@ -815,7 +815,8 @@ and verify the attachment opens again.
 
 Build with `npx electron-builder --win nsis --publish never`, then run
 `"release/win-unpacked/Financial Tracker.exe" --smoke-test`. It must print
-`SQLite smoke test OK`, `Image smoke test OK`, then `QR smoke test OK` and exit
+`SQLite smoke test OK`, `Image smoke test OK`, `QR smoke test OK`, and
+`OCR smoke test OK`, then exit
 successfully.
 
 ## Receipt inbox
@@ -826,10 +827,21 @@ successfully.
   2,000-pixel image bound as transaction image attachments.
 - The sidebar badge counts received and read photos. The inbox lists them oldest
   first with a thumbnail, original name, received date, and intake source.
-- Open a receipt to view its photo beside an empty transaction form. The form
-  defaults to an expense, today's date, and the last active account used by a
-  transaction. Confirming creates the transaction with exactly that photo as its
-  attachment; discarding hides the receipt. Both decisions are undoable.
+- Receipt OCR runs only on this PC with bundled Hungarian, German, and English
+  Tesseract models selected from the profile language with English fallback. No
+  receipt or OCR text is sent to a network service. Before recognition, a
+  transient copy is converted to grayscale, contrast-normalised, adaptively
+  binarised, deskewed, and enlarged when small; the stored colour photo is not
+  changed.
+- Open a receipt to view its photo beside an editable transaction form. OCR can
+  prefill payee (including aliases, categorisation rules, and last-used values),
+  date, amount, and a matching active HUF/CHF account. A detected currency with
+  no matching account is shown as a hint. Confirming creates the transaction
+  with exactly that photo as its attachment; discarding hides the receipt. Both
+  decisions are undoable.
+- OCR is a convenience, not an authority: thermal paper, blur, unusual layouts,
+  and handwriting can reduce accuracy, so every field must be checked. Line-item
+  extraction and split suggestions are intentionally out of scope.
 - Inbox intake is a background write and does not replace or clear the existing
   Undo history. Active inbox photos are retained by the attachment sweep and are
   included in the incremental attachment backup pool and restore process.
@@ -849,14 +861,20 @@ successfully.
 Run `npm run dev` with synthetic images only. Drop several JPEG/PNG/WebP photos
 onto the main window, verify the drop overlay, oldest-first rows, thumbnails and
 sidebar count, then restart and confirm the items persist. Open a photo, complete
-the transaction form, confirm with Enter and Ctrl+Enter, and verify the created
-transaction has exactly that photo attached. Discard another receipt and use
+the transaction form, verify the reading/low-confidence and OCR-field indicators,
+edit every prefilled field, confirm with Enter and Ctrl+Enter, and verify the
+created transaction has exactly that photo attached. Test Hungarian, German,
+Swiss, and unreadable synthetic receipt images; verify aliases/rules and
+currency-matching accounts are suggested, while an unsupported detected
+currency keeps the default account and shows a hint. Discard another receipt and use
 Undo to return it; also undo a confirmation and verify both the transaction and
 inbox state return correctly. Drop a PDF or another non-image file and verify a
 translated rejection. With the transaction drawer open, drop an image on its
 attachment drop zone and verify it attaches to that transaction instead of
-entering the receipt inbox. Repeat in HU/EN/DE, using only the keyboard where
-applicable, and check light/dark and narrow-window layouts.
+entering the receipt inbox. Restart while an item is waiting and confirm OCR is
+retried. Repeat in HU/EN/DE, using only the keyboard where applicable, and check
+light/dark and narrow-window layouts. For a packaged build, also run the smoke
+test above with networking disabled.
 
 ### Phone upload
 

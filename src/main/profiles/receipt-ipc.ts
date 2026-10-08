@@ -59,6 +59,14 @@ export function registerReceiptIpc(
   )
   registerIpcHandler(
     ipcMain,
+    IPC_CHANNELS.receiptsPrefill,
+    (_event, value): Awaited<ReturnType<AppBridge['receipts']['prefill']>> =>
+      controller
+        .getActiveApplication()
+        .queries.getReceiptPrefill(validateReceiptId(inputRecord(value).id)),
+  )
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.receiptsConfirm,
     (_event, value): Awaited<ReturnType<AppBridge['receipts']['confirm']>> => {
       const input = inputRecord(value)

@@ -18,6 +18,7 @@ import {
 } from './profile-application'
 import { ProfileRegistry } from './profile-registry'
 import type { ExchangeRateSource } from '../exchange-rates/exchange-rate-source'
+import type { OcrEngine } from '../ocr/ocr-engine'
 import {
   WatchedFolderIntake,
   type WatchedFolderIntakeOptions,
@@ -34,6 +35,7 @@ interface ProfileControllerOptions {
   >
   onWatchedFolderStatusChanged?: (status: WatchedFolderStatus | null) => void
   onWatchedFolderFailure?: (failure: WatchedFolderFailure) => void
+  ocrEngine?: OcrEngine
   logger?: Pick<Console, 'error'>
   clock?: () => Date
 }
@@ -92,6 +94,7 @@ export class ProfileController {
           paths: this.#registry.getProfilePaths(profile.id),
           createStartupBackup: false,
           ...this.#applicationOptions(),
+          startBackgroundWork: false,
         })
         application.commands.updateSettings({ language: this.#defaultLanguage })
         application.close()
@@ -127,8 +130,10 @@ export class ProfileController {
             profile,
             paths: this.#registry.getProfilePaths(id),
             ...this.#applicationOptions(),
+            startBackgroundWork: false,
           })
           this.#active = { id, application }
+          application.startBackgroundWork()
           await this.#startWatchedFolder()
         }
         throw error
@@ -146,6 +151,7 @@ export class ProfileController {
           profile,
           paths: this.#registry.getProfilePaths(id),
           ...this.#applicationOptions(),
+          startBackgroundWork: false,
         })
         this.#registry.rememberLastUsed(id)
       } catch (error) {
@@ -153,8 +159,9 @@ export class ProfileController {
         await this.#startWatchedFolder()
         throw error
       }
-      this.#active?.application.close()
+      await this.#closeActive()
       this.#active = { id, application }
+      application.startBackgroundWork()
       await this.#startWatchedFolder()
       return this.getActive() as ActiveProfileInfo
     })
@@ -266,6 +273,7 @@ export class ProfileController {
 
   async #closeActive(): Promise<void> {
     await this.#stopWatchedFolder()
+    await this.#active?.application.stopBackgroundWork()
     this.#active?.application.close()
     this.#active = null
   }
@@ -314,6 +322,7 @@ export class ProfileController {
       onRateStatusChanged: this.#options.onRateStatusChanged,
       onPendingTransactionsChanged: this.#options.onPendingTransactionsChanged,
       onReceiptInboxChanged: this.#options.onReceiptInboxChanged,
+      ocrEngine: this.#options.ocrEngine,
       logger: this.#options.logger,
       clock: this.#options.clock,
     }

@@ -180,6 +180,12 @@ export const en = {
   'receipts.back': 'Back to receipt inbox',
   'receipts.confirm': 'Confirm transaction',
   'receipts.discard': 'Discard',
+  'receipts.reading': 'Reading receipt… You can still enter details manually.',
+  'receipts.ocrPrefilled': 'read by OCR',
+  'receipts.ocrLowConfidence':
+    'OCR confidence is low. Check every prefilled field.',
+  'receipts.currencyMismatch':
+    'No active account matches the detected currency:',
   'receipts.source.drop': 'Dropped into the app',
   'receipts.source.folder': 'Watched folder',
   'receipts.source.phone': 'Phone upload',

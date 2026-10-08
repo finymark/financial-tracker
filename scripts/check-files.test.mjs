@@ -128,10 +128,13 @@ describe('file guard', () => {
   it.each([
     'png',
     'JPG',
+    'jpeg',
     'gif',
     'webp',
     'bmp',
+    'tif',
     'tiff',
+    'pdf',
     'svg',
     'ico',
     'avif',
@@ -141,6 +144,17 @@ describe('file guard', () => {
     expect((await run(`src/fixtures/sample.${extension}`)).stderr).toContain(
       'fixture-image',
     )
+  })
+
+  it.each([
+    'fixtures',
+    'receipt-fixtures',
+    'fixtures-private',
+    'nested/test-fixtures',
+  ])('blocks media under any %s folder', async (folder) => {
+    const file = `${folder}/sample.pdf`
+    write(file, '%PDF-1.7\nsynthetic\n')
+    expect((await run(file)).stderr).toContain('fixture-image')
   })
 
   it('blocks a renamed image by its signature, but permits images outside fixtures', async () => {

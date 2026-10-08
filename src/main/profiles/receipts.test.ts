@@ -9,7 +9,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { afterEach, expect, test } from 'vitest'
+import type { OcrEngine, OcrLanguage, OcrResult } from '../ocr/ocr-engine'
 import {
+  CURRENT_MIGRATIONS,
   openProfileApplication,
   type ProfileApplication,
 } from './profile-application'
@@ -20,7 +22,26 @@ const applications: ProfileApplication[] = []
 let now = new Date('2026-01-15T10:00:00.000Z')
 const clock = () => now
 
-async function setup(createStartupBackup = false): Promise<{
+class FakeOcrEngine implements OcrEngine {
+  calls: { image: Buffer; languages: OcrLanguage[] }[] = []
+
+  constructor(
+    private readonly recognizeImplementation: () => Promise<OcrResult>,
+  ) {}
+
+  async recognize(image: Buffer, languages: OcrLanguage[]) {
+    this.calls.push({ image, languages })
+    return this.recognizeImplementation()
+  }
+
+  async dispose() {}
+}
+
+async function setup(
+  createStartupBackup = false,
+  ocrEngine?: OcrEngine,
+  onReceiptInboxChanged?: () => void,
+): Promise<{
   application: ProfileApplication
   paths: ProfilePaths
   profile: ReturnType<ProfileRegistry['createProfile']>
@@ -35,9 +56,26 @@ async function setup(createStartupBackup = false): Promise<{
     paths,
     clock,
     createStartupBackup,
+    ocrEngine,
+    onReceiptInboxChanged,
   })
   applications.push(application)
   return { application, paths, profile }
+}
+
+async function waitForReceipt(
+  application: ProfileApplication,
+  id: string,
+  status: 'received' | 'read',
+): Promise<ReturnType<ProfileApplication['queries']['listReceipts']>[number]> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const receipt = application.queries
+      .listReceipts()
+      .find((candidate) => candidate.id === id)
+    if (receipt?.status === status) return receipt
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+  throw new Error(`Receipt did not reach ${status}`)
 }
 
 async function image(
@@ -327,4 +365,312 @@ test('receipt form defaults to the last active account used by a transaction', a
   expect(context.application.queries.getReceiptDefaultAccountId()).toBe(
     first.id,
   )
+})
+
+test('intake queues OCR, stores parsed fields without touching undo history, and notifies', async () => {
+  let notifications = 0
+  const engine = new FakeOcrEngine(async () => ({
+    text: 'MINTA OCR Kft.\nFIZETENDŐ 1 234 Ft\n2026. 01. 15.',
+    confidence: 94,
+  }))
+  const context = await setup(false, engine, () => {
+    notifications += 1
+  })
+  const account = context.application.commands.createAccount({
+    name: 'Cash',
+    currency: 'HUF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  const receipt = await context.application.commands.intakeReceipt(
+    { bytes: await image(), name: 'ocr.jpg' },
+    'drop',
+  )
+  const read = await waitForReceipt(context.application, receipt.id, 'read')
+
+  expect(read).toMatchObject({
+    status: 'read',
+    ocrPayeeName: 'MINTA OCR Kft.',
+    ocrDate: '2026-01-15',
+    ocrTotalMinor: 123_400,
+    ocrCurrency: 'HUF',
+    ocrConfidence: 1,
+  })
+  expect(engine.calls).toHaveLength(1)
+  expect(engine.calls[0].languages).toEqual(['eng'])
+  expect(notifications).toBeGreaterThanOrEqual(2)
+  expect(context.application.commands.undoLast()).toBe(true)
+  expect(context.application.queries.listAccounts()).not.toContainEqual(account)
+  expect(context.application.queries.listReceipts()[0].status).toBe('read')
+})
+
+test('OCR failure still marks a receipt read with empty low-confidence fields', async () => {
+  const engine = new FakeOcrEngine(async () => {
+    throw new Error('synthetic OCR failure')
+  })
+  const context = await setup(false, engine)
+  const receipt = await context.application.commands.intakeReceipt(
+    { bytes: await image(), name: 'failure.jpg' },
+    'drop',
+  )
+  await expect(
+    waitForReceipt(context.application, receipt.id, 'read'),
+  ).resolves.toMatchObject({
+    status: 'read',
+    ocrPayeeName: null,
+    ocrDate: null,
+    ocrTotalMinor: null,
+    ocrCurrency: null,
+    ocrConfidence: 0,
+  })
+})
+
+test('closing a profile cancels a pending OCR result before it can write', async () => {
+  let recognizeStarted!: () => void
+  const started = new Promise<void>((resolve) => {
+    recognizeStarted = resolve
+  })
+  let finishRecognition!: (result: OcrResult) => void
+  const recognition = new Promise<OcrResult>((resolve) => {
+    finishRecognition = resolve
+  })
+  const engine = new FakeOcrEngine(async () => {
+    recognizeStarted()
+    return recognition
+  })
+  const context = await setup(false, engine)
+  const receipt = await context.application.commands.intakeReceipt(
+    { bytes: await image(), name: 'pending.jpg' },
+    'drop',
+  )
+  await started
+  close(context.application)
+  finishRecognition({
+    text: 'LATE TEST AG\nTOTAL CHF 12.50\n15.01.2026',
+    confidence: 90,
+  })
+  await recognition
+
+  const reopened = await openProfileApplication({
+    profile: context.profile,
+    paths: context.paths,
+    clock,
+    createStartupBackup: false,
+  })
+  applications.push(reopened)
+  await expect(
+    waitForReceipt(reopened, receipt.id, 'received'),
+  ).resolves.toMatchObject({
+    ocrPayeeName: null,
+  })
+})
+
+test('opening a profile requeues received receipts', async () => {
+  const context = await setup()
+  const receipt = await context.application.commands.intakeReceipt(
+    { bytes: await image(), name: 'requeue.jpg' },
+    'drop',
+  )
+  close(context.application)
+  const engine = new FakeOcrEngine(async () => ({
+    text: 'REOPEN TEST AG\nTOTAL CHF 9.90\n15.01.2026',
+    confidence: 90,
+  }))
+  const reopened = await openProfileApplication({
+    profile: context.profile,
+    paths: context.paths,
+    clock,
+    createStartupBackup: false,
+    ocrEngine: engine,
+  })
+  applications.push(reopened)
+  await expect(
+    waitForReceipt(reopened, receipt.id, 'read'),
+  ).resolves.toMatchObject({
+    ocrPayeeName: 'REOPEN TEST AG',
+    ocrTotalMinor: 990,
+  })
+})
+
+test('receipt prefill resolves an OCR payee alias before rule suggestions', async () => {
+  const engine = new FakeOcrEngine(async () => ({
+    text: 'RAW OCR SHOP\nÖSSZESEN 2 500 Ft\n2026. 01. 15.',
+    confidence: 92,
+  }))
+  const context = await setup(false, engine)
+  const account = context.application.commands.createAccount({
+    name: 'Cash',
+    currency: 'HUF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  const category = context.application.commands.createCategory({
+    kind: 'expense',
+    name: 'OCR category',
+    parentId: null,
+  })
+  const canonical = context.application.commands.createTransaction({
+    accountId: account.id,
+    kind: 'expense',
+    date: '2026-01-14',
+    totalMinor: 100,
+    payeeName: 'Canonical Shop',
+    categoryId: null,
+    note: '',
+    tagNames: ['OCR tag'],
+  })
+  context.application.commands.addPayeeAlias({
+    payeeId: canonical.payeeId!,
+    name: 'RAW OCR SHOP',
+  })
+  const tag = context.application.queries.listTags()[0]
+  context.application.commands.createCategorisationRule({
+    enabled: true,
+    payeeId: canonical.payeeId,
+    textContains: null,
+    accountId: null,
+    minAmountMinor: null,
+    maxAmountMinor: null,
+    categoryId: category.id,
+    tagIds: [tag.id],
+  })
+  const receipt = await context.application.commands.intakeReceipt(
+    { bytes: await image(), name: 'alias.jpg' },
+    'drop',
+  )
+  await waitForReceipt(context.application, receipt.id, 'read')
+
+  expect(context.application.queries.getReceiptPrefill(receipt.id)).toEqual({
+    accountId: account.id,
+    payeeName: 'Canonical Shop',
+    date: '2026-01-15',
+    totalMinor: 250_000,
+    detectedCurrency: 'HUF',
+    currencyAccountMismatch: false,
+    categoryId: category.id,
+    tagNames: ['OCR tag'],
+    confidence: 'high',
+  })
+})
+
+test('receipt prefill selects the last-used matching-currency account or reports no match', async () => {
+  const results = [
+    'SWISS TEST AG\nTOTAL CHF 12.50\n15.01.2026',
+    'EURO TEST GmbH\nSUMME EUR 9,90\n15.01.2026',
+  ]
+  const engine = new FakeOcrEngine(async () => ({
+    text: results.shift()!,
+    confidence: 90,
+  }))
+  const context = await setup(false, engine)
+  const firstChf = context.application.commands.createAccount({
+    name: 'First CHF',
+    currency: 'CHF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  const lastUsedChf = context.application.commands.createAccount({
+    name: 'Last CHF',
+    currency: 'CHF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  const huf = context.application.commands.createAccount({
+    name: 'Default HUF',
+    currency: 'HUF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  context.application.commands.createTransaction({
+    accountId: firstChf.id,
+    kind: 'expense',
+    date: '2026-01-13',
+    totalMinor: 100,
+    payeeName: null,
+    categoryId: null,
+    note: '',
+  })
+  context.application.commands.createTransaction({
+    accountId: lastUsedChf.id,
+    kind: 'expense',
+    date: '2026-01-14',
+    totalMinor: 100,
+    payeeName: null,
+    categoryId: null,
+    note: '',
+  })
+  context.application.commands.createTransaction({
+    accountId: huf.id,
+    kind: 'expense',
+    date: '2026-01-15',
+    totalMinor: 100,
+    payeeName: null,
+    categoryId: null,
+    note: '',
+  })
+
+  const swiss = await context.application.commands.intakeReceipt(
+    { bytes: await image(), name: 'swiss.jpg' },
+    'drop',
+  )
+  await waitForReceipt(context.application, swiss.id, 'read')
+  expect(context.application.queries.getReceiptPrefill(swiss.id)).toMatchObject(
+    {
+      accountId: lastUsedChf.id,
+      detectedCurrency: 'CHF',
+      currencyAccountMismatch: false,
+    },
+  )
+
+  const euro = await context.application.commands.intakeReceipt(
+    { bytes: await image(), name: 'euro.jpg' },
+    'drop',
+  )
+  await waitForReceipt(context.application, euro.id, 'read')
+  expect(context.application.queries.getReceiptPrefill(euro.id)).toMatchObject({
+    accountId: huf.id,
+    detectedCurrency: 'EUR',
+    currencyAccountMismatch: true,
+  })
+})
+
+test('EUR OCR migration preserves receipts created by the inbox schema', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'financial-tracker-receipts-'))
+  directories.push(directory)
+  const registry = new ProfileRegistry({ userDataDirectory: directory, clock })
+  const profile = registry.createProfile('Receipt migration test')
+  const paths = registry.getProfilePaths(profile.id)
+  const previous = await openProfileApplication({
+    profile,
+    paths,
+    clock,
+    createStartupBackup: false,
+    migrations: CURRENT_MIGRATIONS.slice(0, -1),
+  })
+  applications.push(previous)
+  const receipt = await previous.commands.intakeReceipt(
+    { bytes: await image(), name: 'before-eur.png' },
+    'drop',
+  )
+  close(previous)
+
+  const engine = new FakeOcrEngine(async () => ({
+    text: 'EURO UPGRADE GmbH\nSUMME EUR 15,25\n15.01.2026',
+    confidence: 90,
+  }))
+  const upgraded = await openProfileApplication({
+    profile,
+    paths,
+    clock,
+    createStartupBackup: false,
+    ocrEngine: engine,
+  })
+  applications.push(upgraded)
+  await expect(
+    waitForReceipt(upgraded, receipt.id, 'read'),
+  ).resolves.toMatchObject({
+    originalFileName: 'before-eur.png',
+    ocrCurrency: 'EUR',
+    ocrTotalMinor: 1_525,
+  })
 })

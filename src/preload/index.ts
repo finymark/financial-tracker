@@ -41,6 +41,7 @@ const bridge: AppBridge = {
     count: () => ipcRenderer.invoke(IPC_CHANNELS.receiptsCount),
     defaultAccountId: () =>
       ipcRenderer.invoke(IPC_CHANNELS.receiptsDefaultAccount),
+    prefill: (input) => ipcRenderer.invoke(IPC_CHANNELS.receiptsPrefill, input),
     confirm: (input) => ipcRenderer.invoke(IPC_CHANNELS.receiptsConfirm, input),
     discard: (input) => ipcRenderer.invoke(IPC_CHANNELS.receiptsDiscard, input),
     preview: (input) => ipcRenderer.invoke(IPC_CHANNELS.receiptsPreview, input),
