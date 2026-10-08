@@ -1,8 +1,10 @@
+import { desktopMessages } from '../../../shared/desktop-translations'
 import { csvMessages } from '../../../shared/csv-translations'
 import { categoryNames } from '../../../shared/category-translations'
 import type { MessageCatalog } from './en'
 
 export const hu = {
+  ...desktopMessages.hu,
   'privacy.toggle': 'Privát mód',
   'privacy.hiddenAmount': 'Rejtett összeg',
   'privacy.shortcutScope':

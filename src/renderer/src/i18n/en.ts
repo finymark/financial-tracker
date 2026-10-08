@@ -1,6 +1,8 @@
+import { desktopMessages } from '../../../shared/desktop-translations'
 import { csvMessages } from '../../../shared/csv-translations'
 import { categoryNames } from '../../../shared/category-translations'
 export const en = {
+  ...desktopMessages.en,
   'privacy.toggle': 'Privacy mode',
   'privacy.hiddenAmount': 'Hidden amount',
   'privacy.shortcutScope':

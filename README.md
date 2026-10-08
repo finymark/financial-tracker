@@ -1243,3 +1243,91 @@ after completion Undo should revert only that command. Try deleting an account,
 cancel, then confirm deletion. Switch profiles and check that accounts remain
 separate. Repeat with Hungarian/German and light/dark themes; check keyboard
 navigation, focus indicators, and validation errors. UI checks are manual.
+
+### Tray, close-to-tray and Windows startup
+
+Closing the main window always hides it to the tray; it does **not** quit.
+Left-click or double-click the tray icon, or choose **Open**, to restore and focus
+it. **Quick add** currently opens the main window's new-transaction drawer
+(ticket #81 will replace this entry point with a small quick-add window). With
+no profile open, choose a profile first; without active accounts the existing
+no-accounts guidance appears. An already open drawer/dialog and its unsaved
+input are preserved. **Quit** stops the scheduler and closes the profile through
+the existing shutdown path. Starting the app again restores/focuses the existing
+window, even if the second launch includes `--hidden`; it never opens a second
+app instance. A standalone `--hidden` launch creates only the tray icon and keeps
+the main window hidden until requested.
+
+The tooltip, menu, and first-close native notice use the active profile language,
+falling back to the Windows locale and then English. Changing language, switching
+profiles, or restoring a backup refreshes the tray labels. The notice is shown
+once per app-data installation, not once per profile: its shown flag is
+stored in validated, atomically replaced `app-settings.json` beside
+`profiles.json` in the app's user-data folder. As with profiles, uninstall keeps
+app data, so reinstalling with preserved data does not repeat the notice.
+
+**Settings → Start with Windows** is off by default and shared by all profiles
+on this Windows account. The preference is stored only in Windows' login-item
+setting (no duplicate JSON preference that could become stale), using
+`setLoginItemSettings({ openAtLogin, args: ['--hidden'] })` and reading back with
+`getLoginItemSettings({ args: ['--hidden'] })`. Signing in starts the app hidden
+in the tray. The toggle is disabled with an explanation in development mode and
+on non-Windows platforms. OS shutdown/logoff and the updater's **Restart** bypass
+close-to-tray; the updater closes the profile before launching installation.
+
+### Manual tray and autostart check (installed NSIS build)
+
+Use synthetic profiles and data only. Tray interaction, login items and native
+window lifecycle are manual checks, not covered by the unit suite.
+
+1. Run `npm run build`, then `npx electron-builder --win nsis --publish never`.
+   Run `"release/win-unpacked/Financial Tracker.exe" --smoke-test` and also with
+   `--hidden --smoke-test`: both must print **SQLite smoke test OK** and exit with
+   code 0 without a tray icon or window. Repeat the smoke test while a normal
+   instance is running to check it does not acquire/block the single-instance
+   lock or steal focus. Install the generated NSIS installer from `release/`.
+2. On a fresh app-data installation, open Settings: **Start with Windows** must
+   be unchecked. Open/create a synthetic profile and close the window using X
+   and Alt+F4. Verify the window/taskbar entry disappears, the tray icon remains,
+   and the small native keep-running notice appears on the first close only.
+   Acknowledge it, restore, close again, switch profiles, quit/relaunch and close:
+   the notice must not repeat. Check the Task Manager process is still running.
+3. Restore via tray left-click, double-click and **Open**; each must show/focus
+   the same window. Minimize and repeat. Choose **Quick add** from Overview and
+   Settings: verify Transactions opens with a new drawer and Amount focused.
+   Save a synthetic transaction and check its account balance and Undo. Repeat
+   without an open profile (select one), without accounts (normal guidance), and
+   while a drawer/dialog already has unsaved input (it must remain intact).
+4. Change the active profile language through HU/EN/DE. Check tray tooltip,
+   **Open**, **Quick add**, and **Quit** immediately update. Switch to a profile
+   with another language and restore a backup with another language. Before
+   opening a profile, verify the Windows-locale fallback (unsupported locale →
+   English). Check the first-close notice in each language using separate clean
+   synthetic app-data installations. Verify light/dark Settings and keyboard
+   access to the startup toggle. In `npm run dev`, verify the toggle is disabled
+   and the explanatory text appears.
+5. Hide to tray or minimize, then launch the installed app again from its shortcut
+   (and once with `--hidden`). Verify the same window restores/focuses and there
+   is still one tray icon and one main application instance. Also test a rapid
+   second launch during initial startup; it must show the existing window.
+6. Enable **Start with Windows**, switch profiles and restart normally: verify
+   the shared toggle remains on. Quit, sign out and sign in to Windows: verify
+   exactly one tray icon starts automatically, with **no main window**. Open it
+   from the tray, disable startup, quit and sign out/in again: no process/tray
+   icon may autostart. Relaunch manually and verify the toggle is still off.
+7. With a profile open and a scheduler active, choose tray **Quit**. Verify all
+   app processes stop and no tray icon remains; relaunch and verify the database
+   opens normally with saved data. Repeat Windows logoff/shutdown with the window
+   both visible and hidden: there must be no close-to-tray notice or shutdown
+   veto, and the profile must reopen cleanly afterward.
+8. With an update downloaded in an installed build, choose the updater's
+   **Restart** while the window is visible, and repeat after restoring from tray.
+   Verify the old process exits, installation proceeds (close-to-tray must not
+   block it), and the updated app starts and opens the profile cleanly. If an
+   installation attempt fails synchronously, verify the profile and scheduler
+   recover and subsequent window closes hide to tray again.
+
+Automated pure tests cover temporary-folder app-settings defaults, persistence,
+validation, atomic replace/retries/failure preservation, translated menu templates
+and language fallback/rebuilds, strict autostart input, and exact `--hidden`
+argument parsing. No ledger schema change is required.

@@ -2,6 +2,20 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 
 const bridge: AppBridge = {
+  desktop: {
+    autostartStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.desktopAutostartStatus),
+    setAutostart: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.desktopSetAutostart, input),
+    takeQuickAddRequest: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.desktopTakeQuickAddRequest),
+    onQuickAdd: (listener) => {
+      const handler = () => listener()
+      ipcRenderer.on(IPC_CHANNELS.desktopQuickAdd, handler)
+      return () =>
+        ipcRenderer.removeListener(IPC_CHANNELS.desktopQuickAdd, handler)
+    },
+  },
   reports: {
     cashFlow: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.reportsCashFlow, input),

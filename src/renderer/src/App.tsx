@@ -20,6 +20,7 @@ import { ShortcutHelp } from './components/shortcut-help'
 import { matchShortcut, shortcuts } from './lib/shortcuts'
 import { PrivacyProvider } from './lib/privacy'
 import { shortcutTargetContext } from './lib/shortcut-context'
+import { AutostartSettings } from './components/autostart-settings'
 import { UpdateNotice } from './components/update-notice'
 import { BackupSettings } from './components/backup-settings'
 import { CategorySettings } from './components/category-settings'
@@ -349,6 +350,8 @@ function ProfilePicker({
 }
 
 interface ShellProps {
+  quickAddRequested: boolean
+  onQuickAddHandled(): void
   active: ActiveProfileInfo
   version: string
   t: Translate
@@ -358,6 +361,8 @@ interface ShellProps {
 }
 
 function Shell({
+  quickAddRequested,
+  onQuickAddHandled,
   active,
   version,
   t,
@@ -515,6 +520,44 @@ function Shell({
     ruleBusy,
     showShortcutHelp,
     togglePrivacy,
+  ])
+
+  useEffect(() => {
+    if (
+      !quickAddRequested ||
+      savingSettings ||
+      accountBusy ||
+      backupBusy ||
+      categoryBusy ||
+      payeeBusy ||
+      ruleBusy ||
+      undoBusy
+    )
+      return
+    let ignore = false
+    queueMicrotask(() => {
+      if (ignore) return
+      // Preserve an existing drawer or modal and its unsaved input.
+      if (!document.querySelector('[role="dialog"]')) {
+        setReportTransactionFilter(null)
+        setNewTransactionRequested(true)
+        setPage('transactions')
+      }
+      onQuickAddHandled()
+    })
+    return () => {
+      ignore = true
+    }
+  }, [
+    quickAddRequested,
+    onQuickAddHandled,
+    savingSettings,
+    accountBusy,
+    backupBusy,
+    categoryBusy,
+    payeeBusy,
+    ruleBusy,
+    undoBusy,
   ])
 
   async function saveSettings(changes: ProfileSettingsChanges) {
@@ -843,6 +886,7 @@ function Shell({
                     </NativeSelect>
                   </div>
                 </div>
+                <AutostartSettings t={t} />
                 <p className="text-sm text-muted-foreground">
                   {t('settings.version')}: {version}
                 </p>
@@ -974,6 +1018,8 @@ function Shell({
 }
 
 export default function App() {
+  const [quickAddRequested, setQuickAddRequested] = useState(false)
+  const quickAddHandled = useCallback(() => setQuickAddRequested(false), [])
   const [snapshot, setSnapshot] = useState(emptySnapshot)
   const [active, setActive] = useState<ActiveProfileInfo | null>(null)
   const [loading, setLoading] = useState(true)
@@ -1000,6 +1046,30 @@ export default function App() {
         setVersion(appVersion)
       })
       .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    let ignore = false
+    const receive = () => {
+      void window.app.desktop
+        .takeQuickAddRequest()
+        .then((requested) => {
+          if (ignore || !requested) return
+          setQuickAddRequested(true)
+          setShowPicker(false)
+        })
+        .catch(() => {})
+    }
+    const unsubscribe = window.app.desktop.onQuickAdd(receive)
+    // Also consume requests made before subscription. Defer so StrictMode's
+    // discarded mount cannot consume a pending main-process request.
+    queueMicrotask(() => {
+      if (!ignore) receive()
+    })
+    return () => {
+      ignore = true
+      unsubscribe()
+    }
   }, [])
 
   let content
@@ -1032,6 +1102,8 @@ export default function App() {
       >
         <Shell
           key={active.id}
+          quickAddRequested={quickAddRequested}
+          onQuickAddHandled={quickAddHandled}
           active={active}
           version={version}
           t={t}
