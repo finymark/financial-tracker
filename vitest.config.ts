@@ -5,8 +5,9 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts', 'scripts/**/*.test.mjs'],
     // Real SQLite files, online backups and migrations on Windows CI runners are
-    // several times slower than on a developer machine; the 5 s default flakes.
-    testTimeout: 30_000,
-    hookTimeout: 30_000,
+    // many times slower than on a developer machine (runs with 30-40x slower
+    // tests have been seen), so CI gets a much larger budget.
+    testTimeout: process.env.CI ? 120_000 : 30_000,
+    hookTimeout: process.env.CI ? 120_000 : 30_000,
   },
 })
