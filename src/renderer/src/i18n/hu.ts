@@ -102,6 +102,14 @@ export const hu = {
     'Rögzítsd kiadásaidat és bevételeidet, hogy a számlaegyenlegek naprakészek legyenek.',
   'transactions.listDescription':
     'Szűrd a tranzakciókat időszak, számla, kategória, partner vagy megjegyzés szerint.',
+  'transactions.excluded': 'Kizárt',
+  'transactions.excludedHint':
+    'A számla egyenlegébe beleszámít, de a kiadások és bevételek összesítéséből kimarad.',
+  'transactions.exclusion': 'Kizárt tranzakciók',
+  'transactions.exclusion.all': 'Minden tranzakció',
+  'transactions.exclusion.onlyExcluded': 'Csak a kizártak',
+  'transactions.exclusion.hideExcluded': 'Kizártak elrejtése',
+  'transactions.error.excluded': 'Válaszd ki, hogy a tranzakció kizárt-e.',
   'transactions.filters': 'Tranzakciószűrők',
   'transactions.period': 'Időszak',
   'transactions.period.all': 'Összes dátum',

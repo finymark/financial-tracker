@@ -365,6 +365,15 @@ not off-device copies or backups of the separate data folder.
   History is in memory for the open profile only and is cleared by profile
   switching, restart, restore, or another profile write that has no declared undo
   aggregate. Account and category commands are not undoable yet.
+- Mark an expense or income as **Excluded** in the create/edit drawer when it
+  should affect its account balance but not spending/income totals (for example,
+  an expense awaiting reimbursement). The table shows an Excluded badge. The
+  **Excluded transactions** filter offers all transactions (default), only
+  excluded, or hide excluded and combines with the other filters. Filtered-set
+  and whole-day totals always ignore excluded amounts, including in the
+  only-excluded view, where matching days/currencies show zero totals. Saving a
+  flag change uses the same Undo toast and Ctrl+Z as other transaction edits.
+  Existing transactions remain included when upgrading via migration 8.
 - The dense table is newest first (date, creation timestamp, then UUID), grouped
   by day, with income/expense signs and icons. Each day shows totals for that
   whole filtered day, even when it continues onto another page. Only the visible
@@ -405,7 +414,15 @@ After create, edit, and delete, use both the toast action and `Ctrl+Z` and verif
 the exact previous transaction returns. While typing in amount, payee, note, or
 filter input, verify `Ctrl+Z` edits the field instead of undoing a transaction.
 Switch profiles after a change and verify the previous profile's command cannot
-be undone.
+be undone. Mark both an expense and income as Excluded in the drawer and verify
+that the badge appears, balances remain unchanged by toggling the flag, and both
+filtered-set and day totals omit their amounts. Try all three exclusion filter
+modes together with period/account/category/payee/search filters and paging;
+only-excluded totals must be zero. Save a flag toggle, undo it using the toast
+and Ctrl+Z, then delete an excluded transaction and undo the deletion; verify the
+flag, balances, and totals return. Restart and check flags persist. Repeat the
+badge, filter, and checkbox checks in HU/EN/DE, light/dark themes, and using only
+the keyboard.
 Combine all filters and compare whole-set totals with known amounts in both
 currencies. Check custom endpoints, year/month rollover, main-category versus
 subcategory selection, archived-history filters, and case/diacritic-insensitive
@@ -413,8 +430,8 @@ payee/note search. With more than 200 matching transactions, scroll to the botto
 and page forward/back; verify the day header totals still cover the whole day,
 the browser mounts only a small row window, and edit/delete refreshes the first
 page and totals. UI checks remain manual; the application-API tests cover filters,
-calendar boundaries, stable paging, exact totals, upgrade preservation, and the
-20 000-transaction query bound.
+calendar boundaries, stable paging, exact totals, excluded flags and filters,
+undo, upgrade preservation, persistence, and the 20 000-transaction query bound.
 
 ### Manual Categories check
 

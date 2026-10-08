@@ -24,6 +24,7 @@ export interface Transaction {
   payeeId: string | null
   payeeName: string | null
   note: string
+  excluded: boolean
   createdAt: string
   updatedAt: string
   line: TransactionLine
@@ -37,6 +38,8 @@ export interface CreateTransactionInput {
   payeeName: string | null
   categoryId: string | null
   note: string
+  // Defaults to false on create; omission preserves the flag on update.
+  excluded?: boolean
 }
 
 export interface UpdateTransactionInput extends CreateTransactionInput {
@@ -50,9 +53,13 @@ export interface TransactionIdInput {
 export type TransactionPeriod =
   'all' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'custom'
 
+export type TransactionExclusionFilter = 'all' | 'onlyExcluded' | 'hideExcluded'
+
 // Dates are inclusive and valid only with the custom period. Defaults: all
-// dates, offset 0, limit 100 (maximum 500). All supplied filters combine with AND.
+// dates, all exclusion states, offset 0, limit 100 (maximum 500).
+// All supplied filters combine with AND.
 export interface TransactionListInput {
+  exclusion?: TransactionExclusionFilter
   period?: TransactionPeriod
   from?: string
   to?: string
@@ -78,7 +85,8 @@ export interface TransactionDayTotals {
 export interface TransactionPage {
   rows: Transaction[]
   totalCount: number
-  // Aggregates cover the entire filtered set, independent of offset/limit.
+  // Aggregates cover the entire filtered set, independent of offset/limit,
+  // and always omit excluded amounts.
   totals: TransactionTotals[]
   days: TransactionDayTotals[]
 }

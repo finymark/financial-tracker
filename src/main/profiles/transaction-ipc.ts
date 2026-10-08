@@ -11,6 +11,7 @@ import {
   validateTransactionNote,
   validateTransactionPayeeName,
   validateTransactionTotal,
+  validateTransactionExcluded,
 } from './transaction-validation'
 import { inputRecord, registerIpcHandler } from '../ipc'
 
@@ -24,6 +25,7 @@ function transactionFields(value: unknown) {
     payeeName: validateTransactionPayeeName(input.payeeName),
     categoryId: validateTransactionCategoryId(input.categoryId),
     note: validateTransactionNote(input.note),
+    excluded: validateTransactionExcluded(input.excluded),
   }
 }
 

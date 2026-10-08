@@ -9,6 +9,7 @@ import type {
   TransactionPage,
   TransactionListInput,
   TransactionPeriod,
+  TransactionExclusionFilter,
 } from '../../shared/transactions'
 import { Button } from './components/ui/button'
 import { CardContent } from './components/ui/card'
@@ -28,6 +29,7 @@ const errorKeys = [
   'transactions.error.payee',
   'transactions.error.category',
   'transactions.error.note',
+  'transactions.error.excluded',
   'transactions.error.notFound',
   'transactions.error.lines',
   'transactions.error.filters',
@@ -58,6 +60,7 @@ interface FormState {
   payeeName: string
   categoryId: string
   note: string
+  excluded: boolean
 }
 
 function emptyForm(accountId = ''): FormState {
@@ -70,6 +73,7 @@ function emptyForm(accountId = ''): FormState {
     payeeName: '',
     categoryId: '',
     note: '',
+    excluded: false,
   }
 }
 
@@ -98,6 +102,7 @@ export function TransactionsPage({
     categoryId: '',
     payeeId: '',
     search: '',
+    exclusion: 'all' as TransactionExclusionFilter,
   })
   const [revision, setRevision] = useState(0)
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -172,6 +177,7 @@ export function TransactionsPage({
       categoryId: filters.categoryId || undefined,
       payeeId: filters.payeeId || undefined,
       search: filters.search,
+      exclusion: filters.exclusion,
       limit: 200,
       offset: 0,
     })
@@ -209,6 +215,7 @@ export function TransactionsPage({
         payeeName: form.payeeName,
         categoryId: form.categoryId || null,
         note: form.note,
+        excluded: form.excluded,
       }
       return form.id
         ? window.app.transactions.update({ id: form.id, ...input })
@@ -374,6 +381,26 @@ export function TransactionsPage({
             }
           />
         </label>
+        <label className="space-y-1 text-xs font-medium">
+          {t('transactions.exclusion')}
+          <NativeSelect
+            value={filters.exclusion}
+            onChange={(event) =>
+              setFilters({
+                ...filters,
+                exclusion: event.target.value as TransactionExclusionFilter,
+              })
+            }
+          >
+            {(['all', 'onlyExcluded', 'hideExcluded'] as const).map(
+              (exclusion) => (
+                <option key={exclusion} value={exclusion}>
+                  {t(`transactions.exclusion.${exclusion}`)}
+                </option>
+              ),
+            )}
+          </NativeSelect>
+        </label>
         <Button type="submit" disabled={busy || loading} className="self-end">
           {t('transactions.applyFilters')}
         </Button>
@@ -418,6 +445,7 @@ export function TransactionsPage({
                     payeeName: transaction.payeeName ?? '',
                     categoryId: transaction.line.categoryId ?? '',
                     note: transaction.note,
+                    excluded: transaction.excluded,
                   })
                 }
                 onDelete={setDeleting}
@@ -677,6 +705,27 @@ export function TransactionsPage({
                     setForm({ ...form, note: event.target.value })
                   }
                 />
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={form.excluded}
+                    disabled={busy}
+                    aria-describedby="transaction-excluded-hint"
+                    onChange={(event) =>
+                      setForm({ ...form, excluded: event.target.checked })
+                    }
+                    className="size-4 accent-primary"
+                  />
+                  {t('transactions.excluded')}
+                </label>
+                <p
+                  id="transaction-excluded-hint"
+                  className="text-xs text-muted-foreground"
+                >
+                  {t('transactions.excludedHint')}
+                </p>
               </div>
               <div className="flex gap-2 pt-2">
                 <Button type="submit" disabled={busy}>
