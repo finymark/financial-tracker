@@ -78,11 +78,18 @@ export function openQuickAdd(): void {
 const APP_ID = 'com.finymark.financial-tracker'
 const APP_NAME = 'Financial Tracker'
 
+function applicationIconPath(): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, 'icon.ico')
+    : join(app.getAppPath(), 'build/icon.ico')
+}
+
 function createAppWindow(
   options: Omit<BrowserWindowConstructorOptions, 'webPreferences'>,
   view?: 'quick-add',
 ): BrowserWindow {
   const window = new BrowserWindow({
+    icon: applicationIconPath(),
     ...options,
     webPreferences: {
       preload: join(import.meta.dirname, '../preload/index.cjs'),
@@ -519,9 +526,7 @@ function startApplication(): void {
       },
     )
   })
-  const iconPath = app.isPackaged
-    ? join(process.resourcesPath, 'icon.png')
-    : join(app.getAppPath(), 'build/icon.png')
+  const iconPath = applicationIconPath()
   const icon = nativeImage.createFromPath(iconPath)
   if (icon.isEmpty())
     throw new Error('Application tray icon could not be loaded')

@@ -8,6 +8,8 @@ files:
 extraResources:
   - from: build/icon.png
     to: icon.png
+  - from: build/icon.ico
+    to: icon.ico
   - from: node_modules/financial-tracker-ocr-models
     to: ocr-models
 asar: true
@@ -40,13 +42,16 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  # Unsigned release: neither signing nor PE resource editing needs winCodeSign.
-  signAndEditExecutable: false
+  # Keep PE resource editing (icon and metadata), but do not code-sign releases.
+  signAndEditExecutable: true
+  signExecutable: false
   verifyUpdateCodeSignature: false
 nsis:
   oneClick: true
   perMachine: false
   deleteAppDataOnUninstall: false
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
   # No spaces: gh uploads assets under their file names, and latest.yml must
   # reference the same name for electron-updater.
   artifactName: Financial-Tracker-Setup-${version}.${ext}
