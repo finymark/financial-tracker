@@ -21,7 +21,10 @@ async function setup({
 }: {
   profileClock?: () => Date
   migrations?: typeof CURRENT_MIGRATIONS
-  arrange?: (application: ProfileApplication) => void
+  arrange?: (
+    application: ProfileApplication,
+    database: Database.Database,
+  ) => void
 } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'financial-tracker-ledger-'))
   directories.push(directory)
@@ -50,7 +53,8 @@ async function setup({
   // Batch the performance fixture in one outer transaction to avoid 20 000
   // durable commits. Financial writes and assertions still use the application
   // API; the connection is available only through the public migration seam.
-  if (arrange) fixtureDatabase!.transaction(() => arrange(application))()
+  if (arrange)
+    fixtureDatabase!.transaction(() => arrange(application, fixtureDatabase!))()
   return application
 }
 
@@ -113,6 +117,40 @@ test('records an exact one-line transaction and reuses payees case-insensitively
   expect(application.queries.listPayees()).toHaveLength(1)
   expect(application.queries.listTransactions().rows).toEqual([first, second])
 })
+
+test.each([
+  ['Élelmiszer', 'élelmiszer'],
+  ['Ärztin', 'ärztin'],
+])(
+  'reuses the oldest payee for Unicode case variants %s and %s',
+  async (firstName, secondName) => {
+    const application = await setup()
+    const account = application.commands.createAccount({
+      name: 'Cash',
+      currency: 'HUF',
+      openingBalance: 0,
+      openingDate: '2026-01-01',
+    })
+    const input = {
+      accountId: account.id,
+      kind: 'expense' as const,
+      date: '2026-01-15',
+      totalMinor: 100,
+      categoryId: null,
+      note: '',
+    }
+    const first = application.commands.createTransaction({
+      ...input,
+      payeeName: firstName,
+    })
+    const second = application.commands.createTransaction({
+      ...input,
+      payeeName: secondName,
+    })
+    expect(second.payeeId).toBe(first.payeeId)
+    expect(second.payeeName).toBe(firstName)
+  },
+)
 
 test('rejects future calendar dates through the injected clock without partial writes', async () => {
   const application = await setup()
@@ -232,6 +270,103 @@ test('editing and deleting transactions updates signed account balances and acco
     false,
   )
   expect(application.queries.listTransactions().rows).toHaveLength(1)
+})
+
+test('edits other fields while keeping archived account and category references unchanged', async () => {
+  const application = await setup()
+  const account = application.commands.createAccount({
+    name: 'Old account',
+    currency: 'HUF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  const category = application.commands.createCategory({
+    name: 'Old category',
+    kind: 'expense',
+  })
+  const transaction = application.commands.createTransaction({
+    accountId: account.id,
+    kind: 'expense',
+    date: '2026-01-15',
+    totalMinor: 100,
+    payeeName: null,
+    categoryId: category.id,
+    note: '',
+  })
+  application.commands.archiveAccount(account.id)
+  application.commands.archiveCategory(category.id)
+  const edited = application.commands.updateTransaction({
+    id: transaction.id,
+    accountId: account.id,
+    kind: 'expense',
+    date: transaction.date,
+    totalMinor: transaction.totalMinor,
+    payeeName: null,
+    categoryId: category.id,
+    note: 'Kept history',
+  })
+  expect(edited.note).toBe('Kept history')
+
+  const otherAccount = application.commands.createAccount({
+    name: 'Other archived account',
+    currency: 'HUF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  application.commands.archiveAccount(otherAccount.id)
+  expect(() =>
+    application.commands.updateTransaction({
+      ...edited,
+      accountId: otherAccount.id,
+      payeeName: null,
+      categoryId: category.id,
+    }),
+  ).toThrow('transactions.error.account')
+})
+
+test('filtered and daily totals aggregate transaction lines rather than header totals', async () => {
+  let transactionId = ''
+  const application = await setup({
+    arrange(application, database) {
+      const account = application.commands.createAccount({
+        name: 'Split fixture',
+        currency: 'HUF',
+        openingBalance: 0,
+        openingDate: '2026-01-01',
+      })
+      const transaction = application.commands.createTransaction({
+        accountId: account.id,
+        kind: 'expense',
+        date: '2026-01-15',
+        totalMinor: 500,
+        payeeName: null,
+        categoryId: null,
+        note: '',
+      })
+      transactionId = transaction.id
+      database
+        .prepare('UPDATE transaction_lines SET amount_minor = 200 WHERE id = ?')
+        .run(transaction.line.id)
+      database
+        .prepare(
+          'INSERT INTO transaction_lines (id, transaction_id, amount_minor, category_id) VALUES (?, ?, ?, NULL)',
+        )
+        .run('00000000-0000-4000-8000-000000000001', transaction.id, 200)
+    },
+  })
+  const page = application.queries.listTransactions({ offset: 1 })
+  expect(page.rows).toEqual([])
+  expect(page.totalCount).toBe(1)
+  expect(page.totals).toEqual([
+    { currency: 'HUF', expenseMinor: 400, incomeMinor: 0 },
+  ])
+  expect(page.days).toEqual([
+    {
+      date: '2026-01-15',
+      totals: [{ currency: 'HUF', expenseMinor: 400, incomeMinor: 0 }],
+    },
+  ])
+  expect(transactionId).not.toBe('')
 })
 
 test('detects category use and delete-with-replacement reassigns transaction lines', async () => {
@@ -735,4 +870,49 @@ test('upgrades the previous ledger schema and keeps transaction filters and tota
       },
     ],
   })
+})
+
+test('payee-key migration merges Unicode case duplicates and repoints their transactions', async () => {
+  const directory = mkdtempSync(
+    join(tmpdir(), 'financial-tracker-payee-upgrade-'),
+  )
+  directories.push(directory)
+  const registry = new ProfileRegistry({ userDataDirectory: directory, clock })
+  const profile = registry.createProfile('Payee upgrade')
+  const paths = registry.getProfilePaths(profile.id)
+  const previous = await openProfileApplication({
+    profile,
+    paths,
+    clock,
+    migrations: CURRENT_MIGRATIONS.slice(0, 6),
+  })
+  const account = previous.commands.createAccount({
+    name: 'History',
+    currency: 'HUF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  const create = (payeeName: string) =>
+    previous.commands.createTransaction({
+      accountId: account.id,
+      kind: 'expense',
+      date: '2026-01-15',
+      totalMinor: 100,
+      categoryId: null,
+      payeeName,
+      note: '',
+    })
+  const oldest = create('Élelmiszer')
+  const duplicate = create('élelmiszer')
+  expect(duplicate.payeeId).not.toBe(oldest.payeeId)
+  previous.close()
+
+  const upgraded = await openProfileApplication({ profile, paths, clock })
+  applications.push(upgraded)
+  expect(upgraded.queries.listPayees()).toEqual([
+    { id: oldest.payeeId, name: 'Élelmiszer', createdAt: oldest.createdAt },
+  ])
+  expect(
+    upgraded.queries.listTransactions().rows.map(({ payeeId }) => payeeId),
+  ).toEqual([oldest.payeeId, oldest.payeeId])
 })

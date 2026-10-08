@@ -14,6 +14,7 @@ export const en = {
   'categories.create': 'Create category',
   'categories.rename': 'Rename',
   'categories.archive': 'Archive',
+  'categories.unarchive': 'Unarchive',
   'categories.archived': 'Archived — hidden from category pickers',
   'categories.delete': 'Delete',
   'categories.deleteConfirmation': 'Permanently delete this category?',
@@ -77,6 +78,21 @@ export const en = {
   'profile.cancel': 'Back to profile',
   'profile.switch': 'Switch profile',
   'profile.error': 'The profile operation could not be completed.',
+  'profiles.error.name': 'Enter a profile name between 1 and 100 characters.',
+  'profiles.error.notFound':
+    'The profile could not be found. Refresh the list.',
+  'profiles.error.confirmation':
+    'Type the profile name exactly to confirm deletion.',
+  'profiles.error.registryRead': 'The profile list could not be read.',
+  'profiles.error.registryWrite': 'The profile list could not be saved.',
+  'profiles.error.delete':
+    'The profile could not be deleted safely and remains available.',
+  'profiles.error.newerSchema':
+    'This profile was opened by a newer app version and cannot be opened safely.',
+  'profiles.error.migration':
+    'The profile upgrade failed. Its pre-upgrade database was preserved.',
+  'profiles.error.identity':
+    'The profile database does not match the selected profile.',
   'overview.title': 'A clear view of your finances',
   'overview.description':
     'A summarized financial overview will be available here later.',
@@ -198,6 +214,7 @@ export const en = {
   'settings.description':
     'Language, appearance and base currency are saved for this profile and apply immediately.',
   'settings.baseCurrency': 'Base currency',
+  'settings.version': 'App version',
   'settings.error': 'The settings could not be saved. Please try again.',
   'backups.title': 'Backups',
   'backups.description':
@@ -214,6 +231,19 @@ export const en = {
     'The backup operation failed. If recovery also failed, restart the app before continuing.',
   'backups.restored':
     'Backup restored. The profile database has been reopened.',
+  'backups.error.confirmation': 'Confirm the restore before continuing.',
+  'backups.error.notFound':
+    'That backup is no longer available. Refresh the list.',
+  'backups.error.restore':
+    'The backup could not be restored; the previous database was reopened.',
+  'backups.error.recovery':
+    'Backup recovery failed. Restart the app before continuing.',
+  'backups.error.create':
+    'The startup backup could not be created and verified.',
+  'backups.error.invalid': 'The selected backup is corrupt or invalid.',
+  'backups.error.foreign': 'The selected backup belongs to another profile.',
+  'backups.error.newerSchema':
+    'The selected backup requires a newer app version.',
   'settings.language': 'Language',
   'settings.theme': 'Appearance',
   'language.hu': 'Hungarian',

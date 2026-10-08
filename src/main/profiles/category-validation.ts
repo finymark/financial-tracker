@@ -1,12 +1,8 @@
 import { categoryKinds, type CategoryKind } from '../../shared/categories'
+import { UUID_PATTERN } from '../../shared/validation'
 
 export function validateCategoryId(value: unknown): string {
-  if (
-    typeof value !== 'string' ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      value,
-    )
-  ) {
+  if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {
     throw new Error('categories.error.notFound')
   }
   return value
@@ -26,7 +22,9 @@ export function validateCategoryKind(value: unknown): CategoryKind {
 }
 
 export function validateCategoryParent(value: unknown): string | null {
-  return value === null ? null : validateCategoryId(value)
+  return value === null || value === undefined
+    ? null
+    : validateCategoryId(value)
 }
 
 export function validateCategorySortOrder(value: unknown): number {

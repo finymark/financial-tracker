@@ -70,3 +70,8 @@ test('formats exact large and negative CHF hundredths without losing cents', () 
   expect(format.money(-1, 'CHF')).toBe('-CHF\u00a00.01')
   expect(format.money(0, 'CHF')).toBe('CHF\u00a00.00')
 })
+
+test('does not render rounded HUF values as negative zero', () => {
+  const format = createFormatters('en')
+  expect(format.money(-1, 'HUF')).toBe('HUF\u00a00')
+})

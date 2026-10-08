@@ -5,6 +5,7 @@ import { CardContent } from './components/ui/card'
 import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
 import { createFormatters, type Language, type MessageKey } from './i18n'
+import { parseAmountInput } from './lib/amount-input'
 
 const errorKeys = [
   'accounts.error.name',
@@ -15,16 +16,6 @@ const errorKeys = [
   'accounts.error.currencyLocked',
   'accounts.error.notEmpty',
 ] as const satisfies readonly MessageKey[]
-
-function parseOpeningBalance(value: string): number {
-  const match = /^(-?)(\d+)(?:[.,](\d{1,2}))?$/.exec(value.trim())
-  if (!match) throw new Error('accounts.error.balance')
-  const absolute =
-    BigInt(match[2]) * 100n + BigInt((match[3] ?? '').padEnd(2, '0'))
-  const amount = Number(match[1] ? -absolute : absolute)
-  if (!Number.isSafeInteger(amount)) throw new Error('accounts.error.balance')
-  return amount
-}
 
 interface AccountsPageProps {
   language: Language
@@ -88,7 +79,14 @@ export function AccountsPage({ language, t }: AccountsPageProps) {
       await window.app.accounts.create({
         name,
         currency,
-        openingBalance: parseOpeningBalance(openingBalance),
+        openingBalance: parseAmountInput(
+          openingBalance,
+          'accounts.error.balance',
+          {
+            allowNegative: true,
+            allowZero: true,
+          },
+        ),
         openingDate,
       })
       setName('')

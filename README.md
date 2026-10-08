@@ -76,6 +76,9 @@ in a Git clone, `git config --get core.hooksPath` should print `.husky/_`.
   `fixtures/` directory (common extensions and image signatures), invalid `.json`
   files, merge-conflict markers, and files larger than **1,000,000 bytes**.
   Diagnostics identify the file, line, and rule without echoing matched content.
+  The generated root `package-lock.json` has one explicit file exemption for
+  upstream maintainers' e-mail addresses in registry metadata; all other guard
+  rules still apply to it, and nested lockfiles are not exempt.
 - **pre-push** runs `npm run typecheck` and then `npm test` against the working
   tree; either failure aborts the push.
 
@@ -115,7 +118,9 @@ node --input-type=module -e "import {createHash} from 'node:crypto'; import {rea
 ```
 
 An entry exempts only that rule for that exact file content. Any file change
-revokes it; there are no wildcard or blanket file exemptions. JSON, merge-marker,
+revokes it; there are no wildcard or blanket allowlist exemptions. The generated
+lockfile e-mail exception documented above is the only rule-level file exemption.
+JSON, merge-marker,
 and size checks cannot be allowlisted. Stage the reviewed allowlist with the file
 so hooks and a later CI diff scan see the same approval. Hooks are a local safety
 net, not a substitute for review or CI: Git's `--no-verify` and `HUSKY=0` can bypass
@@ -124,13 +129,20 @@ them, and pattern matching cannot detect every possible form of sensitive data.
 The renderer has no Node access; a sandboxed, isolated preload exposes only the
 typed app, update, profile (including settings), account, category, transaction,
 payee, and backup commands/queries. Every IPC input is validated in the main
-process. Financial writes use the profile application API, with each command
+process, and every handler rejects calls not sent by the app's own renderer frame.
+Production CSP permits only same-origin connections; localhost WebSockets are
+added only by the development server for hot reload. SQLite foreign-key
+enforcement and shared Unicode text functions are enabled when each profile
+connection opens. Financial writes use the profile application API, with each command
 executed in one SQLite transaction. SQLite is used only in the main
 process. Profiles are listed in `profiles.json` under the app's user-data folder; each
 profile lives in `profiles/<id>/` (database, data folder, and backups). Registry
 writes replace the file atomically and briefly retry transient Windows file locks
 (up to five retries with 310 ms total backoff); persistent failures still surface
-without replacing the previous registry. Migrations are forward-only and run after a verified backup; a
+without replacing the previous registry or leaving `profiles.json.tmp`. Deletion
+first renames the profile directory to a tombstone, then updates the registry;
+failed renames keep or reopen the profile, and stale tombstones are retried on
+startup. Migrations are forward-only and run after a verified backup; a
 database with a newer schema is refused.
 
 ## Continuous integration
@@ -213,12 +225,14 @@ dispatched on a tag. It creates neither a tag nor a GitHub Release.
 2. Validate the build-only workflow and the installed artifact first.
 3. **Only when the owners explicitly authorize a release**, tag the approved
    commit `v<version>` and push that tag. Do not push a release tag during testing.
-4. `.github/workflows/release.yml` runs on `v*.*.*` tags on `windows-latest`,
-   requires the tag to equal `v` plus `package.json`'s version, installs npm
-   12.2.0, runs `npm ci` and all acceptance gates, builds without publishing,
-   and smoke-tests the packaged app. Only then it builds/publishes a GitHub
-   Release using `electron-builder --publish always` and `GH_TOKEN` from the
-   workflow's `GITHUB_TOKEN` (`contents: write`). Actions are SHA-pinned.
+4. `.github/workflows/release.yml` runs on `v*.*.*` tags on `windows-latest`.
+   Its read-only build job requires the tag to equal `v` plus `package.json`'s
+   version, installs npm 12.2.0, runs `npm ci` and all acceptance gates, builds
+   once without publishing, smoke-tests the packaged app, and uploads the
+   installer, blockmap, and `latest.yml` as one artifact. A separate tag-only
+   publish job has `contents: write`, downloads exactly that verified artifact,
+   and creates the GitHub Release with `gh`; it never rebuilds.
+   `workflow_dispatch` runs only the build job. Actions are SHA-pinned.
 5. Confirm the public Release includes the installer, its `.blockmap`, and
    `latest.yml`; electron-updater needs these assets. Check a previously
    installed version detects and installs the new version on restart.
@@ -261,9 +275,10 @@ not off-device copies or backups of the separate data folder.
 - Visual tokens live in `src/renderer/src/tokens.css`: calm green/teal accent,
   light and dark surfaces, radius, and density (the Tailwind spacing unit).
 - Settings saves language (HU/EN/DE), appearance (light/dark/system), and base
-  currency (HUF/CHF) in each profile's SQLite database. English, the system theme,
-  and HUF are the initial defaults, including for existing profiles upgraded from
-  the identity-only schema. Saved choices apply immediately and return when the
+  currency (HUF/CHF) in each profile's SQLite database. New profiles use Hungarian
+  for a Hungarian system locale, German for a German locale, and English otherwise;
+  the system theme and HUF remain the defaults. Existing profiles upgraded from
+  the identity-only schema retain the migration's English default. Saved choices apply immediately and return when the
   profile is opened again; switching profiles switches its language and theme.
   Failed saves show a translated error and leave the previous choices applied.
   Base currency is stored for later reports; currency conversion is not included.
@@ -316,7 +331,8 @@ not off-device copies or backups of the separate data folder.
   siblings without changing the hierarchy or the other kind's ordering.
 - Archive a category to hide it from pickers while keeping it in Settings.
   Archiving a main category also hides its subcategories from pickers, without
-  changing the subcategories' own archive flags.
+  changing the subcategories' own archive flags. Unarchive reverses the category's
+  own archive flag.
 - Deletion requires confirmation. Delete subcategories before their main category;
   deletion does not cascade. A replacement must be a different active category
   of the same kind, not hidden by an archived parent.
@@ -333,7 +349,7 @@ not off-device copies or backups of the separate data folder.
   thousands separators. Amounts are persisted as exact integer hundredths. HUF
   is displayed without decimals; CHF is displayed with two decimals.
 - Typing a new payee creates it in the active profile. An existing payee with the
-  same name ignoring case is reused. Category choices are limited to active
+  same Unicode-normalized name ignoring case is reused. Category choices are limited to active
   expense or income categories matching the transaction kind and preserve the
   two-level hierarchy.
 - Each transaction currently has exactly one line whose amount equals its total.
@@ -351,8 +367,8 @@ not off-device copies or backups of the separate data folder.
   includes its subcategories; archived accounts/categories remain filterable.
   Free text matches payee name or note, ignoring case and diacritics, and treats
   punctuation literally. Different filters combine with AND.
-- Filtered-set and daily expense/income totals stay separate by currency (HUF
-  and CHF), without conversion, and include all matching transactions, not only
+- Filtered-set and daily expense/income totals aggregate transaction lines and
+  stay separate by currency (HUF and CHF), without conversion, and include all matching transactions, not only
   the current page. Queries return bounded pages (default 100, maximum 500);
   the UI uses 200-row pages. Row and aggregate queries share one read snapshot.
 - Offset paging fits the numbered previous/next windows and known filtered

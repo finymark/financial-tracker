@@ -32,7 +32,13 @@ export function createFormatters(language: Language) {
       const absolute = negative ? -amount : amount
       const decimals = currency === 'HUF' ? 0 : 2
       const units = decimals === 0 ? (absolute + 50n) / 100n : absolute / 100n
-      const signedUnits = negative ? (units === 0n ? -0 : -units) : units
+      const signedUnits = negative
+        ? units === 0n
+          ? currency === 'HUF'
+            ? 0
+            : -0
+          : -units
+        : units
       return new Intl.NumberFormat(locale, {
         style: 'currency',
         currency,

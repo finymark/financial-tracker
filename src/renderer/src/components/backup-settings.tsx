@@ -31,7 +31,7 @@ export function BackupSettings({
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<MessageKey | null>(null)
   const [restored, setRestored] = useState(false)
   const format = createFormatters(language)
 
@@ -45,7 +45,7 @@ export function BackupSettings({
         setSelectedId(items[0]?.id ?? '')
       })
       .catch(() => {
-        if (mounted) setError(true)
+        if (mounted) setError('backups.error')
       })
       .finally(() => {
         if (mounted) setLoading(false)
@@ -58,7 +58,7 @@ export function BackupSettings({
   async function restore() {
     setBusy(true)
     onBusyChange(true)
-    setError(false)
+    setError(null)
     setRestored(false)
     try {
       const profile = await window.app.backups.restore({
@@ -66,10 +66,25 @@ export function BackupSettings({
         confirmed: true,
       })
       onRestored(profile)
+      const items = await window.app.backups.list()
+      setBackups(items)
+      setSelectedId(items[0]?.id ?? '')
       setConfirming(false)
       setRestored(true)
-    } catch {
-      setError(true)
+    } catch (caught) {
+      const keys = [
+        'backups.error.confirmation',
+        'backups.error.notFound',
+        'backups.error.restore',
+        'backups.error.recovery',
+        'backups.error.create',
+        'backups.error.invalid',
+        'backups.error.foreign',
+        'backups.error.newerSchema',
+      ] as const satisfies readonly MessageKey[]
+      setError(
+        keys.find((key) => String(caught).includes(key)) ?? 'backups.error',
+      )
     } finally {
       setBusy(false)
       onBusyChange(false)
@@ -102,7 +117,7 @@ export function BackupSettings({
                 onChange={(event) => {
                   setSelectedId(event.target.value)
                   setRestored(false)
-                  setError(false)
+                  setError(null)
                 }}
               >
                 {backups.map((backup) => (
@@ -119,7 +134,7 @@ export function BackupSettings({
         )}
         {error && (
           <p role="alert" className="text-sm font-medium text-error">
-            {t('backups.error')}
+            {t(error)}
           </p>
         )}
         {restored && (

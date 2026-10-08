@@ -15,6 +15,7 @@ export interface ProfileSettings {
 
 export type ProfileSettingsChanges = Partial<ProfileSettings>
 
+// Keep these defaults aligned with the profile-settings schema migration.
 export const DEFAULT_PROFILE_SETTINGS: Readonly<ProfileSettings> = {
   language: 'en',
   theme: 'system',

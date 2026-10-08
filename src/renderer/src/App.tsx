@@ -78,7 +78,7 @@ function ProfilePicker({
   const [confirmation, setConfirmation] = useState('')
   const [mode, setMode] = useState<'none' | 'rename' | 'delete'>('none')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<MessageKey | null>(null)
   const selected = snapshot.profiles.find((item) => item.id === selectedId)
 
   async function refresh(preferredId?: string) {
@@ -95,11 +95,24 @@ function ProfilePicker({
 
   async function run(action: () => Promise<void>) {
     setBusy(true)
-    setError(false)
+    setError(null)
     try {
       await action()
-    } catch {
-      setError(true)
+    } catch (caught) {
+      const keys = [
+        'profiles.error.name',
+        'profiles.error.notFound',
+        'profiles.error.confirmation',
+        'profiles.error.registryRead',
+        'profiles.error.registryWrite',
+        'profiles.error.delete',
+        'profiles.error.newerSchema',
+        'profiles.error.migration',
+        'profiles.error.identity',
+      ] as const satisfies readonly MessageKey[]
+      setError(
+        keys.find((key) => String(caught).includes(key)) ?? 'profile.error',
+      )
     } finally {
       setBusy(false)
     }
@@ -205,7 +218,7 @@ function ProfilePicker({
 
             {error && (
               <p role="alert" className="text-sm font-medium text-error">
-                {t('profile.error')}
+                {t(error)}
               </p>
             )}
 
@@ -323,6 +336,7 @@ function ProfilePicker({
 
 interface ShellProps {
   active: ActiveProfileInfo
+  version: string
   t: Translate
   onSettingsChange(changes: ProfileSettingsChanges): Promise<void>
   onSwitchProfile(): void
@@ -331,6 +345,7 @@ interface ShellProps {
 
 function Shell({
   active,
+  version,
   t,
   onSettingsChange,
   onSwitchProfile,
@@ -548,6 +563,9 @@ function Shell({
                     {t('settings.error')}
                   </p>
                 )}
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.version')}: {version}
+                </p>
                 <section
                   className="rounded-lg bg-muted p-4"
                   aria-labelledby="formatting-preview"
@@ -612,6 +630,7 @@ export default function App() {
   const [active, setActive] = useState<ActiveProfileInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [showPicker, setShowPicker] = useState(true)
+  const [version, setVersion] = useState('')
   const { language, theme } = active?.settings ?? DEFAULT_PROFILE_SETTINGS
   const t: Translate = (key) => translate(language, key)
   useTheme(theme)
@@ -625,10 +644,12 @@ export default function App() {
     void Promise.all([
       window.app.profiles.list(),
       window.app.profiles.getActive(),
+      window.app.getVersion(),
     ])
-      .then(([registry, current]) => {
+      .then(([registry, current, appVersion]) => {
         setSnapshot(registry)
         setActive(current)
+        setVersion(appVersion)
       })
       .finally(() => setLoading(false))
   }, [])
@@ -660,6 +681,7 @@ export default function App() {
       <Shell
         key={active.id}
         active={active}
+        version={version}
         t={t}
         onSettingsChange={async (settings) => {
           const saved = await window.app.profiles.updateSettings({

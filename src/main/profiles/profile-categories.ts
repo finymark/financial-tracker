@@ -105,6 +105,16 @@ export function archiveCategory(database: Database.Database, id: string): void {
     .run(category.id)
 }
 
+export function unarchiveCategory(
+  database: Database.Database,
+  id: string,
+): void {
+  const category = getCategory(database, id)
+  database
+    .prepare('UPDATE categories SET archived = 0 WHERE id = ?')
+    .run(category.id)
+}
+
 export function reorderCategory(
   database: Database.Database,
   input: ReorderCategoryInput,

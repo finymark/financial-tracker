@@ -13,7 +13,6 @@ const bridge: AppBridge = {
     restart: () => ipcRenderer.invoke(IPC_CHANNELS.updatesRestart),
   },
   getVersion: () => ipcRenderer.invoke(IPC_CHANNELS.getVersion),
-  dbPing: () => ipcRenderer.invoke(IPC_CHANNELS.dbPing),
   transactions: {
     list: (input) => ipcRenderer.invoke(IPC_CHANNELS.transactionsList, input),
     create: (input) =>
@@ -40,6 +39,8 @@ const bridge: AppBridge = {
       ipcRenderer.invoke(IPC_CHANNELS.categoriesReorder, input),
     archive: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.categoriesArchive, input),
+    unarchive: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.categoriesUnarchive, input),
     delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.categoriesDelete, input),
   },
   accounts: {

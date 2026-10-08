@@ -50,6 +50,16 @@ describe('file guard', () => {
       ['/c', 'Users', 'synthetic'].join('/'),
       'windows-home',
     ],
+    [
+      'macOS home path',
+      ['', 'Users', 'synthetic', 'file.txt'].join('/'),
+      'windows-home',
+    ],
+    [
+      'Linux home path',
+      ['', 'home', 'synthetic', 'file.txt'].join('/'),
+      'windows-home',
+    ],
     ['GitHub token', token, 'secret'],
     [
       'fine-grained GitHub token',

@@ -7,6 +7,7 @@ import type {
   ProfileSummary,
 } from '../../shared/profiles'
 import type { ProfileSettings } from '../../shared/settings'
+import type { Language } from '../../shared/settings'
 import {
   openProfileApplication,
   type ProfileApplication,
@@ -15,13 +16,18 @@ import { ProfileRegistry } from './profile-registry'
 
 export class ProfileController {
   readonly #registry: ProfileRegistry
+  readonly #defaultLanguage: Language
   #changing = false
   #shuttingDown = false
   #pending: Promise<unknown> | null = null
   #active: { id: string; application: ProfileApplication } | null = null
+  #shutdownProfileId: string | null = null
 
-  constructor(registry: ProfileRegistry) {
+  constructor(registry: ProfileRegistry, systemLocale = 'en') {
     this.#registry = registry
+    const language = systemLocale.toLowerCase().split(/[-_]/)[0]
+    this.#defaultLanguage =
+      language === 'hu' || language === 'de' ? language : 'en'
   }
 
   list(): ProfileRegistrySnapshot {
@@ -38,7 +44,9 @@ export class ProfileController {
         const application = await openProfileApplication({
           profile,
           paths: this.#registry.getProfilePaths(profile.id),
+          createStartupBackup: false,
         })
+        application.commands.updateSettings({ language: this.#defaultLanguage })
         application.close()
         return profile
       } catch (error) {
@@ -53,16 +61,30 @@ export class ProfileController {
     return this.#registry.renameProfile(id, name)
   }
 
-  delete(id: string, confirmation: string): void {
-    this.#assertIdle()
-    if (
-      this.#active?.id === id &&
-      this.#registry.getProfile(id).name !== confirmation
-    ) {
-      throw new Error('Profile deletion confirmation does not match')
-    }
-    if (this.#active?.id === id) this.close()
-    this.#registry.deleteProfile(id, confirmation)
+  async delete(id: string, confirmation: string): Promise<void> {
+    return this.#changeProfile(async () => {
+      if (
+        this.#active?.id === id &&
+        this.#registry.getProfile(id).name !== confirmation
+      ) {
+        throw new Error('profiles.error.confirmation')
+      }
+      const wasActive = this.#active?.id === id
+      if (wasActive) this.#closeActive()
+      try {
+        this.#registry.deleteProfile(id, confirmation)
+      } catch (error) {
+        if (wasActive) {
+          const profile = this.#registry.getProfile(id)
+          const application = await openProfileApplication({
+            profile,
+            paths: this.#registry.getProfilePaths(id),
+          })
+          this.#active = { id, application }
+        }
+        throw error
+      }
+    })
   }
 
   async open(id: string): Promise<ActiveProfileInfo> {
@@ -144,13 +166,22 @@ export class ProfileController {
   }
 
   async shutdown(): Promise<void> {
-    this.#shuttingDown = true
     try {
       await this.#pending
     } catch {
       // The initiating IPC call reports failure; shutdown still closes the database.
     }
+    this.#shuttingDown = true
+    this.#shutdownProfileId = this.#active?.id ?? null
     this.#closeActive()
+  }
+
+  async recoverFromFailedShutdown(): Promise<void> {
+    if (!this.#shuttingDown) return
+    const profileId = this.#shutdownProfileId
+    this.#shuttingDown = false
+    this.#shutdownProfileId = null
+    if (profileId) await this.open(profileId)
   }
 
   close(): void {

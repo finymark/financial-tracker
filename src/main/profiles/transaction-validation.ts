@@ -5,9 +5,8 @@ import type {
 } from '../../shared/transactions'
 import { validateAccountId } from './account-validation'
 import { validateCategoryId, validateCategoryKind } from './category-validation'
-
-const UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+import { UUID_PATTERN } from '../../shared/validation'
+import { today } from '../../shared/date'
 
 function isCalendarDate(value: string): boolean {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
@@ -23,16 +22,8 @@ function isCalendarDate(value: string): boolean {
   )
 }
 
-export function today(clock: () => Date): string {
-  const value = clock()
-  const year = value.getFullYear()
-  const month = String(value.getMonth() + 1).padStart(2, '0')
-  const day = String(value.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 export function validateTransactionId(value: unknown): string {
-  if (typeof value !== 'string' || !UUID.test(value)) {
+  if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {
     throw new Error('transactions.error.notFound')
   }
   return value
@@ -62,6 +53,13 @@ export function validateTransactionDate(
     throw new Error('transactions.error.date')
   }
   if (value > today(clock)) throw new Error('transactions.error.futureDate')
+  return value
+}
+
+export function validateTransactionDateShape(value: unknown): string {
+  if (typeof value !== 'string' || !isCalendarDate(value)) {
+    throw new Error('transactions.error.date')
+  }
   return value
 }
 
@@ -125,7 +123,7 @@ export function parseTransactionListInput(
     throw new Error('transactions.error.filters')
   const id = (value: unknown): string | undefined => {
     if (value === undefined) return undefined
-    if (typeof value !== 'string' || !UUID.test(value))
+    if (typeof value !== 'string' || !UUID_PATTERN.test(value))
       throw new Error('transactions.error.filters')
     return value
   }

@@ -23,7 +23,7 @@ export interface CategoryIdInput {
 export interface CreateCategoryInput {
   name: string
   kind: CategoryKind
-  parentId: string | null
+  parentId?: string | null
 }
 
 export interface RenameCategoryInput extends CategoryIdInput {

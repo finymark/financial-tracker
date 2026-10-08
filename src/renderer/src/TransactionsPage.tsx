@@ -16,6 +16,8 @@ import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
 import { type Language, type MessageKey } from './i18n'
 import { TransactionTable, Totals } from './components/transaction-table'
+import { parseAmountInput } from './lib/amount-input'
+import { today } from '../../shared/date'
 
 const errorKeys = [
   'transactions.error.account',
@@ -31,26 +33,6 @@ const errorKeys = [
   'transactions.error.filters',
   'transactions.error.totals',
 ] as const satisfies readonly MessageKey[]
-
-function today(): string {
-  const date = new Date()
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function parseAmount(value: string): number {
-  const match = /^(\d+)(?:[.,](\d{1,2}))?$/.exec(value.trim())
-  if (!match) throw new Error('transactions.error.amount')
-  const minor =
-    BigInt(match[1]) * 100n + BigInt((match[2] ?? '').padEnd(2, '0'))
-  const amount = Number(minor)
-  if (!Number.isSafeInteger(amount) || amount <= 0) {
-    throw new Error('transactions.error.amount')
-  }
-  return amount
-}
 
 function amountInput(minor: number): string {
   const value = BigInt(minor)
@@ -97,12 +79,12 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
     totalCount: 0,
   })
   const [request, setRequest] = useState<TransactionListInput>({
-    period: 'thisMonth',
+    period: 'all',
     limit: 200,
     offset: 0,
   })
   const [filters, setFilters] = useState({
-    period: 'thisMonth' as TransactionPeriod,
+    period: 'all' as TransactionPeriod,
     from: '',
     to: '',
     accountId: '',
@@ -113,6 +95,10 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
   const [revision, setRevision] = useState(0)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [accountOptions, setAccountOptions] = useState<Account[]>([])
+  const [categoryOptions, setCategoryOptions] = useState<
+    Record<TransactionKind, Category[]>
+  >({ expense: [], income: [] })
   const [payees, setPayees] = useState<Payee[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -128,15 +114,31 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
       window.app.transactions.list(request),
       window.app.accounts.list(),
       window.app.categories.list(),
+      window.app.accounts.listOptions(),
+      Promise.all([
+        window.app.categories.listOptions({ kind: 'expense' }),
+        window.app.categories.listOptions({ kind: 'income' }),
+      ]),
       window.app.payees.list(),
     ])
-      .then(([nextPage, nextAccounts, nextCategories, nextPayees]) => {
-        if (ignore) return
-        setPage(nextPage)
-        setAccounts(nextAccounts)
-        setCategories(nextCategories)
-        setPayees(nextPayees)
-      })
+      .then(
+        ([
+          nextPage,
+          nextAccounts,
+          nextCategories,
+          nextAccountOptions,
+          [expenseOptions, incomeOptions],
+          nextPayees,
+        ]) => {
+          if (ignore) return
+          setPage(nextPage)
+          setAccounts(nextAccounts)
+          setCategories(nextCategories)
+          setAccountOptions(nextAccountOptions)
+          setCategoryOptions({ expense: expenseOptions, income: incomeOptions })
+          setPayees(nextPayees)
+        },
+      )
       .catch((error: unknown) => {
         if (!ignore)
           setError(
@@ -195,7 +197,7 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
         accountId: form.accountId,
         kind: form.kind,
         date: form.date,
-        totalMinor: parseAmount(form.amount),
+        totalMinor: parseAmountInput(form.amount, 'transactions.error.amount'),
         payeeName: form.payeeName,
         categoryId: form.categoryId || null,
         note: form.note,
@@ -206,13 +208,21 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
     })
   }
 
-  const categoryOptions = categories.filter((category) => {
-    if (category.kind !== form?.kind || category.archived) return false
-    if (category.parentId === null) return true
-    return !categories.find((parent) => parent.id === category.parentId)
-      ?.archived
-  })
-  const activeAccounts = accounts.filter((account) => !account.archived)
+  const selectedAccount = form
+    ? accounts.find((account) => account.id === form.accountId)
+    : undefined
+  const selectedCategory = form
+    ? categories.find((category) => category.id === form.categoryId)
+    : undefined
+  const drawerAccounts = selectedAccount?.archived
+    ? [selectedAccount, ...accountOptions]
+    : accountOptions
+  const drawerCategories = form
+    ? selectedCategory &&
+      !categoryOptions[form.kind].some(({ id }) => id === selectedCategory.id)
+      ? [selectedCategory, ...categoryOptions[form.kind]]
+      : categoryOptions[form.kind]
+    : []
 
   return (
     <CardContent className="space-y-6">
@@ -221,13 +231,13 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
           {t('transactions.listDescription')}
         </p>
         <Button
-          disabled={busy || loading || activeAccounts.length === 0}
-          onClick={() => setForm(emptyForm(activeAccounts[0]?.id))}
+          disabled={busy || loading || accountOptions.length === 0}
+          onClick={() => setForm(emptyForm(accountOptions[0]?.id))}
         >
           {t('transactions.create')}
         </Button>
       </div>
-      {activeAccounts.length === 0 && !loading && (
+      {accountOptions.length === 0 && !loading && (
         <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
           {t('transactions.noAccounts')}
         </p>
@@ -585,7 +595,7 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
                   <option value="" disabled>
                     {t('transactions.chooseAccount')}
                   </option>
-                  {activeAccounts.map((account) => (
+                  {drawerAccounts.map((account) => (
                     <option key={account.id} value={account.id}>
                       {account.name} ({account.currency})
                     </option>
@@ -634,7 +644,7 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
                   }
                 >
                   <option value="">{t('transactions.noCategory')}</option>
-                  {categoryOptions.map((category) => (
+                  {drawerCategories.map((category) => (
                     <option key={category.id} value={category.id}>
                       {category.parentId ? `— ${category.name}` : category.name}
                     </option>

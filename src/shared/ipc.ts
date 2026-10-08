@@ -42,7 +42,6 @@ export const IPC_CHANNELS = {
   updatesIsReady: 'updates:is-ready',
   updatesReady: 'updates:ready',
   updatesRestart: 'updates:restart',
-  dbPing: 'db:ping',
   profilesList: 'profiles:list',
   profilesCreate: 'profiles:create',
   profilesRename: 'profiles:rename',
@@ -58,6 +57,7 @@ export const IPC_CHANNELS = {
   categoriesRename: 'categories:rename',
   categoriesReorder: 'categories:reorder',
   categoriesArchive: 'categories:archive',
+  categoriesUnarchive: 'categories:unarchive',
   categoriesDelete: 'categories:delete',
   accountsList: 'accounts:list',
   accountsListOptions: 'accounts:list-options',
@@ -74,8 +74,6 @@ export const IPC_CHANNELS = {
   payeesList: 'payees:list',
 } as const
 
-export type DatabasePing = 'ok'
-
 export interface AppBridge {
   updates: {
     isReady(): Promise<boolean>
@@ -83,7 +81,6 @@ export interface AppBridge {
     restart(): Promise<void>
   }
   getVersion(): Promise<string>
-  dbPing(): Promise<DatabasePing>
   transactions: {
     list(input?: TransactionListInput): Promise<TransactionPage>
     create(input: CreateTransactionInput): Promise<Transaction>
@@ -104,6 +101,7 @@ export interface AppBridge {
     rename(input: RenameCategoryInput): Promise<Category>
     reorder(input: ReorderCategoryInput): Promise<void>
     archive(input: CategoryIdInput): Promise<void>
+    unarchive(input: CategoryIdInput): Promise<void>
     delete(input: DeleteCategoryInput): Promise<void>
   }
   accounts: {

@@ -8,29 +8,26 @@ import {
   validateOpeningDate,
 } from './account-validation'
 import type { ProfileController } from './profile-controller'
-
-function inputRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new TypeError('IPC input must be an object')
-  }
-  return value as Record<string, unknown>
-}
+import { inputRecord, registerIpcHandler } from '../ipc'
 
 export function registerAccountIpc(
   ipcMain: IpcMain,
   controller: ProfileController,
 ): void {
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.accountsList,
     (): Awaited<ReturnType<AppBridge['accounts']['list']>> =>
       controller.getActiveApplication().queries.listAccounts(),
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.accountsListOptions,
     (): Awaited<ReturnType<AppBridge['accounts']['listOptions']>> =>
       controller.getActiveApplication().queries.listAccountOptions(),
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.accountsCreate,
     (
       _event,
@@ -45,7 +42,8 @@ export function registerAccountIpc(
       })
     },
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.accountsRename,
     (
       _event,
@@ -58,7 +56,8 @@ export function registerAccountIpc(
       })
     },
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.accountsChangeCurrency,
     (
       _event,
@@ -71,7 +70,8 @@ export function registerAccountIpc(
       })
     },
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.accountsArchive,
     (
       _event,
@@ -83,7 +83,8 @@ export function registerAccountIpc(
         .commands.archiveAccount(validateAccountId(input.id))
     },
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.accountsDelete,
     (
       _event,
