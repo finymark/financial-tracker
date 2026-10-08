@@ -48,6 +48,7 @@ import { startsHidden } from '../shared/desktop'
 import { QuickAddShortcut } from './global-shortcut'
 import { registerAttachmentIpc } from './profiles/attachment-ipc'
 import { registerReceiptIpc } from './profiles/receipt-ipc'
+import { registerPhoneUploadIpc, renderPhoneUploadQr } from './phone-upload-ipc'
 import sharp from 'sharp'
 
 let mainWindow: BrowserWindow | null = null
@@ -194,6 +195,12 @@ async function smokeTest(): Promise<void> {
     if (metadata.width !== 1 || metadata.height !== 1)
       throw new Error('Image processing failed')
     console.log('Image smoke test OK')
+    const qrDataUrl = await renderPhoneUploadQr(
+      `http://192.168.1.2:12345/u/${'a'.repeat(43)}`,
+    )
+    if (!qrDataUrl.startsWith('data:image/png;base64,'))
+      throw new Error('QR rendering failed')
+    console.log('QR smoke test OK')
     exitCode = 0
   } catch {
     console.error('Smoke test FAILED')
@@ -383,6 +390,26 @@ function startApplication(): void {
     IPC_CHANNELS.getVersion,
     (): Awaited<ReturnType<AppBridge['getVersion']>> => app.getVersion(),
   )
+  const phoneUpload = registerPhoneUploadIpc(ipcMain, {
+    getActiveProfile: () => {
+      const active = profiles.getActive()
+      if (!active) throw new Error('No profile is open')
+      const application = profiles.getActiveApplication()
+      return {
+        id: active.id,
+        language: active.settings.language,
+        intake: (input, source) =>
+          application.commands.intakeReceipt(
+            { bytes: input.bytes, name: input.name },
+            source,
+          ),
+      }
+    },
+    onReceived: (received) => {
+      if (mainWindow && !mainWindow.isDestroyed())
+        mainWindow.webContents.send(IPC_CHANNELS.phoneUploadReceived, received)
+    },
+  })
   registerProfileIpc(
     ipcMain,
     profiles,
@@ -400,6 +427,7 @@ function startApplication(): void {
       if (quickAddWindow && !quickAddWindow.isDestroyed())
         quickAddWindow.webContents.send(IPC_CHANNELS.desktopProfileChanged)
     },
+    () => phoneUpload.stop(),
   )
   registerAccountIpc(ipcMain, profiles)
   registerCategoryIpc(ipcMain, profiles)
@@ -423,9 +451,12 @@ function startApplication(): void {
   function shutdown(): Promise<void> {
     exchangeRates.stop()
     recurring.stop()
-    shutdownPromise ??= profiles.shutdown().then(() => {
-      shutdownComplete = true
-    })
+    shutdownPromise ??= phoneUpload
+      .stop()
+      .then(() => profiles.shutdown())
+      .then(() => {
+        shutdownComplete = true
+      })
     return shutdownPromise
   }
   app.on('before-quit', (event) => {

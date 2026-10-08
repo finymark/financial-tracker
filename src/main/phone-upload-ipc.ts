@@ -77,7 +77,7 @@ function parseStopInput(value: unknown): PhoneUploadStopInput {
   return { dialogId: requiredDialogId(inputRecord(value)) }
 }
 
-async function qrDataUrl(url: string): Promise<string> {
+export async function renderPhoneUploadQr(url: string): Promise<string> {
   return toDataURL(url, {
     type: 'image/png',
     errorCorrectionLevel: 'M',
@@ -167,7 +167,7 @@ export function registerPhoneUploadIpc(
           ...previous,
           selectedAddress: selected,
           server,
-          qrDataUrl: await qrDataUrl(server.url),
+          qrDataUrl: await renderPhoneUploadQr(server.url),
         }
         current = rebound
         return sessionInfo(rebound)
@@ -214,7 +214,7 @@ export function registerPhoneUploadIpc(
         expiresAt,
         state,
         server,
-        qrDataUrl: await qrDataUrl(server.url),
+        qrDataUrl: await renderPhoneUploadQr(server.url),
       }
       current = opened
       return sessionInfo(opened)

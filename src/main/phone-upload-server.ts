@@ -324,7 +324,6 @@ export async function startPhoneUploadServer(
       Number(contentLength) > PHONE_UPLOAD_MAX_BYTES
     ) {
       request.resume()
-      response.setHeader('Connection', 'close')
       respondJson(response, 413, { ok: false })
       return
     }
@@ -354,7 +353,6 @@ export async function startPhoneUploadServer(
         request.removeAllListeners('data')
         request.resume()
         release()
-        response.setHeader('Connection', 'close')
         respondJson(response, 413, { ok: false })
         return
       }

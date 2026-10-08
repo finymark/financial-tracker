@@ -72,6 +72,7 @@ export function registerProfileIpc(
   onProfileNeedsRateRefresh: () => void = () => {},
   onProfileClosed: () => void = () => {},
   onProfileLanguageChanged: () => void = () => {},
+  beforeActiveProfileChange: () => Promise<void> = () => Promise.resolve(),
 ): void {
   registerIpcHandler(
     ipcMain,
@@ -86,6 +87,7 @@ export function registerProfileIpc(
       _event,
       value: unknown,
     ): Promise<Awaited<ReturnType<AppBridge['backups']['restore']>>> => {
+      await beforeActiveProfileChange()
       const restored = await controller.restoreBackup(
         parseRestoreBackupInput(value),
       )
@@ -126,6 +128,7 @@ export function registerProfileIpc(
     async (_event, value: unknown): Promise<void> => {
       const input = parseDeleteProfileInput(value)
       const deletesActiveProfile = controller.getActive()?.id === input.id
+      if (deletesActiveProfile) await beforeActiveProfileChange()
       await controller.delete(input.id, input.confirmation)
       if (deletesActiveProfile) {
         onProfileClosed()
@@ -141,6 +144,7 @@ export function registerProfileIpc(
       value: unknown,
     ): Promise<Awaited<ReturnType<AppBridge['profiles']['open']>>> => {
       const input = parseProfileIdInput(value)
+      if (controller.getActive()) await beforeActiveProfileChange()
       const opened = await controller.open(input.id)
       onProfileNeedsRateRefresh()
       onProfileLanguageChanged()
@@ -167,10 +171,10 @@ export function registerProfileIpc(
       return settings
     },
   )
-  registerIpcHandler(ipcMain, IPC_CHANNELS.profilesClose, (): Promise<void> => {
+  registerIpcHandler(ipcMain, IPC_CHANNELS.profilesClose, async () => {
+    if (controller.getActive()) await beforeActiveProfileChange()
     controller.close()
     onProfileClosed()
     onProfileLanguageChanged()
-    return Promise.resolve()
   })
 }
