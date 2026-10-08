@@ -1,0 +1,108 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions:
+      contents: read
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Verify release tag matches package version
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs'
+          const { version } = JSON.parse(readFileSync('package.json', 'utf8'))
+          if (process.env.GITHUB_REF_NAME !== `v${version}`) {
+            throw new Error('Release tag must equal v' + version)
+          }
+          JS
+
+      - name: Install npm 12.2.0
+        run: npm install --global npm@12.2.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build app
+        run: npm run build
+
+      - name: Build unsigned x64 installer (no publishing)
+        run: npx electron-builder --win nsis --publish never
+
+      - name: Verify packaged SQLite
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD 'release/win-unpacked/Financial Tracker.exe'
+          $log = Join-Path $env:RUNNER_TEMP 'sqlite-smoke.log'
+          $process = Start-Process -FilePath $exe -ArgumentList '--smoke-test' -Wait -PassThru -RedirectStandardOutput $log
+          Get-Content $log
+          if ($process.ExitCode -ne 0 -or !(Select-String -Path $log -SimpleMatch 'SQLite smoke test OK' -Quiet)) {
+            throw 'Packaged SQLite smoke test failed'
+          }
+
+      - name: Upload installer and update metadata
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: financial-tracker-windows-x64
+          path: |
+            release/*.exe
+            release/*.blockmap
+            release/latest.yml
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    if: github.event_name == 'push'
+    needs: build
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    steps:
+      - name: Download verified release artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: financial-tracker-windows-x64
+          path: release-artifacts
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mapfile -t assets < <(find release-artifacts -maxdepth 1 -type f -print | sort)
+          test "${#assets[@]}" -eq 3
+          test "$(find release-artifacts -maxdepth 1 -name '*.exe' -type f | wc -l)" -eq 1
+          test "$(find release-artifacts -maxdepth 1 -name '*.blockmap' -type f | wc -l)" -eq 1
+          test -f release-artifacts/latest.yml
+          gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
