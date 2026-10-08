@@ -5,7 +5,7 @@ import sharp from 'sharp'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const source = await readFile(`${root}/build/icon.svg`)
-const sizes = [16, 24, 32, 48, 64, 128, 256]
+const sizes = [16, 20, 24, 32, 40, 48, 64, 128, 256]
 
 const images = await Promise.all(
   sizes.map((size) =>
