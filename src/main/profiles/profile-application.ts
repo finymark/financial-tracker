@@ -80,6 +80,8 @@ import type {
   UpdateBalanceAdjustmentInput,
 } from '../../shared/adjustments'
 import { listTransactions } from './profile-transactions'
+import { exportTransactionsCsv } from './profile-transaction-csv'
+import type { TransactionCsvInput } from '../../shared/transaction-csv'
 import { listPayeeAliases, listPayees, suggestPayees } from './profile-payees'
 import {
   addPayeeAliasUndoableCommand,
@@ -153,6 +155,35 @@ import {
   reorderCategorisationRuleUndoableCommand,
   updateCategorisationRuleUndoableCommand,
 } from './rule-undo'
+import type { ExchangeRateSource } from '../exchange-rates/exchange-rate-source'
+import type {
+  BaseCurrencyConversion,
+  ConversionLine,
+  RateStatus,
+} from '../../shared/exchange-rates'
+import {
+  convertToBaseCurrency,
+  getRateStatus,
+  needsExchangeRateRefresh,
+  refreshExchangeRates as refreshProfileExchangeRates,
+} from './profile-exchange-rates'
+import type {
+  CategoryBreakdownReport,
+  SpendingPaceReport,
+  MonthlyTrendReport,
+  ReportDateRangeInput,
+} from '../../shared/reports'
+import {
+  parseReportDateRangeInput,
+  resolveReportDateRange,
+} from './report-validation'
+import { getCategoryBreakdown } from './profile-reports'
+import type { CashFlowReport } from '../../shared/report-cash-flow'
+import { getCashFlow } from './profile-report-cash-flow'
+import { getSpendingPace } from './profile-report-pace'
+import { getOverviewDashboard } from './profile-report-overview'
+import type { OverviewDashboard } from '../../shared/report-overview'
+import { getMonthlyTrend } from './profile-report-trend'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -204,14 +235,27 @@ export interface OpenProfileApplicationOptions {
   migrations?: readonly SchemaMigration[]
   clock?: () => Date
   createStartupBackup?: boolean
+  exchangeRateSource?: ExchangeRateSource
+  onRateStatusChanged?: () => void
+  logger?: Pick<Console, 'error'>
 }
 
 export interface ProfileQueries {
+  getCashFlow(input: ReportDateRangeInput): CashFlowReport
+  getSpendingPace(): SpendingPaceReport
+  getOverviewDashboard(): OverviewDashboard
+  getMonthlyTrend(input: ReportDateRangeInput): MonthlyTrendReport
+  getCategoryBreakdown(input: ReportDateRangeInput): CategoryBreakdownReport
+  convertToBaseCurrency(
+    lines: readonly ConversionLine[],
+  ): BaseCurrencyConversion
+  getRateStatus(): RateStatus
   listTemplates(): TransactionTemplate[]
   listCategorisationRules(): CategorisationRule[]
   getCategorisationAutofill(
     input: CategorisationRuleDraftInput,
   ): CategorisationAutofill
+  exportTransactionsCsv(input?: TransactionCsvInput): string
   listTransactions(input?: TransactionListInput): TransactionPage
   listPayees(): Payee[]
   listPayeeAliases(payeeId: string): PayeeAlias[]
@@ -230,6 +274,7 @@ export interface ProfileQueries {
 }
 
 export interface ProfileCommands {
+  refreshExchangeRates(source: ExchangeRateSource): Promise<void>
   updateTemplate(input: UpdateTemplateInput): TransactionTemplate
   deleteTemplate(id: string): void
   saveTransactionAsTemplate(
@@ -740,6 +785,41 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
       ON transaction_template_tags(tag_id, template_id);
   `,
   ),
+  defineSqlMigration(
+    17,
+    'MNB exchange-rate cache',
+    `
+    CREATE TABLE exchange_rates (
+      date TEXT NOT NULL CHECK (date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+      currency TEXT NOT NULL CHECK (currency = 'CHF'),
+      rate TEXT NOT NULL CHECK (length(rate) > 0),
+      unit INTEGER NOT NULL CHECK (typeof(unit) = 'integer' AND unit > 0),
+      PRIMARY KEY (date, currency)
+    ) WITHOUT ROWID;
+    CREATE TABLE exchange_rate_cache_metadata (
+      id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),
+      coverage_start_date TEXT,
+      coverage_end_date TEXT,
+      last_refresh_at TEXT,
+      CHECK (
+        (coverage_start_date IS NULL AND coverage_end_date IS NULL) OR
+        (coverage_start_date IS NOT NULL AND coverage_end_date IS NOT NULL AND
+          coverage_start_date <= coverage_end_date)
+      )
+    );
+    INSERT INTO exchange_rate_cache_metadata
+      (id, coverage_start_date, coverage_end_date, last_refresh_at)
+    VALUES (1, NULL, NULL, NULL);
+  `,
+  ),
+  defineSqlMigration(
+    18,
+    'profile privacy mode',
+    `
+    ALTER TABLE profile_settings ADD COLUMN privacy_mode INTEGER NOT NULL
+      DEFAULT 0 CHECK (privacy_mode IN (0, 1));
+  `,
+  ),
 ]
 
 function validateMigrations(
@@ -870,6 +950,8 @@ class OpenProfileApplication implements ProfileApplication {
   readonly #profile: ProfileSummary
   readonly #clock: () => Date
   readonly #undoHistory = new UndoHistory()
+  #pendingRateRefresh: Promise<void> | null = null
+  #rateRefreshRequested = false
 
   constructor(
     database: Database.Database,
@@ -880,6 +962,7 @@ class OpenProfileApplication implements ProfileApplication {
     this.#options = options
     this.#clock = options.clock ?? (() => new Date())
     this.commands = {
+      refreshExchangeRates: (source) => this.#refreshExchangeRates(source),
       updateTemplate: (input) =>
         this.#executeUndoableCommand(
           updateTemplateUndoableCommand(this.#database, input, this.#clock),
@@ -901,7 +984,7 @@ class OpenProfileApplication implements ProfileApplication {
           createTemplateUndoableCommand(this.#database, input, this.#clock),
         ),
       duplicateTransaction: (id) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           duplicateTransactionUndoableCommand(this.#database, id, this.#clock),
         ),
       createCategorisationRule: (input) =>
@@ -929,15 +1012,15 @@ class OpenProfileApplication implements ProfileApplication {
           deleteCategorisationRuleUndoableCommand(this.#database, id),
         ),
       createTransaction: (input) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           createTransactionUndoableCommand(this.#database, input, this.#clock),
         ),
       updateTransaction: (input) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           updateTransactionUndoableCommand(this.#database, input, this.#clock),
         ),
       deleteTransaction: (id) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           deleteTransactionUndoableCommand(this.#database, id),
         ),
       deleteTag: (id) =>
@@ -949,15 +1032,15 @@ class OpenProfileApplication implements ProfileApplication {
           renameTagUndoableCommand(this.#database, input),
         ),
       createTransfer: (input) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           createTransferUndoableCommand(this.#database, input, this.#clock),
         ),
       updateTransfer: (input) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           updateTransferUndoableCommand(this.#database, input, this.#clock),
         ),
       deleteTransfer: (id) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           deleteTransferUndoableCommand(this.#database, id),
         ),
       addPayeeAlias: (input) =>
@@ -994,7 +1077,9 @@ class OpenProfileApplication implements ProfileApplication {
         ),
       undoLast: () => {
         this.#assertAvailable()
-        return this.#undoHistory.undoLast(this.#database)
+        const undone = this.#undoHistory.undoLast(this.#database)
+        if (undone) this.#maybeRefreshExchangeRates()
+        return undone
       },
       deleteCategory: (input) =>
         this.#executeUndoableCommand(
@@ -1051,7 +1136,7 @@ class OpenProfileApplication implements ProfileApplication {
       restoreBackup: (input) => this.#restoreBackup(input),
       ensureProfileIdentity: () => this.#ensureProfileIdentity(),
       createAccount: (input) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           createAccountUndoableCommand(this.#database, input, this.#clock),
         ),
       renameAccount: (input) =>
@@ -1059,7 +1144,7 @@ class OpenProfileApplication implements ProfileApplication {
           renameAccountUndoableCommand(this.#database, input),
         ),
       changeAccountCurrency: (input) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           changeAccountCurrencyUndoableCommand(this.#database, input),
         ),
       archiveAccount: (id) =>
@@ -1077,6 +1162,62 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      getCashFlow: (input) => {
+        this.#assertAvailable()
+        const range = resolveReportDateRange(
+          parseReportDateRangeInput(input),
+          this.#clock,
+        )
+        return this.#database.transaction(() =>
+          getCashFlow(this.#database, range),
+        )()
+      },
+      getSpendingPace: () => {
+        this.#assertAvailable()
+        return this.#database.transaction(() =>
+          getSpendingPace(this.#database, this.#clock),
+        )()
+      },
+      getOverviewDashboard: () => {
+        this.#assertAvailable()
+        return this.#database.transaction(() =>
+          getOverviewDashboard(this.#database, this.#clock),
+        )()
+      },
+      getMonthlyTrend: (input) => {
+        this.#assertAvailable()
+        const range = resolveReportDateRange(
+          parseReportDateRangeInput(input),
+          this.#clock,
+        )
+        return this.#database.transaction(() =>
+          getMonthlyTrend(this.#database, range),
+        )()
+      },
+      getCategoryBreakdown: (input) => {
+        this.#assertAvailable()
+        const range = resolveReportDateRange(
+          parseReportDateRangeInput(input),
+          this.#clock,
+        )
+        return this.#database.transaction(() =>
+          getCategoryBreakdown(this.#database, range),
+        )()
+      },
+      exportTransactionsCsv: (input) => {
+        this.#assertAvailable()
+        return this.#database.transaction(() =>
+          exportTransactionsCsv(this.#database, input, this.#clock),
+        )()
+      },
+      convertToBaseCurrency: (lines) => {
+        this.#assertAvailable()
+        return convertToBaseCurrency(this.#database, lines)
+      },
+      getRateStatus: () => {
+        this.#assertAvailable()
+        return getRateStatus(this.#database, this.#clock)
+      },
       listTemplates: () => {
         this.#assertAvailable()
         return listTemplates(this.#database)
@@ -1091,7 +1232,58 @@ class OpenProfileApplication implements ProfileApplication {
       },
       listTransactions: (input) => {
         this.#assertAvailable()
-        return listTransactions(this.#database, input, this.#clock)
+        const page = listTransactions(this.#database, input, this.#clock)
+        const expense = convertToBaseCurrency(
+          this.#database,
+          page.days.flatMap((day) =>
+            day.totals.map((total) => ({
+              date: day.date,
+              currency: total.currency,
+              amountMinor: total.expenseMinor,
+            })),
+          ),
+        )
+        const income = convertToBaseCurrency(
+          this.#database,
+          page.days.flatMap((day) =>
+            day.totals.map((total) => ({
+              date: day.date,
+              currency: total.currency,
+              amountMinor: total.incomeMinor,
+            })),
+          ),
+        )
+        const unconverted = new Map<
+          (typeof expense.unconverted)[number]['currency'],
+          { expenseMinor: number; incomeMinor: number }
+        >()
+        for (const item of expense.unconverted)
+          unconverted.set(item.currency, {
+            expenseMinor: item.amountMinor,
+            incomeMinor: 0,
+          })
+        for (const item of income.unconverted) {
+          const current = unconverted.get(item.currency) ?? {
+            expenseMinor: 0,
+            incomeMinor: 0,
+          }
+          current.incomeMinor = item.amountMinor
+          unconverted.set(item.currency, current)
+        }
+        return {
+          ...page,
+          baseTotals: {
+            currency: expense.baseCurrency,
+            expenseMinor: expense.roundedMinor,
+            incomeMinor: income.roundedMinor,
+            unconverted: [...unconverted.entries()]
+              .map(([currency, totals]) => ({ currency, ...totals }))
+              .sort((left, right) =>
+                left.currency.localeCompare(right.currency),
+              ),
+            stale: expense.stale || income.stale,
+          },
+        }
       },
       listTags: () => {
         this.#assertAvailable()
@@ -1290,6 +1482,56 @@ class OpenProfileApplication implements ProfileApplication {
     return result
   }
 
+  #executeBackgroundWrite(operation: () => void): void {
+    this.#assertAvailable()
+    // Cache maintenance is not a user-data command. It must neither be
+    // undoable nor invalidate user-data images already in the undo history.
+    this.#database.transaction(operation)()
+  }
+
+  #refreshExchangeRates(source: ExchangeRateSource): Promise<void> {
+    this.#assertAvailable()
+    if (this.#pendingRateRefresh) return this.#pendingRateRefresh
+    const pending = refreshProfileExchangeRates(
+      this.#database,
+      source,
+      this.#clock,
+      () => this.#assertAvailable(),
+      (operation) => this.#executeBackgroundWrite(operation),
+    ).finally(() => {
+      if (this.#pendingRateRefresh === pending) this.#pendingRateRefresh = null
+      if (this.#rateRefreshRequested) {
+        this.#rateRefreshRequested = false
+        this.#maybeRefreshExchangeRates()
+      }
+    })
+    this.#pendingRateRefresh = pending
+    return pending
+  }
+
+  #maybeRefreshExchangeRates(): void {
+    if (!this.#database.open || this.#restoring) return
+    const logger = this.#options.logger ?? console
+    try {
+      const source = this.#options.exchangeRateSource
+      if (!source || !needsExchangeRateRefresh(this.#database, this.#clock))
+        return
+      if (this.#pendingRateRefresh) {
+        this.#rateRefreshRequested = true
+        return
+      }
+      void this.#refreshExchangeRates(source)
+        .finally(() => {
+          this.#options.onRateStatusChanged?.()
+        })
+        .catch((error: unknown) => {
+          logger.error('Exchange-rate refresh failed', error)
+        })
+    } catch (error) {
+      logger.error('Exchange-rate refresh failed', error)
+    }
+  }
+
   #executeUndoableCommand<BeforeImage, AfterImage, Result>(
     command: UndoableCommand<BeforeImage, AfterImage, Result>,
   ): Result {
@@ -1297,28 +1539,55 @@ class OpenProfileApplication implements ProfileApplication {
     return this.#undoHistory.execute(this.#database, command)
   }
 
+  #executeAndRefreshRates<BeforeImage, AfterImage, Result>(
+    command: UndoableCommand<BeforeImage, AfterImage, Result>,
+  ): Result {
+    const result = this.#executeUndoableCommand(command)
+    this.#maybeRefreshExchangeRates()
+    return result
+  }
+
   #updateSettings(changes: ProfileSettingsChanges): ProfileSettings {
-    return this.#executeCommand(() => {
-      const settings = {
-        ...this.#getSettings(),
-        ...parseSettingsChanges(changes),
-      }
+    this.#assertAvailable()
+    const parsed = parseSettingsChanges(changes)
+    const update = () => {
+      const settings = { ...this.#getSettings(), ...parsed }
       this.#database
         .prepare(
-          'UPDATE profile_settings SET language = ?, theme = ?, base_currency = ? WHERE id = 1',
+          'UPDATE profile_settings SET language = ?, theme = ?, base_currency = ?, privacy_mode = ? WHERE id = 1',
         )
-        .run(settings.language, settings.theme, settings.baseCurrency)
+        .run(
+          settings.language,
+          settings.theme,
+          settings.baseCurrency,
+          Number(settings.privacyMode),
+        )
       return this.#getSettings()
-    })
+    }
+    // Privacy is presentation-only: do not invalidate ledger undo images.
+    // Mixed writes retain the existing non-undoable settings-command boundary.
+    if (Object.keys(parsed).every((key) => key === 'privacyMode')) {
+      return this.#database.transaction(update)()
+    }
+    return this.#executeCommand(update)
   }
 
   #getSettings(): ProfileSettings {
     this.#assertAvailable()
-    return this.#database
-      .prepare(
-        'SELECT language, theme, base_currency AS baseCurrency FROM profile_settings WHERE id = 1',
-      )
-      .get() as ProfileSettings
+    const row = this.#database
+      .prepare('SELECT * FROM profile_settings WHERE id = 1')
+      .get() as {
+      language: ProfileSettings['language']
+      theme: ProfileSettings['theme']
+      base_currency: ProfileSettings['baseCurrency']
+      privacy_mode?: number
+    }
+    return {
+      language: row.language,
+      theme: row.theme,
+      baseCurrency: row.base_currency,
+      privacyMode: row.privacy_mode === 1,
+    }
   }
 
   #getProfileInfo(): ProfileInfo {

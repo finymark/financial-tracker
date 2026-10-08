@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import {
+  Eye,
+  EyeOff,
   ArrowLeftRight,
+  ChartPie,
   LayoutDashboard,
   PanelLeftClose,
   PanelLeftOpen,
@@ -14,7 +17,8 @@ import type {
   ProfileRegistrySnapshot,
 } from '../../shared/profiles'
 import { ShortcutHelp } from './components/shortcut-help'
-import { matchShortcut } from './lib/shortcuts'
+import { matchShortcut, shortcuts } from './lib/shortcuts'
+import { PrivacyProvider } from './lib/privacy'
 import { shortcutTargetContext } from './lib/shortcut-context'
 import { UpdateNotice } from './components/update-notice'
 import { BackupSettings } from './components/backup-settings'
@@ -41,10 +45,15 @@ import {
   type ProfileSettingsChanges,
 } from '../../shared/settings'
 import { cn } from './lib/utils'
+import type { RateStatus } from '../../shared/exchange-rates'
+import { ReportsPage } from './ReportsPage'
+import { OverviewPage } from './OverviewPage'
+import type { TransactionListInput } from '../../shared/transactions'
 
 const pages = [
   { id: 'overview', icon: LayoutDashboard },
   { id: 'transactions', icon: ArrowLeftRight },
+  { id: 'reports', icon: ChartPie },
   { id: 'accounts', icon: Wallet },
   { id: 'settings', icon: Settings },
 ] as const
@@ -357,6 +366,8 @@ function Shell({
   onRestored,
 }: ShellProps) {
   const [page, setPage] = useState<Page>('overview')
+  const [reportTransactionFilter, setReportTransactionFilter] =
+    useState<TransactionListInput | null>(null)
   const [newTransactionRequested, setNewTransactionRequested] = useState(false)
   const [showShortcutHelp, setShowShortcutHelp] = useState(false)
   const transactionRequestHandled = useCallback(
@@ -377,7 +388,54 @@ function Shell({
   const [undoOffered, setUndoOffered] = useState(false)
   const [undoBusy, setUndoBusy] = useState(false)
   const [undoError, setUndoError] = useState(false)
+  const [rateStatus, setRateStatus] = useState<RateStatus | null>(null)
   const format = createFormatters(language)
+  const privacyShortcut = shortcuts.find(
+    (item) => item.action === 'privacy',
+  )!.label
+  const togglePrivacy = useCallback(async () => {
+    if (savingSettings || backupBusy) return
+    setSavingSettings(true)
+    setSettingsError(false)
+    try {
+      await onSettingsChange({ privacyMode: !active.settings.privacyMode })
+    } catch {
+      setSettingsError(true)
+    } finally {
+      setSavingSettings(false)
+    }
+  }, [
+    savingSettings,
+    backupBusy,
+    onSettingsChange,
+    active.settings.privacyMode,
+  ])
+
+  useEffect(() => {
+    let ignore = false
+    const load = () => {
+      void window.app.rates
+        .status()
+        .then((status) => {
+          if (!ignore) setRateStatus(status)
+        })
+        .catch(() => {
+          if (!ignore)
+            setRateStatus({
+              coverage: null,
+              lastRefresh: null,
+              stale: true,
+              missing: true,
+            })
+        })
+    }
+    load()
+    const unsubscribe = window.app.rates.onStatusChanged(load)
+    return () => {
+      ignore = true
+      unsubscribe()
+    }
+  }, [])
 
   const undoLast = useCallback(async () => {
     if (undoBusy || accountBusy) return
@@ -404,6 +462,11 @@ function Shell({
         scope: 'app',
         ...shortcutTargetContext(event.target),
       })
+      if (action === 'privacy') {
+        event.preventDefault()
+        void togglePrivacy()
+        return
+      }
       if (!action || showShortcutHelp) return
       // Do not open a second drawer or undo the ledger beneath a modal.
       if (action !== 'help' && document.querySelector('[role="dialog"]')) return
@@ -419,6 +482,7 @@ function Shell({
         )
           return
         event.preventDefault()
+        setReportTransactionFilter(null)
         setNewTransactionRequested(true)
         setPage('transactions')
       } else if (action === 'help') {
@@ -450,6 +514,7 @@ function Shell({
     payeeBusy,
     ruleBusy,
     showShortcutHelp,
+    togglePrivacy,
   ])
 
   async function saveSettings(changes: ProfileSettingsChanges) {
@@ -522,7 +587,10 @@ function Shell({
                 payeeBusy ||
                 ruleBusy
               }
-              onClick={() => setPage(id)}
+              onClick={() => {
+                if (id === 'transactions') setReportTransactionFilter(null)
+                setPage(id)
+              }}
             >
               <Icon aria-hidden="true" />
               {!collapsed && t(`navigation.${id}`)}
@@ -566,6 +634,21 @@ function Shell({
             <Button
               className="float-right"
               variant="ghost"
+              aria-pressed={active.settings.privacyMode}
+              title={`${t('privacy.toggle')} (${privacyShortcut})`}
+              disabled={savingSettings || backupBusy}
+              onClick={() => void togglePrivacy()}
+            >
+              {active.settings.privacyMode ? (
+                <EyeOff aria-hidden="true" />
+              ) : (
+                <Eye aria-hidden="true" />
+              )}
+              {t('privacy.toggle')}
+            </Button>
+            <Button
+              className="float-right"
+              variant="ghost"
               onClick={() => setShowShortcutHelp(true)}
             >
               {t('shortcuts.help')}
@@ -573,6 +656,29 @@ function Shell({
             <p className="mb-2 text-sm text-muted-foreground">
               {t('app.tagline')}
             </p>
+            {settingsError && (
+              <p role="alert" className="text-sm font-medium text-error">
+                {t('settings.error')}
+              </p>
+            )}
+            {rateStatus && (
+              <p className="mb-2 text-xs text-muted-foreground" role="status">
+                {t(
+                  rateStatus.missing
+                    ? 'rates.status.missing'
+                    : rateStatus.stale
+                      ? 'rates.status.stale'
+                      : 'rates.status.upToDate',
+                )}
+                {rateStatus.lastRefresh && (
+                  <>
+                    {' · '}
+                    {t('rates.status.lastRefresh')}:{' '}
+                    {format.date(new Date(rateStatus.lastRefresh))}
+                  </>
+                )}
+              </p>
+            )}
             <h1
               id="page-title"
               className="text-2xl font-semibold tracking-tight"
@@ -582,8 +688,16 @@ function Shell({
           </header>
           <Card>
             <CardHeader>
-              <CardTitle>{t(`${page}.title`)}</CardTitle>
-              <CardDescription>{t(`${page}.description`)}</CardDescription>
+              <CardTitle>
+                {t(page === 'reports' ? 'reports.heading' : `${page}.title`)}
+              </CardTitle>
+              <CardDescription>
+                {t(
+                  page === 'reports'
+                    ? 'reports.introduction'
+                    : `${page}.description`,
+                )}
+              </CardDescription>
             </CardHeader>
             {page === 'accounts' && (
               <AccountsPage
@@ -599,7 +713,7 @@ function Shell({
             )}
             {page === 'transactions' && (
               <TransactionsPage
-                key={active.id}
+                key={`${active.id}:${JSON.stringify(reportTransactionFilter)}`}
                 baseCurrency={baseCurrency}
                 language={language}
                 t={t}
@@ -609,6 +723,29 @@ function Shell({
                 onTransactionChanged={() => {
                   setUndoError(false)
                   setUndoOffered(true)
+                }}
+                initialReportFilter={reportTransactionFilter}
+              />
+            )}
+            {page === 'overview' && (
+              <OverviewPage
+                key={`${active.id}:${undoRevision}`}
+                language={language}
+                t={t}
+                onOpenReports={() => setPage('reports')}
+                onOpenTransactions={(input) => {
+                  setReportTransactionFilter(input)
+                  setPage('transactions')
+                }}
+              />
+            )}
+            {page === 'reports' && (
+              <ReportsPage
+                language={language}
+                t={t}
+                onOpenTransactions={(input) => {
+                  setReportTransactionFilter(input)
+                  setPage('transactions')
                 }}
               />
             )}
@@ -706,11 +843,6 @@ function Shell({
                     </NativeSelect>
                   </div>
                 </div>
-                {settingsError && (
-                  <p role="alert" className="text-sm font-medium text-error">
-                    {t('settings.error')}
-                  </p>
-                )}
                 <p className="text-sm text-muted-foreground">
                   {t('settings.version')}: {version}
                 </p>
@@ -894,25 +1026,30 @@ export default function App() {
     )
   } else {
     content = (
-      <Shell
-        key={active.id}
-        active={active}
-        version={version}
-        t={t}
-        onSettingsChange={async (settings) => {
-          const saved = await window.app.profiles.updateSettings({
-            id: active.id,
-            settings,
-          })
-          setActive((current) =>
-            current?.id === active.id
-              ? { ...current, settings: saved }
-              : current,
-          )
-        }}
-        onRestored={setActive}
-        onSwitchProfile={() => setShowPicker(true)}
-      />
+      <PrivacyProvider
+        privacyMode={active.settings.privacyMode}
+        language={language}
+      >
+        <Shell
+          key={active.id}
+          active={active}
+          version={version}
+          t={t}
+          onSettingsChange={async (settings) => {
+            const saved = await window.app.profiles.updateSettings({
+              id: active.id,
+              settings,
+            })
+            setActive((current) =>
+              current?.id === active.id
+                ? { ...current, settings: saved }
+                : current,
+            )
+          }}
+          onRestored={setActive}
+          onSwitchProfile={() => setShowPicker(true)}
+        />
+      </PrivacyProvider>
     )
   }
   return (

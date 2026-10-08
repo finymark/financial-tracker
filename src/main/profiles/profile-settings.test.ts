@@ -38,6 +38,7 @@ test('a new profile starts with English, the system theme and HUF base currency'
     expect(application.queries.getSettings()).toEqual({
       language: 'en',
       theme: 'system',
+      privacyMode: false,
       baseCurrency: 'HUF',
     })
   } finally {
@@ -64,11 +65,13 @@ test('setting changes apply immediately and survive closing and reopening the pr
     ).toEqual({
       language: 'hu',
       theme: 'dark',
+      privacyMode: false,
       baseCurrency: 'CHF',
     })
     expect(application.queries.getSettings()).toEqual({
       language: 'hu',
       theme: 'dark',
+      privacyMode: false,
       baseCurrency: 'CHF',
     })
   } finally {
@@ -79,6 +82,7 @@ test('setting changes apply immediately and survive closing and reopening the pr
     expect(reopened.queries.getSettings()).toEqual({
       language: 'hu',
       theme: 'dark',
+      privacyMode: false,
       baseCurrency: 'CHF',
     })
   } finally {
@@ -98,6 +102,9 @@ test.each(
     { language: 'de', theme: null },
     { baseCurrency: undefined },
     { unexpected: 'value' },
+    { privacyMode: 1 },
+    { privacyMode: 'true' },
+    { privacyMode: null },
   ].map((input) => ({ input })),
 )(
   'invalid settings are rejected without changing saved settings: $input',
@@ -121,6 +128,7 @@ test.each(
       expect(application.queries.getSettings()).toEqual({
         language: 'hu',
         theme: 'dark',
+        privacyMode: false,
         baseCurrency: 'CHF',
       })
     } finally {
@@ -158,6 +166,7 @@ test('switching between reopened profiles restores only their own settings', asy
     expect(secondApplication.queries.getSettings()).toEqual({
       language: 'en',
       theme: 'system',
+      privacyMode: false,
       baseCurrency: 'HUF',
     })
     secondApplication.commands.updateSettings({ language: 'hu', theme: 'dark' })
@@ -165,8 +174,24 @@ test('switching between reopened profiles restores only their own settings', asy
     secondApplication.close()
   }
   for (const [options, expected] of [
-    [firstOptions, { language: 'de', theme: 'light', baseCurrency: 'CHF' }],
-    [secondOptions, { language: 'hu', theme: 'dark', baseCurrency: 'HUF' }],
+    [
+      firstOptions,
+      {
+        language: 'de',
+        theme: 'light',
+        baseCurrency: 'CHF',
+        privacyMode: false,
+      },
+    ],
+    [
+      secondOptions,
+      {
+        language: 'hu',
+        theme: 'dark',
+        baseCurrency: 'HUF',
+        privacyMode: false,
+      },
+    ],
   ] as const) {
     const reopened = await openProfileApplication(options)
     try {
@@ -194,11 +219,13 @@ test('changing one setting preserves the other saved choices', async () => {
     expect(application.commands.updateSettings({ language: 'de' })).toEqual({
       language: 'de',
       theme: 'dark',
+      privacyMode: false,
       baseCurrency: 'CHF',
     })
     expect(application.commands.updateSettings({ theme: 'light' })).toEqual({
       language: 'de',
       theme: 'light',
+      privacyMode: false,
       baseCurrency: 'CHF',
     })
     expect(
@@ -207,7 +234,12 @@ test('changing one setting preserves the other saved choices', async () => {
         theme: 'system',
         baseCurrency: 'HUF',
       }),
-    ).toEqual({ language: 'en', theme: 'system', baseCurrency: 'HUF' })
+    ).toEqual({
+      language: 'en',
+      theme: 'system',
+      baseCurrency: 'HUF',
+      privacyMode: false,
+    })
   } finally {
     application.close()
   }
@@ -235,9 +267,78 @@ test('an existing profile gains default settings when upgraded from the identity
     expect(upgraded.queries.getSettings()).toEqual({
       language: 'en',
       theme: 'system',
+      privacyMode: false,
       baseCurrency: 'HUF',
     })
   } finally {
     upgraded.close()
+  }
+})
+
+test('privacy persists per profile without invalidating undo; other settings still clear history', async () => {
+  const registry = setup()
+  const first = registry.createProfile('Private profile')
+  const second = registry.createProfile('Visible profile')
+  const options = {
+    profile: first,
+    paths: registry.getProfilePaths(first.id),
+    clock,
+  }
+  const application = await openProfileApplication(options)
+  try {
+    expect(application.queries.getSettings()).toMatchObject({
+      privacyMode: false,
+    })
+    const account = application.commands.createAccount({
+      name: 'Synthetic cash',
+      currency: 'HUF',
+      openingBalance: 12300,
+      openingDate: '2026-01-01',
+    })
+    application.commands.updateSettings({ privacyMode: true })
+    expect(application.queries.getSettings()).toMatchObject({
+      privacyMode: true,
+    })
+    expect(application.commands.undoLast()).toBe(true)
+    expect(
+      application.queries.listAccounts().some((item) => item.id === account.id),
+    ).toBe(false)
+    application.commands.createAccount({
+      name: 'Another cash',
+      currency: 'CHF',
+      openingBalance: 100,
+      openingDate: '2026-01-01',
+    })
+    application.commands.updateSettings({ privacyMode: false })
+    expect(application.commands.undoLast()).toBe(true)
+    application.commands.createAccount({
+      name: 'Mixed settings cash',
+      currency: 'HUF',
+      openingBalance: 0,
+      openingDate: '2026-01-01',
+    })
+    application.commands.updateSettings({ privacyMode: true, language: 'hu' })
+    expect(application.commands.undoLast()).toBe(false)
+  } finally {
+    application.close()
+  }
+  const other = await openProfileApplication({
+    profile: second,
+    paths: registry.getProfilePaths(second.id),
+    clock,
+  })
+  try {
+    expect(other.queries.getSettings()).toMatchObject({ privacyMode: false })
+  } finally {
+    other.close()
+  }
+  const reopened = await openProfileApplication(options)
+  try {
+    expect(reopened.queries.getSettings()).toMatchObject({
+      privacyMode: true,
+      language: 'hu',
+    })
+  } finally {
+    reopened.close()
   }
 })

@@ -1,3 +1,4 @@
+import type { TransactionCsvInput } from './transaction-csv'
 import type {
   CreateTemplateInput,
   UpdateTemplateInput,
@@ -76,6 +77,15 @@ import type {
   ReorderCategorisationRuleInput,
   UpdateCategorisationRuleInput,
 } from './rules'
+import type { RateStatus } from './exchange-rates'
+import type { CashFlowReport } from './report-cash-flow'
+import type { OverviewDashboard } from './report-overview'
+import type {
+  CategoryBreakdownReport,
+  MonthlyTrendReport,
+  ReportDateRangeInput,
+  SpendingPaceReport,
+} from './reports'
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
@@ -115,6 +125,7 @@ export const IPC_CHANNELS = {
   templatesSaveTransaction: 'templates:save-transaction',
   transactionsDuplicate: 'transactions:duplicate',
   transactionsList: 'transactions:list',
+  transactionsExportCsv: 'transactions:export-csv',
   transactionsCreate: 'transactions:create',
   transactionsUpdate: 'transactions:update',
   transactionsDelete: 'transactions:delete',
@@ -140,9 +151,29 @@ export const IPC_CHANNELS = {
   rulesUpdate: 'rules:update',
   rulesReorder: 'rules:reorder',
   rulesDelete: 'rules:delete',
+  ratesStatus: 'rates:status',
+  ratesStatusChanged: 'rates:status-changed',
+  reportsCategoryBreakdown: 'reports:category-breakdown',
+  reportsCashFlow: 'reports:cash-flow',
+  reportsSpendingPace: 'reports:spending-pace',
+  reportsOverviewDashboard: 'reports:overview-dashboard',
+  reportsMonthlyTrend: 'reports:monthly-trend',
 } as const
 
 export interface AppBridge {
+  reports: {
+    cashFlow(input: ReportDateRangeInput): Promise<CashFlowReport>
+    spendingPace(): Promise<SpendingPaceReport>
+    overviewDashboard(): Promise<OverviewDashboard>
+    monthlyTrend(input: ReportDateRangeInput): Promise<MonthlyTrendReport>
+    categoryBreakdown(
+      input: ReportDateRangeInput,
+    ): Promise<CategoryBreakdownReport>
+  }
+  rates: {
+    status(): Promise<RateStatus>
+    onStatusChanged(listener: () => void): () => void
+  }
   rules: {
     list(): Promise<CategorisationRule[]>
     autofill(
@@ -169,6 +200,8 @@ export interface AppBridge {
     ): Promise<TransactionTemplate>
   }
   transactions: {
+    // True after writing the file; false when the native save dialog is cancelled.
+    exportCsv(input?: TransactionCsvInput): Promise<boolean>
     duplicate(input: TransactionIdInput): Promise<string>
     list(input?: TransactionListInput): Promise<TransactionPage>
     create(input: CreateTransactionInput): Promise<Transaction>

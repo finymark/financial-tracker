@@ -29,6 +29,9 @@ import { validateTagNames } from './tag-validation'
 import { getLinesTags, setLineTags } from './profile-tags'
 import { getBalanceAdjustments } from './profile-adjustments'
 import { foldTextKey } from '../../shared/text-keys'
+import { resolvePresetDateRange } from './period-date-range'
+
+type StoredTransactionPage = Omit<TransactionPage, 'baseTotals'>
 
 interface StoredTransaction {
   id: string
@@ -467,11 +470,12 @@ function assertNotLinkedFee(
   }
 }
 
-export function listTransactions(
+function withFilteredMovements<Result>(
   database: Database.Database,
   value: TransactionListInput | undefined,
   clock: () => Date,
-): TransactionPage {
+  read: (input: TransactionListInput) => Result,
+): Result {
   const input = parseTransactionListInput(value)
   const where: string[] = []
   const parameters: (string | number)[] = []
@@ -483,21 +487,16 @@ export function listTransactions(
     where.push(condition)
     parameters.push(...values)
   }
-  const current = today(clock)
   let from = input.from
   let to = input.to
-  if (input.period === 'thisMonth') {
-    from = `${current.slice(0, 7)}-01`
-    to = current
-  } else if (input.period === 'thisYear') {
-    from = `${current.slice(0, 4)}-01-01`
-    to = current
-  } else if (input.period === 'lastMonth') {
-    const first = new Date(`${current.slice(0, 7)}-01T12:00:00`)
-    first.setDate(0)
-    const last = today(() => first)
-    from = `${last.slice(0, 7)}-01`
-    to = last
+  if (
+    input.period === 'thisMonth' ||
+    input.period === 'lastMonth' ||
+    input.period === 'thisYear'
+  ) {
+    const range = resolvePresetDateRange(input.period, clock)
+    from = range.from
+    to = range.to
   }
   const addTransfer = (condition: string, ...values: (string | number)[]) => {
     transferWhere.push(condition)
@@ -537,20 +536,32 @@ export function listTransactions(
     addTransfer('0 = 1')
     addAdjustment('0 = 1')
   }
+  if (input.kind) {
+    add('transactions.kind = ?', input.kind)
+    addTransfer('0 = 1')
+    addAdjustment('0 = 1')
+  }
   const filteredLineConditions = [
     'filter_lines.transaction_id = transactions.id',
   ]
   const filteredLineParameters: string[] = []
   if (input.categoryId) {
     filteredLineConditions.push(
-      `EXISTS (
+      input.exactCategory
+        ? 'filter_lines.category_id = ?'
+        : `EXISTS (
         SELECT 1 FROM categories
         WHERE categories.id = filter_lines.category_id
           AND (categories.id = ? OR categories.parent_id = ?)
       )`,
     )
-    filteredLineParameters.push(input.categoryId, input.categoryId)
+    filteredLineParameters.push(
+      input.categoryId,
+      ...(input.exactCategory ? [] : [input.categoryId]),
+    )
   }
+  if (input.uncategorized)
+    filteredLineConditions.push('filter_lines.category_id IS NULL')
   if (input.tagId) {
     filteredLineConditions.push(
       `EXISTS (
@@ -561,7 +572,7 @@ export function listTransactions(
     )
     filteredLineParameters.push(input.tagId)
   }
-  if (input.categoryId || input.tagId) {
+  if (input.categoryId || input.uncategorized || input.tagId) {
     add(
       `EXISTS (
         SELECT 1 FROM transaction_lines AS filter_lines
@@ -637,6 +648,45 @@ export function listTransactions(
       )
       .run(...adjustmentParameters)
 
+    return read(input)
+  })()
+}
+
+// CSV uses the same matched transaction identities as the list, but never its
+// paging, transfer/adjustment rows, or spending aggregates.
+export function listFilteredTransactions(
+  database: Database.Database,
+  input: TransactionListInput | undefined,
+  clock: () => Date,
+): Transaction[] {
+  return withFilteredMovements(database, input, clock, () => {
+    const ids = database
+      .prepare(
+        `
+      SELECT id FROM temp.filtered_movements WHERE row_kind = 'transaction'
+      ORDER BY date DESC, created_at DESC, id DESC
+    `,
+      )
+      .all() as { id: string }[]
+    const rows: Transaction[] = []
+    for (let offset = 0; offset < ids.length; offset += 500) {
+      rows.push(
+        ...getTransactions(
+          database,
+          ids.slice(offset, offset + 500).map(({ id }) => id),
+        ),
+      )
+    }
+    return rows
+  })
+}
+
+export function listTransactions(
+  database: Database.Database,
+  value: TransactionListInput | undefined,
+  clock: () => Date,
+): StoredTransactionPage {
+  return withFilteredMovements(database, value, clock, (input) => {
     const pageRows = database
       .prepare(
         `SELECT id, row_kind AS rowKind FROM temp.filtered_movements
@@ -713,14 +763,19 @@ export function listTransactions(
             ON aggregate_lines.transaction_id = transactions.id
           WHERE movements.row_kind = 'transaction'
           ${
-            input.categoryId || input.tagId
+            input.categoryId || input.uncategorized || input.tagId
               ? `AND ${[
                   input.categoryId
-                    ? `EXISTS (
+                    ? input.exactCategory
+                      ? 'aggregate_lines.category_id = ?'
+                      : `EXISTS (
                     SELECT 1 FROM categories AS aggregate_categories
                     WHERE aggregate_categories.id = aggregate_lines.category_id
                       AND (aggregate_categories.id = ? OR aggregate_categories.parent_id = ?)
                   )`
+                    : '',
+                  input.uncategorized
+                    ? 'aggregate_lines.category_id IS NULL'
                     : '',
                   input.tagId
                     ? `EXISTS (
@@ -747,7 +802,12 @@ export function listTransactions(
       )
       .safeIntegers()
       .all(
-        ...(input.categoryId ? [input.categoryId, input.categoryId] : []),
+        ...(input.categoryId
+          ? [
+              input.categoryId,
+              ...(input.exactCategory ? [] : [input.categoryId]),
+            ]
+          : []),
         ...(input.tagId ? [input.tagId] : []),
       ) as {
       date: string | null
@@ -801,5 +861,5 @@ export function listTransactions(
       ),
       days,
     }
-  })()
+  })
 }

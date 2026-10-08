@@ -16,6 +16,14 @@
   --input: var(--border);
   --ring: var(--primary);
   --error: oklch(0.5 0.18 28);
+  --chart-1: oklch(0.55 0.12 172);
+  --chart-2: oklch(0.62 0.13 205);
+  --chart-3: oklch(0.68 0.14 95);
+  --chart-4: oklch(0.62 0.15 45);
+  --chart-5: oklch(0.58 0.14 285);
+  --chart-6: oklch(0.65 0.12 330);
+  --chart-7: oklch(0.64 0.1 135);
+  --chart-8: oklch(0.57 0.1 245);
 
   --radius: 0.75rem;
   --density: 0.25rem;
@@ -40,6 +48,14 @@
   --input: var(--border);
   --ring: var(--primary);
   --error: oklch(0.75 0.14 28);
+  --chart-1: oklch(0.76 0.11 172);
+  --chart-2: oklch(0.76 0.11 205);
+  --chart-3: oklch(0.8 0.12 95);
+  --chart-4: oklch(0.76 0.13 45);
+  --chart-5: oklch(0.75 0.12 285);
+  --chart-6: oklch(0.78 0.1 330);
+  --chart-7: oklch(0.76 0.1 135);
+  --chart-8: oklch(0.75 0.09 245);
 }
 
 @theme inline {

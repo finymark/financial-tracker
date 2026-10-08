@@ -2,8 +2,8 @@
 
 A local-first personal expense tracker for Windows, built with Electron, React,
 TypeScript, and SQLite. The app opens to a collapsible sidebar with Overview,
-Transactions, Accounts, and Settings pages. On start you pick or create a
-profile; each profile has its own SQLite database and data folder. Financial
+Transactions, Reports, Accounts, and Settings pages. On start you pick or create
+a profile; each profile has its own SQLite database and data folder. Financial
 data stays local. Accounts track opening balances, signed expense/income
 transactions, both legs of transfers, and target-based balance adjustments.
 Settings includes payee alias/merge management, ordered categorisation rules,
@@ -288,7 +288,8 @@ not off-device copies or backups of the separate data folder.
   the identity-only schema retain the migration's English default. Saved choices apply immediately and return when the
   profile is opened again; switching profiles switches its language and theme.
   Failed saves show a translated error and leave the previous choices applied.
-  Base currency is stored for later reports; currency conversion is not included.
+  Base currency drives exact HUF/CHF conversion with official MNB rates cached
+  inside that profile's database.
 - The system theme follows Windows through `prefers-color-scheme`, using
   Electron's default system `nativeTheme`. Explicit light/dark modes override
   that preference in the renderer, including native form controls.
@@ -300,7 +301,222 @@ not off-device copies or backups of the separate data folder.
 - The profile area at the bottom of the sidebar shows the active profile and
   switches profiles. Accounts lists active and archived accounts with balances in
   their own currency. Transactions provides a filterable, virtualised table and a
-  right-side create/edit drawer; Overview remains a placeholder.
+  right-side create/edit drawer. Reports provides base-currency expense totals by
+  main category and subcategory, monthly trends, spending pace, and cash flow.
+  Overview shows this month's expenses, income, net, and top five expense
+  categories compared with the full last month.
+
+## Exchange rates and base-currency conversion
+
+- Profiles with an account outside their base currency fetch official CHF rates
+  from the MNB SOAP service after the profile opens and every hour while the app
+  runs. Creating a non-base-currency account, changing an account's currency, or
+  writing a transaction/transfer or undoing a change also starts a coalesced
+  background refresh when it extends the needed history, restores a missing
+  left-edge rate, or the cached coverage ends before yesterday. Requests use
+  Electron's system-proxy-aware network stack and never block the renderer. MNB serves this SOAP endpoint only
+  over plain HTTP; ADR 0005 records the accepted integrity risk. Failures are
+  logged and leave the visible rate status stale or missing.
+- Migration 17 stores each quoted decimal string and unit by publication date,
+  plus fetched coverage and the last successful refresh, in the profile database.
+  Requested past dates are final. Today remains open and is requested again each
+  hour until MNB's response includes today's publication; until then coverage
+  ends yesterday. A backwards extension starts 14 days before the earliest
+  needed date so weekends and holiday closures can use the previous publication.
+  Profile backups and restores remain self-contained. Weekends and holidays use
+  the latest earlier published rate within fetched coverage; dates after coverage
+  use the latest cached rate as provisional. Only a conversion that actually
+  uses a rate after coverage is marked provisional. The separate cache status is
+  up to date when coverage reaches at least yesterday, stale when it does not,
+  and missing when a needed date has no earlier published rate. An amount without
+  an earlier rate remains explicitly unconverted, never zero.
+- Conversion uses exact BigInt rational arithmetic. CHF converts to HUF with the
+  MNB HUF-per-quoted-unit rate; HUF converts to CHF with its exact inverse. Values
+  are aggregated exactly and rounded once per displayed total to integer
+  hundredths, with ties away from zero. Transfers retain both recorded legs and
+  are not converted into expense or income totals.
+- The shell shows whether rates are up to date, stale, or missing and includes the
+  last refresh date. Filtered transaction totals retain their per-currency values
+  and additionally show a base-currency total, provisional state, and any
+  unconverted currency bucket.
+
+## Overview dashboard
+
+- **Overview** is the start page: expenses, income, and net (income minus expenses)
+  for this month to date, alongside the full previous calendar month and the
+  absolute change. Both inclusive date ranges are displayed; last month is not
+  cut at today's day-of-month.
+- The dashboard reuses the category-breakdown query and report-line selection,
+  so expense totals and category amounts agree with **Reports** for the same
+  range. Transfers, balance adjustments, and excluded transactions never count.
+  Splits use each part's category, including the uncategorized group.
+- All totals use the profile's base currency, explicit unconverted buckets, and
+  provisional-rate indicators. Net and changes use exact signed converted lines
+  and round once, rather than subtracting rounded card amounts.
+- The top five main expense categories include uncategorized when it ranks in
+  the top five. Ranking and shares use exact converted expenses; shares use all
+  categories as the denominator, not just the top five. Missing-rate amounts
+  remain separate and do not count in ranking or shares. With no converted
+  expenses, shares are zero and the unconverted bucket remains visible.
+- Expense/income cards and category names open the matching transaction list
+  with the dashboard's date range and excluded transactions hidden. **View
+  reports** opens the full category breakdown. Rates refreshing and returning
+  focus to the app reload the dashboard.
+
+### Manual Overview and report charts check
+
+Run `npm run dev` with synthetic HUF/CHF accounts and transactions. Repeat in
+HU/EN/DE and light/dark themes, including a collapsed sidebar and a narrow
+window. Verify Overview opens first, the two explicit date ranges show this
+month to date versus the full last month, and expense/income/net cards show
+current totals, previous totals, and signed absolute changes. Test no data,
+income only, negative net, and year/month rollover.
+
+Create more than five main expense categories, subcategories, split parts, and
+uncategorized lines; check the top-five order, amounts, and shares against the
+Reports breakdown for the same inclusive dates. Verify excluded expenses and
+income, transfers, and balance adjustments never count. Check missing-rate
+buckets on current/previous/change totals and category rows, and stale-rate
+indicators while offline; after refresh the dashboard should update. Switch
+base currency and profiles, return from editing or undoing transactions, and
+verify totals and translated category names reload without another profile's
+values.
+
+Check the overview bar chart and Reports pie/bar charts use theme-token colors,
+readable labels, and locale-formatted money tooltips. Check top-five table links,
+expense/income card links, and View reports using keyboard navigation; category
+links must preserve the inclusive dates, include subcategories, handle
+uncategorized, and hide excluded transactions. In Transactions, the report chip
+must describe the applied category and kind, including “without subcategories”
+for direct-category lines. Editing the category without Apply must not change
+that chip. Apply a category to an uncategorized report filter, then change or
+clear an exact category: both must load without validation errors. Choose
+**Show all kinds and subcategories** and verify the chip disappears while the
+visible period and exclusion filters remain unchanged, including in CSV export.
+Chart rendering/tooltips and navigation remain manual checks. Temporary SQLite application-API tests cover
+dashboard/breakdown agreement, splits, exclusions, exact net/change rounding,
+date-based conversion, missing/stale rates, top-five shares, and calendar
+rollover.
+
+## Reports
+
+Use the shared view selector for **Expenses by category**, **Monthly trend**,
+**Spending pace**, and **Cash flow**. Breakdown, trend, and cash flow retain the
+same applied date range when switching views. Pace uses its fixed month-to-date
+comparison and hides the date-range controls.
+
+- **Reports** defaults to this month and also offers last month, this year, the
+  rolling last 12 months, and an inclusive custom range. Custom dates cannot be
+  before 1900-01-01 or span more than 100 years.
+- The category breakdown uses ordinary expense transaction lines only. Income,
+  transfers, balance adjustments, and excluded transactions do not count; split
+  parts use their own categories and uncategorized lines remain explicit.
+- Converted category totals use the profile base currency and exact cached-rate
+  conversion, rounding once per displayed total. Missing rates remain in an
+  unconverted bucket per currency, and provisional cached rates are marked.
+- Switch between pie and bar charts. Choose a main category to see its direct
+  lines and subcategories, then open Transactions with that category and the
+  inclusive report range applied.
+- **Spending pace** is a separate view, independent of the report date-range
+  filter. It compares expenses from the first of this month through today with
+  the average of the previous three calendar months, each cut at today’s day of
+  month and clamped to that month’s length. Empty months still count in the
+  three-month average. The query uses the application clock.
+- Total and main-category comparisons show this month, the exact three-month
+  average, and ahead/behind by amount and percentage. Uncategorized and
+  historical-only categories stay visible. The average and difference are
+  computed from exact converted amounts and rounded once; percentages use the
+  exact average, not its rounded display value. A zero average has no percentage
+  baseline. Ahead/behind is determined before rounding, so a tiny difference can
+  display as zero while its percentage remains nonzero.
+- The pace chart compares current spending with the average using theme tokens.
+  Affected months retain explicit unconverted currency buckets and make the
+  comparison partial; provisional rates remain flagged. **Refresh pace** reloads
+  the comparison, and background exchange-rate updates refresh it automatically.
+
+- **Monthly trend** shows expenses and incomes as bars with a net line and a
+  month-by-month table, in base currency, for the same report date range. Empty
+  months stay visible as zero. Partial first/last months count only in-range days
+  and show their covered dates. Each month's expense, income, and net totals keep
+  their own explicit unconverted currency amounts and provisional-rate markers.
+  Net is converted and rounded independently from exact income minus expense
+  lines, not calculated by subtracting rounded display totals.
+
+- Choose **Cash flow** to draw income main categories (including uncategorized
+  income) through **Income** to expense main categories. A **From savings / deficit**
+  source or **Saved / surplus** sink balances unequal flows. These are balancing
+  amounts for the selected range, not account balances or actual savings transfers.
+- Cash-flow data comes from the profile application query. Each category converts
+  exactly and rounds once to base-currency hundredths; links reuse that value.
+  The central node and balancing amount sum those rounded flows, so they can differ
+  slightly from a whole-period aggregate rounded once. Unconverted income and
+  expenses remain separate by currency and never enter the diagram.
+
+### Manual Spending pace chart check
+
+Run `npm run dev` with synthetic HUF/CHF expenses across this month and the prior
+three months. In Reports, check pie/bar category drill-down and custom ranges,
+then switch to **Spending pace**. Verify its current-month dates stay independent
+of the category range. Check total and main-category current/average amounts,
+ahead/behind amount and percent, split parts, uncategorized lines, categories
+used only in earlier months, empty months, and zero baselines. Include expenses
+at both window endpoints and just after the same day in earlier months; check
+31st-day comparisons include February’s last day and 30-day months’ last day.
+Include excluded expenses, income, transfers, and adjustments and verify they
+never inflate pace. Test an offline/missing-rate month: its currency bucket must
+be visible, the total/category comparison marked partial, and cached provisional
+rates flagged. Refresh rates and pace and verify the numbers update. Repeat in
+HU/EN/DE, light/dark themes, and with keyboard navigation; check bar labels,
+tooltip currency formatting/contrast, and narrow-window table scrolling. Charts
+remain manual checks; temporary SQLite profile-application tests cover the pace
+query, injected clock, leap/non-leap clamping, grouping/exclusions, and exact
+conversion/rounding.
+
+### Manual Monthly trend chart check
+
+Run `npm run dev` with synthetic HUF/CHF expenses and income over several months,
+including an empty month, split categories, uncategorized lines, excluded
+transactions, transfers with included/excluded fees, and balance adjustments.
+In **Reports**, check both category charts and their drill-down, then switch to
+**Monthly trend**. Verify expense/income bars, the positive/negative net line,
+legend, tooltips, and table agree with the known amounts. Try every preset and a
+custom range starting/ending mid-month, a single day, year rollover, and leap
+February; only in-range days count and partial labels show the covered dates.
+Check zeros in empty months, separate missing-rate amounts in each month's
+expense/income/net cells (not plotted as converted values), and provisional-rate
+markers when using stale cached rates. Switch base currency and repeat in HU/EN/DE
+and light/dark themes; confirm localized month/money labels, themed axes/series/
+tooltips, horizontal scrolling for long ranges, keyboard range/tab controls, and
+loading/error states. Chart rendering remains a manual check; application-API
+SQLite tests cover the aggregation and translation completeness is automated.
+
+### Manual Cash-flow chart check
+
+Run `npm run dev` with synthetic HUF and CHF accounts, income and expense main
+categories/subcategories, split parts, uncategorized lines, excluded transactions,
+transfers (with and without ordinary fees), and balance adjustments. Repeat in
+HU/EN/DE and light/dark themes. Apply every preset and an inclusive custom range;
+verify the category pie/bar charts, drill-down and Transactions link still work.
+Switch to **Cash flow** and verify the same applied range is retained. Check equal
+income/expense, surplus, deficit, income-only, expense-only, empty and missing-rate-only
+ranges: categories flow through Income and the balancing source/sink appears only
+when needed. Check both kinds of uncategorized group, split parts grouped by their
+own main category, archived category history, and exclusions. Only ordinary transfer
+fees count, never transfer legs or balance adjustments.
+
+Hover nodes and links and check locale-formatted base-currency tooltips, translated
+seeded/balancing labels, preserved custom names, readable theme colors, and the
+text table (including full long names). Resize the window and check horizontal
+scrolling without clipped chart controls. Change base currency and verify dated
+conversion and previous-published-day fallback. With missing or stale cached rates,
+verify separate unconverted income/expense amounts and the provisional indicator;
+neither bucket enters the diagram. Use small fractional conversions to check links
+match rounded category values and central inflow equals outflow; the rounding note
+explains differences from whole-period totals. Check loading/error/empty messages,
+keyboard navigation of view/range controls, and switching views/languages while a
+query is pending. Charts remain manual checks; temporary SQLite application-API
+tests cover cash-flow values, balancing, exclusions, splits, cached conversion,
+missing buckets, staleness, range validation and empty data.
 
 ## Accounts
 
@@ -538,6 +754,53 @@ and light/dark themes.
   first page plus all aggregates with a generous 500 ms local bound, arranging
   the fixture through application commands in one outer transaction.
 
+### CSV export
+
+**Transactions → Export CSV**, beside **Apply filters**, exports the currently
+applied filters (not unsubmitted filter edits) across every page. The small
+export dialog defaults to the profile language's decimal separator and offers a
+dot/comma override. **Save CSV** opens a native save dialog with a dated default
+filename. Cancelling does not write a file; write failures remain visible in the
+export dialog. Export is a read-only query and does not change Undo history.
+
+The UTF-8 file includes a BOM for Excel and uses CRLF records with RFC 4180
+quoting. HU/DE use comma decimals and semicolon-separated fields; EN uses dot
+decimals and comma-separated fields. An override changes both separators but
+keeps headers, kinds, yes/no values, and default category names in the profile
+language. Amounts use exact signed integer hundredths in both HUF and CHF,
+always with two decimals and no thousands grouping; no currency conversion is
+performed.
+
+Columns are date (ISO YYYY-MM-DD), account, kind, payee, main category,
+subcategory, amount, currency, note, tags, and excluded. Matching expenses and
+income produce one row per line, including every part of a matching split;
+parts share the transaction date/account/payee. Uncategorized lines have empty
+category cells. Notes prefer the line note, falling back to the transaction note;
+tags are comma-separated inside one cell. Excluded transactions follow the
+applied exclusion filter. Transfers and balance adjustments are never exported,
+but their ordinary linked fee expenses are. Text cells beginning with `=`, `+`,
+`-`, `@`, tab, or CR receive a leading single quote to prevent spreadsheet formula
+injection; signed numeric amount cells never receive that prefix.
+
+### Manual CSV export check
+
+Run `npm run dev` with synthetic data, then repeat in HU/EN/DE and light/dark
+appearance. Combine period, account, main/subcategory, payee, tag, search, and
+exclusion filters; apply them, change an unapplied filter, and verify export still
+uses the applied set across all pages. Include a split with different categories,
+notes, and tags, excluded expenses/income, uncategorized lines, transfers with
+fees, and balance adjustments. Verify one row per split part and no transfer or
+adjustment rows, while ordinary fee expenses remain. Check the dated filename,
+export-dialog Tab/Shift+Tab focus trapping, Esc/cancel focus restoration, native
+save cancellation (no success message), overwrite confirmation, and a failed
+write (translated error, no success message). Export using both decimal choices
+and open the files in Excel: verify delimiters, negative expenses, positive
+income, two decimals including HUF, `őűäöüß`, multiline/quoted notes, and text
+starting with formula characters remaining text. Verify export leaves Ctrl+Z
+available for the previous command. Native dialogs and Excel behavior remain
+manual checks; temporary SQLite application-API tests cover the CSV contents,
+filters, paging bypass, validation, exact money, and unchanged undo history.
+
 ### Duplicate and transaction templates
 
 - **Duplicate transaction** in an expense/income row or its edit drawer immediately
@@ -639,6 +902,57 @@ indicator and check each part. Apply each part's category and tag filters in
 turn: the transaction remains one list row while filtered and daily totals show
 only the matching part. Mark the transaction Excluded and verify every part is
 omitted from totals. Edit/delete/undo and repeat in HU/EN/DE.
+
+### Privacy mode
+
+The shell header's **Privacy mode** eye/eye-off button, or **Ctrl+Shift+H**, hides
+all monetary values. The shortcut also works while typing and inside dialogs;
+plain H, Ctrl+H, text Undo, and other editing keys are unchanged. The translated
+keyboard cheat sheet lists it. The choice is saved independently in each
+profile (append-only migration 18), survives reopening, and is presentation-only:
+toggling it neither creates an Undo entry nor clears existing Undo history.
+Other settings changes, including a write mixed with privacy, still clear history.
+A failed toggle shows the translated settings error and keeps the saved state.
+
+Read-only values use the shared amount component: CSS blur, no text selection,
+and an accessible **Hidden amount** replacement instead of exposing the value
+to screen readers. Chart ticks, tooltips, SVG titles and other string-only
+previews use **•••**, not SVG blur. Percentages and transfer exchange rates are
+hidden too. Amount inputs (including calculator expressions, rule bounds and
+template amounts) are readable **only while focused** so editing remains usable;
+unfocused inputs are blurred password fields, and result previews stay hidden.
+Privacy is a screen-sharing aid, not encryption: underlying data and CSV exports
+are unchanged. Text written in notes/names is not scanned for amounts. Category
+names, dates and transaction counts outside charts remain visible. Entire chart
+areas, including their category labels, are blurred so bar lengths, slice sizes
+and Sankey widths cannot be read.
+
+### Manual Privacy mode check
+
+Run `npm run dev` with synthetic HUF and CHF accounts, income/expenses, splits,
+transfers, adjustments, templates and amount-bound rules, including cached and
+missing exchange rates. Turn privacy on with the button and Ctrl+Shift+H: verify
+**no readable amount anywhere** across Overview, Accounts, Transactions, Settings,
+and every Reports view (breakdown pie/bar, monthly trend, spending pace and
+cash-flow). Verify chart areas are blurred so bar lengths, pie slice sizes and
+Sankey widths are unreadable. Check filtered/day/base-currency totals and unconverted parts,
+opening/current balances, split parts/remainder, transfer rates, drawer previews,
+rule bounds, template fields, CSV-dialog decimal preview, and toasts. Hover chart
+points/bars/pie slices/Sankey nodes and check tooltips, axis ticks, SVG titles,
+labels and table hover titles. Check keyboard chart navigation as well. Verify
+screen readers announce Hidden amount (never a read-only value), selecting or
+copying blurred values is blocked, and hovering never reveals them.
+
+Focus an amount field: only that editable value becomes readable; Tab away and
+verify it hides immediately while its calculator preview stays hidden. Try the
+shortcut in amount/payee/note/search inputs, every drawer/dialog and shortcut
+help; it must not alter the draft or steal text Undo. Toggle after a ledger write
+and verify the Undo toast and Ctrl+Z still undo that write. Switch profiles,
+restart and restore a backup to verify each profile's saved state; toggle off
+and check exact original formatting. Repeat **every page/report in HU/EN/DE,
+light/dark**. This is a visual/accessibility check, not a data-security guarantee.
+Automated API tests cover persistence, isolation, reopen, validation and Undo;
+pure tests cover private formatting and shortcut matching.
 
 ### Keyboard-first transaction entry
 
@@ -891,7 +1205,7 @@ replacement validation, isolation, migration, and persistence.
 
 ### Manual shell check
 
-Run `npm run dev`, navigate all four pages, and collapse/expand the sidebar.
+Run `npm run dev`, navigate all five pages, and collapse/expand the sidebar.
 In Settings, select each language and verify labels and formatting change live.
 Select HUF and CHF as the base currency. Create a second profile with a different
 language, theme, and base currency; switch between the profiles and restart the

@@ -10,6 +10,7 @@ import { registerCategoryIpc } from './profiles/category-ipc'
 import { registerAccountIpc } from './profiles/account-ipc'
 import { registerProfileIpc } from './profiles/profile-ipc'
 import { registerTransactionIpc } from './profiles/transaction-ipc'
+import { registerTransactionCsvIpc } from './profiles/transaction-csv-ipc'
 import { registerUndoIpc } from './profiles/undo-ipc'
 import { registerTemplateIpc } from './profiles/template-ipc'
 import { registerTagIpc } from './profiles/tag-ipc'
@@ -19,6 +20,13 @@ import { registerBalanceAdjustmentIpc } from './profiles/adjustment-ipc'
 import { ProfileRegistry } from './profiles/profile-registry'
 import { registerIpcHandler } from './ipc'
 import { registerCategorisationRuleIpc } from './profiles/rule-ipc'
+import { registerExchangeRateIpc } from './profiles/exchange-rate-ipc'
+import {
+  createElectronNetTransport,
+  MnbExchangeRateSource,
+} from './exchange-rates/mnb-source'
+import { ExchangeRateScheduler } from './exchange-rates/exchange-rate-scheduler'
+import { registerReportIpc } from './profiles/report-ipc'
 
 const APP_ID = 'com.finymark.financial-tracker'
 const APP_NAME = 'Financial Tracker'
@@ -80,20 +88,40 @@ void app.whenReady().then(() => {
     smokeTest()
     return
   }
+  let window: BrowserWindow | null = null
+  const rateSource = new MnbExchangeRateSource(createElectronNetTransport())
+  const onRateStatusChanged = () => {
+    if (window && !window.isDestroyed())
+      window.webContents.send(IPC_CHANNELS.ratesStatusChanged)
+  }
   const profiles = new ProfileController(
     new ProfileRegistry({ userDataDirectory: app.getPath('userData') }),
     app.getLocale(),
+    { exchangeRateSource: rateSource, onRateStatusChanged },
   )
+  const exchangeRates = new ExchangeRateScheduler(profiles, rateSource, {
+    onStatusChanged: onRateStatusChanged,
+  })
+  exchangeRates.start()
 
   registerIpcHandler(
     ipcMain,
     IPC_CHANNELS.getVersion,
     (): Awaited<ReturnType<AppBridge['getVersion']>> => app.getVersion(),
   )
-  registerProfileIpc(ipcMain, profiles)
+  registerProfileIpc(
+    ipcMain,
+    profiles,
+    () => {
+      exchangeRates.start()
+      void exchangeRates.refreshActive()
+    },
+    () => exchangeRates.stop(),
+  )
   registerAccountIpc(ipcMain, profiles)
   registerCategoryIpc(ipcMain, profiles)
   registerTransactionIpc(ipcMain, profiles)
+  registerTransactionCsvIpc(ipcMain, profiles)
   registerPayeeIpc(ipcMain, profiles)
   registerTransferIpc(ipcMain, profiles)
   registerBalanceAdjustmentIpc(ipcMain, profiles)
@@ -101,10 +129,13 @@ void app.whenReady().then(() => {
   registerTagIpc(ipcMain, profiles)
   registerCategorisationRuleIpc(ipcMain, profiles)
   registerTemplateIpc(ipcMain, profiles)
+  registerExchangeRateIpc(ipcMain, profiles)
+  registerReportIpc(ipcMain, profiles)
 
   let shutdownPromise: Promise<void> | null = null
   let shutdownComplete = false
   function shutdown(): Promise<void> {
+    exchangeRates.stop()
     shutdownPromise ??= profiles.shutdown().then(() => {
       shutdownComplete = true
     })
@@ -115,11 +146,13 @@ void app.whenReady().then(() => {
     event.preventDefault()
     void shutdown().then(() => app.quit())
   })
-  const window = createWindow()
+  window = createWindow()
   registerUpdates(ipcMain, window, app.isPackaged, shutdown, async () => {
     shutdownPromise = null
     shutdownComplete = false
     await profiles.recoverFromFailedShutdown()
+    exchangeRates.start()
+    void exchangeRates.refreshActive()
   })
 })
 

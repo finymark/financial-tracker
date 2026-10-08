@@ -1,7 +1,13 @@
+import { csvMessages } from '../../../shared/csv-translations'
 import { categoryNames } from '../../../shared/category-translations'
 import type { MessageCatalog } from './en'
 
 export const de = {
+  'privacy.toggle': 'Privatmodus',
+  'privacy.hiddenAmount': 'Verborgener Betrag',
+  'privacy.shortcutScope':
+    'Der Privatmodus funktioniert überall, auch beim Tippen (Ctrl+Shift+H).',
+
   'shortcuts.closeHelp': 'Tastaturhilfe schließen',
   'transactions.saveAndAddAnother': 'Speichern und weitere hinzufügen',
   'shortcuts.scope':
@@ -19,6 +25,19 @@ export const de = {
     'Speichern und weitere hinzufügen (Datum, Konten und Typ behalten)',
   'shortcuts.newTransaction': 'Neue Transaktion (außerhalb von Eingabefeldern)',
   ...categoryNames.de,
+  ...csvMessages.de,
+  'csv.description':
+    'Alle Transaktionen mit den angewendeten Filtern exportieren, nicht nur diese Seite. Jeder Split-Teil erhält eine eigene Zeile. Umbuchungen und Saldoanpassungen werden nicht exportiert.',
+  'csv.decimalSeparator': 'Dezimaltrennzeichen',
+  'csv.profileDefault': 'Standard der Profilsprache',
+  'csv.dot': 'Punkt (123.45) · kommagetrennte Felder',
+  'csv.comma': 'Komma (123,45) · semikolongetrennte Felder',
+  'csv.saving': 'CSV wird gespeichert…',
+  'csv.saved': 'CSV gespeichert.',
+  'csv.error':
+    'Die CSV konnte nicht gespeichert werden. Bitte erneut versuchen.',
+  'csv.error.separator': 'Punkt oder Komma als Dezimaltrennzeichen wählen.',
+
   'rules.title': 'Kategorisierungsregeln',
   'rules.description':
     'Regeln werden der Reihe nach geprüft. Die erste passende Regel gewinnt und kann Zahlungspartner, Kategorie und Tags vor den zuletzt verwendeten Werten ausfüllen.',
@@ -143,9 +162,14 @@ export const de = {
     'Neustart für das Update fehlgeschlagen. Bitte versuchen Sie es erneut.',
   'app.name': 'Financial Tracker',
   'app.tagline': 'Deine Finanzen auf deinem PC.',
+  'rates.status.upToDate': 'Wechselkurse sind aktuell',
+  'rates.status.stale': 'Wechselkurse sind veraltet',
+  'rates.status.missing': 'Ein Wechselkurs fehlt',
+  'rates.status.lastRefresh': 'Letzte Aktualisierung',
   'navigation.label': 'Hauptnavigation',
   'navigation.overview': 'Übersicht',
   'navigation.transactions': 'Transaktionen',
+  'navigation.reports': 'Berichte',
   'navigation.accounts': 'Konten',
   'navigation.settings': 'Einstellungen',
   'sidebar.collapse': 'Seitenleiste einklappen',
@@ -192,7 +216,103 @@ export const de = {
     'Die Profildatenbank stimmt nicht mit dem ausgewählten Profil überein.',
   'overview.title': 'Deine Finanzen im Überblick',
   'overview.description':
-    'Eine zusammengefasste Finanzübersicht wird später hier verfügbar sein.',
+    'Dieser Monat bis heute im Vergleich zum vollständigen letzten Monat, in Ihrer Basiswährung.',
+  'overview.error': 'Die Übersicht konnte nicht geladen werden.',
+  'overview.expenses': 'Ausgaben',
+  'overview.incomes': 'Einnahmen',
+  'overview.net': 'Saldo',
+  'overview.thisMonthToDate': 'Dieser Monat bis heute',
+  'overview.fullLastMonth': 'Vollständiger letzter Monat',
+  'overview.change': 'Änderung zum letzten Monat',
+  'overview.topCategories': 'Top 5 Ausgabenkategorien dieses Monats',
+  'overview.transactions': 'Transaktionen anzeigen',
+  'overview.reports': 'Berichte anzeigen',
+  'overview.chartLabel': 'Die fünf größten Ausgabenkategorien dieses Monats',
+  'overview.shareHint':
+    'Anteile beziehen sich auf umgerechnete Ausgaben aller Kategorien, nicht nur der ersten fünf. Nicht umgerechnete Beträge werden separat angezeigt und sind nicht in den Anteilen enthalten.',
+  'reports.trend.title': 'Monatlicher Trend',
+  'reports.trend.description':
+    'Ausgaben, Einnahmen und Saldo in der Basiswährung.',
+  'reports.trend.partial': 'Teilmonat',
+  'reports.trend.partialHint':
+    'Teilmonate enthalten nur Tage innerhalb des gewählten Zeitraums.',
+  'reports.trend.unconvertedHint':
+    'Beträge ohne Wechselkurs fehlen im Diagramm. Die Tabelle zeigt sie für jeden Monat separat.',
+  'reports.trend.chartLabel':
+    'Monatliche Ausgaben und Einnahmen mit Saldolinie',
+  'reports.trend.month': 'Monat',
+  'reports.trend.expenses': 'Ausgaben',
+  'reports.trend.incomes': 'Einnahmen',
+  'reports.trend.net': 'Saldo',
+  'reports.pace.title': 'Ausgabentempo',
+  'reports.pace.description':
+    'Bisherige Ausgaben dieses Monats im Vergleich zum Durchschnitt der drei vorherigen Kalendermonate bis zum gleichen Tag, begrenzt auf die jeweilige Monatslänge.',
+  'reports.pace.current': 'Dieser Monat bisher',
+  'reports.pace.average': 'Dreimonatsdurchschnitt',
+  'reports.pace.difference': 'Im Vergleich zu den üblichen Ausgaben',
+  'reports.pace.ahead': 'Voraus',
+  'reports.pace.behind': 'Zurück',
+  'reports.pace.onPace': 'Im üblichen Tempo',
+  'reports.pace.noBaseline': 'Keine Basis für einen Prozentsatz',
+  'reports.pace.partial':
+    'Teilweiser Vergleich: Einige Beträge konnten nicht umgerechnet werden. Die betroffenen Monate stehen unten.',
+  'reports.pace.months': 'Vergleichsmonate',
+  'reports.pace.refresh': 'Tempo aktualisieren',
+  'reports.pace.chartLabel':
+    'Bisherige Monatsausgaben im Vergleich zum Dreimonatsdurchschnitt',
+  'reports.title': 'Ausgaben nach Kategorie',
+  'reports.description':
+    'Vergleichen Sie Kategoriesummen in Ihrer Basiswährung und öffnen Sie die zugehörigen Transaktionen.',
+  'reports.heading': 'Berichte in Ihrer Basiswährung',
+  'reports.introduction':
+    'Kategorien, monatliche Trends und Geldflüsse für den gewählten Zeitraum erkunden oder das Ausgabentempo dieses Monats vergleichen.',
+  'reports.view': 'Berichtsansicht',
+  'reports.cashFlow.title': 'Geldfluss',
+  'reports.cashFlow.income': 'Einnahmen',
+  'reports.cashFlow.expense': 'Ausgaben',
+  'reports.cashFlow.uncategorizedIncome': 'Nicht kategorisierte Einnahmen',
+  'reports.cashFlow.uncategorizedExpense': 'Nicht kategorisierte Ausgaben',
+  'reports.cashFlow.deficit': 'Aus Ersparnissen / Defizit',
+  'reports.cashFlow.surplus': 'Gespart / Überschuss',
+  'reports.cashFlow.empty':
+    'Keine umgerechneten Einnahmen oder Ausgaben in diesem Zeitraum.',
+  'reports.cashFlow.description':
+    'Einnahmenkategorien fließen über Einnahmen zu Ausgabenkategorien. Ersparnisse gleichen die umgerechneten Flüsse aus; nicht umgerechnete Beträge bleiben separat.',
+  'reports.cashFlow.rounding':
+    'Die Flüsse verwenden gerundete Kategoriesummen; ihre Summe kann leicht vom einmal gerundeten Gesamtbetrag des Zeitraums abweichen.',
+  'reports.dateRange': 'Berichtszeitraum',
+  'reports.period.thisMonth': 'Dieser Monat',
+  'reports.period.lastMonth': 'Letzter Monat',
+  'reports.period.thisYear': 'Dieses Jahr',
+  'reports.period.last12Months': 'Letzte 12 Monate',
+  'reports.period.custom': 'Benutzerdefinierter Zeitraum',
+  'reports.apply': 'Zeitraum anwenden',
+  'reports.loading': 'Bericht wird geladen…',
+  'reports.error':
+    'Der Bericht konnte nicht geladen werden. Bitte erneut versuchen.',
+  'reports.error.range':
+    'Geben Sie einen gültigen Zeitraum ab dem 01.01.1900 ein, der höchstens 100 Jahre umfasst.',
+  'reports.total': 'Gesamtausgaben',
+  'reports.provisional': 'vorläufige Kurse',
+  'reports.chartType': 'Diagrammtyp',
+  'reports.pie': 'Kreis',
+  'reports.bar': 'Balken',
+  'reports.unconverted': 'Nicht umgerechnet',
+  'reports.empty': 'Keine einbezogenen Ausgaben in diesem Zeitraum.',
+  'reports.chartLabel': 'Diagramm der Ausgabenkategorien',
+  'reports.categories': 'Hauptkategorien',
+  'reports.subcategories': 'Unterkategorien',
+  'reports.amount': 'Betrag',
+  'reports.share': 'Anteil',
+  'reports.uncategorized': 'Nicht kategorisiert',
+  'reports.back': 'Zurück zu den Hauptkategorien',
+  'reports.drillHint':
+    'Wählen Sie eine Hauptkategorie und dann eine Unterkategorie, um deren Transaktionen zu öffnen.',
+  'reports.transactionFilter': 'Aus Bericht:',
+  'reports.transactionFilter.expense': 'nur Ausgaben',
+  'reports.transactionFilter.income': 'nur Einnahmen',
+  'reports.transactionFilter.exactCategory': 'ohne Unterkategorien',
+  'reports.transactionFilter.clear': 'Alle Arten und Unterkategorien anzeigen',
   'transactions.title': 'Deine Transaktionen an einem Ort',
   'transactions.description':
     'Erfasse Ausgaben, Einnahmen und Umbuchungen, damit deine Kontosalden aktuell bleiben.',
@@ -243,6 +363,9 @@ export const de = {
   'transactions.search': 'Zahlungspartner oder Notiz',
   'transactions.applyFilters': 'Filter anwenden',
   'transactions.filteredTotals': 'Gefilterte Summen',
+  'transactions.baseTotal': 'Summe in Basiswährung',
+  'transactions.unconverted': 'Nicht umgerechnet',
+  'transactions.provisional': 'vorläufig',
   'transactions.matches': 'Transaktionen',
   'transactions.noMatches': 'Keine Transaktionen entsprechen diesen Filtern.',
   'transactions.previousPage': 'Vorherige Seite',

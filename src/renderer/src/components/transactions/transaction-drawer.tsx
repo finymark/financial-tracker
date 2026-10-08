@@ -478,7 +478,8 @@ export function TransactionDrawer({
                 scope: 'drawer',
                 ...shortcutTargetContext(event.target),
               })
-              if (!action) return
+              // The shell owns the global privacy toggle, even while typing.
+              if (!action || action === 'privacy') return
               if (
                 action !== 'close' &&
                 (templateEditor ||

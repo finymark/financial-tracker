@@ -1,10 +1,11 @@
+import { useAmountFormatters } from '../../lib/privacy'
 import { tagKey } from '../../../../shared/text-keys'
 import type { AccountOption } from '../../../../shared/accounts'
 import type { Category } from '../../../../shared/categories'
 import type { Tag } from '../../../../shared/tags'
 import { parseAmountExpression } from '../../../../shared/amount-expression'
 import { X } from 'lucide-react'
-import { createFormatters, type Language, type MessageKey } from '../../i18n'
+import { type Language, type MessageKey } from '../../i18n'
 import { AmountInput } from '../amount-input'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -36,6 +37,7 @@ export function SplitEditor({
   t,
   autofillProtectedRef,
 }: SplitEditorProps) {
+  const format = useAmountFormatters(language)
   function addSplitTag(key: string) {
     if (!form.splitLines) return
     const line = form.splitLines.find((candidate) => candidate.key === key)
@@ -142,10 +144,7 @@ export function SplitEditor({
               {t('splits.remaining')}:{' '}
               {splitRemaining === null || !selectedAccount
                 ? '—'
-                : createFormatters(language).money(
-                    splitRemaining,
-                    selectedAccount.currency,
-                  )}
+                : format.amount(splitRemaining, selectedAccount.currency)}
             </span>
           </>
         )}

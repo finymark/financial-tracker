@@ -4,6 +4,7 @@ import type { Tag } from './tags'
 import type { Transfer } from './transfers'
 export type { Payee } from './payees'
 import type { BalanceAdjustment } from './adjustments'
+import type { BaseCurrencyTransactionTotals } from './exchange-rates'
 
 export type TransactionKind = CategoryKind
 
@@ -83,6 +84,11 @@ export interface TransactionListInput {
   to?: string
   accountId?: string
   categoryId?: string
+  /** Matches only categoryId itself instead of including its subcategories. */
+  exactCategory?: boolean
+  /** Matches lines without a category; cannot be combined with categoryId. */
+  uncategorized?: boolean
+  kind?: TransactionKind
   payeeId?: string
   tagId?: string
   search?: string
@@ -108,4 +114,5 @@ export interface TransactionPage {
   // and always omit excluded amounts.
   totals: TransactionTotals[]
   days: TransactionDayTotals[]
+  baseTotals: BaseCurrencyTransactionTotals
 }

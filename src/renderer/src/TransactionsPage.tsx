@@ -1,3 +1,4 @@
+import { reportFlagsForCategory } from './lib/transaction-report-filter'
 import type { Currency } from '../../shared/accounts'
 import type { CreateCategorisationRuleInput } from '../../shared/rules'
 import { CreateRuleDialog } from './components/create-rule-dialog'
@@ -16,9 +17,14 @@ import { CardContent } from './components/ui/card'
 import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
 import type { Language, MessageKey } from './i18n'
-import { TransactionTable, Totals } from './components/transaction-table'
+import {
+  BaseCurrencyTotals,
+  TransactionTable,
+  Totals,
+} from './components/transaction-table'
 import { TransactionDrawer } from './components/transactions/transaction-drawer'
 import { TagManager } from './components/transactions/tag-manager'
+import { ExportCsvDialog } from './components/transactions/export-csv-dialog'
 import {
   emptyForm,
   emptyAdjustmentForm,
@@ -35,6 +41,7 @@ interface TransactionsPageProps {
   newTransactionRequested: boolean
   onNewTransactionHandled(): void
   onTransactionChanged(): void
+  initialReportFilter: TransactionListInput | null
 }
 
 export function TransactionsPage({
@@ -45,28 +52,46 @@ export function TransactionsPage({
   newTransactionRequested,
   onNewTransactionHandled,
   onTransactionChanged,
+  initialReportFilter,
 }: TransactionsPageProps) {
+  const [reportFilterActive, setReportFilterActive] = useState(
+    Boolean(
+      initialReportFilter?.kind ||
+      initialReportFilter?.uncategorized ||
+      initialReportFilter?.exactCategory,
+    ),
+  )
   const [page, setPage] = useState<TransactionPage>({
     rows: [],
     totals: [],
     days: [],
     totalCount: 0,
+    baseTotals: {
+      currency: baseCurrency,
+      expenseMinor: 0,
+      incomeMinor: 0,
+      unconverted: [],
+      stale: false,
+    },
   })
-  const [request, setRequest] = useState<TransactionListInput>({
-    period: 'all',
-    limit: 200,
-    offset: 0,
-  })
+  const [request, setRequest] = useState<TransactionListInput>(
+    initialReportFilter ?? {
+      period: 'all',
+      limit: 200,
+      offset: 0,
+    },
+  )
   const [filters, setFilters] = useState({
-    period: 'all' as TransactionPeriod,
-    from: '',
-    to: '',
-    accountId: '',
-    categoryId: '',
-    payeeId: '',
-    tagId: '',
-    search: '',
-    exclusion: 'all' as TransactionExclusionFilter,
+    period: (initialReportFilter?.period ?? 'all') as TransactionPeriod,
+    from: initialReportFilter?.from ?? '',
+    to: initialReportFilter?.to ?? '',
+    accountId: initialReportFilter?.accountId ?? '',
+    categoryId: initialReportFilter?.categoryId ?? '',
+    payeeId: initialReportFilter?.payeeId ?? '',
+    tagId: initialReportFilter?.tagId ?? '',
+    search: initialReportFilter?.search ?? '',
+    exclusion: (initialReportFilter?.exclusion ??
+      'all') as TransactionExclusionFilter,
   })
   const [revision, setRevision] = useState(0)
   const references = useTransactionReferenceData(
@@ -104,6 +129,9 @@ export function TransactionsPage({
   }
   const [form, setForm] = useState<DrawerForm | null>(null)
   const createRef = useRef<HTMLButtonElement>(null)
+  const exportRef = useRef<HTMLButtonElement>(null)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [csvSaved, setCsvSaved] = useState(false)
   const [deleting, setDeleting] = useState<
     Transaction | Transfer | BalanceAdjustment | null
   >(null)
@@ -149,6 +177,16 @@ export function TransactionsPage({
   }, [request, revision, language, undoRevision, pageKey])
   function applyFilters(event: FormEvent) {
     event.preventDefault()
+    const reportFlags = reportFilterActive
+      ? reportFlagsForCategory(request, filters.categoryId)
+      : {}
+    setReportFilterActive(
+      Boolean(
+        reportFlags.kind ||
+        reportFlags.uncategorized ||
+        reportFlags.exactCategory,
+      ),
+    )
     setRequest({
       period: filters.period,
       ...(filters.period === 'custom'
@@ -160,8 +198,35 @@ export function TransactionsPage({
       tagId: filters.tagId || undefined,
       search: filters.search,
       exclusion: filters.exclusion,
+      ...reportFlags,
       limit: 200,
       offset: 0,
+    })
+  }
+
+  const reportFilterParts = reportFilterActive
+    ? [
+        request.uncategorized
+          ? t('reports.uncategorized')
+          : request.categoryId
+            ? categories.find((category) => category.id === request.categoryId)
+                ?.name
+            : null,
+        request.exactCategory
+          ? t('reports.transactionFilter.exactCategory')
+          : null,
+        request.kind ? t(`reports.transactionFilter.${request.kind}`) : null,
+      ].filter((part): part is string => Boolean(part))
+    : []
+
+  function clearReportFlags() {
+    setReportFilterActive(false)
+    setRequest((current) => {
+      const next = { ...current }
+      delete next.kind
+      delete next.uncategorized
+      delete next.exactCategory
+      return { ...next, offset: 0 }
     })
   }
 
@@ -245,6 +310,21 @@ export function TransactionsPage({
         className="grid gap-3 rounded-md border p-3 sm:grid-cols-3 lg:grid-cols-6"
         aria-label={t('transactions.filters')}
       >
+        {reportFilterActive && (
+          <div className="flex items-center gap-2 self-end text-xs text-muted-foreground sm:col-span-3 lg:col-span-6">
+            <span className="rounded-full border bg-muted px-3 py-1">
+              {t('reports.transactionFilter')} {reportFilterParts.join(', ')}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={clearReportFlags}
+              aria-label={t('reports.transactionFilter.clear')}
+            >
+              {t('reports.transactionFilter.clear')}
+            </Button>
+          </div>
+        )}
         <label className="space-y-1 text-xs font-medium">
           {t('transactions.period')}
           <NativeSelect
@@ -390,7 +470,38 @@ export function TransactionsPage({
         <Button type="submit" disabled={busy || loading} className="self-end">
           {t('transactions.applyFilters')}
         </Button>
+        <Button
+          ref={exportRef}
+          type="button"
+          variant="ghost"
+          disabled={busy || loading}
+          className="self-end"
+          onClick={() => {
+            setCsvSaved(false)
+            setExportOpen(true)
+          }}
+        >
+          {t('csv.export')}
+        </Button>
       </form>
+      {csvSaved && (
+        <p role="status" className="text-sm text-muted-foreground">
+          {t('csv.saved')}
+        </p>
+      )}
+      {exportOpen && (
+        <ExportCsvDialog
+          input={request}
+          language={language}
+          t={t}
+          exportRef={exportRef}
+          onClose={() => setExportOpen(false)}
+          onSaved={() => {
+            setCsvSaved(true)
+            setExportOpen(false)
+          }}
+        />
+      )}
       {loading ? (
         <p role="status" className="text-sm text-muted-foreground">
           {t('transactions.loading')}
@@ -406,7 +517,14 @@ export function TransactionsPage({
                 {t('transactions.filteredTotals')} · {page.totalCount}{' '}
                 {t('transactions.matches')}
               </span>
-              <Totals totals={page.totals} language={language} t={t} />
+              <span className="inline-flex flex-col items-end gap-1">
+                <Totals totals={page.totals} language={language} t={t} />
+                <BaseCurrencyTotals
+                  totals={page.baseTotals}
+                  language={language}
+                  t={t}
+                />
+              </span>
             </div>
             {page.rows.length === 0 ? (
               <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
