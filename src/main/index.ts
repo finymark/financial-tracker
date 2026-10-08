@@ -35,6 +35,8 @@ import {
 } from './exchange-rates/mnb-source'
 import { ExchangeRateScheduler } from './exchange-rates/exchange-rate-scheduler'
 import { registerReportIpc } from './profiles/report-ipc'
+import { RecurringScheduler } from './recurring-scheduler'
+import { registerRecurringIpc } from './profiles/recurring-ipc'
 import { AppSettingsFile } from './app-settings'
 import { registerDesktopIpc } from './desktop-ipc'
 import { buildTrayMenu, trayLanguage } from './tray-menu'
@@ -156,6 +158,8 @@ function startApplication(): void {
     onStatusChanged: onRateStatusChanged,
   })
   exchangeRates.start()
+  const recurring = new RecurringScheduler(profiles)
+  recurring.start()
 
   const activeLanguage = () =>
     trayLanguage(profiles.getActive()?.settings.language, app.getLocale())
@@ -190,8 +194,12 @@ function startApplication(): void {
     () => {
       exchangeRates.start()
       void exchangeRates.refreshActive()
+      recurring.start()
     },
-    () => exchangeRates.stop(),
+    () => {
+      exchangeRates.stop()
+      recurring.stop()
+    },
     updateTray,
   )
   registerAccountIpc(ipcMain, profiles)
@@ -207,11 +215,13 @@ function startApplication(): void {
   registerTemplateIpc(ipcMain, profiles)
   registerExchangeRateIpc(ipcMain, profiles)
   registerReportIpc(ipcMain, profiles)
+  registerRecurringIpc(ipcMain, profiles)
 
   let shutdownPromise: Promise<void> | null = null
   let shutdownComplete = false
   function shutdown(): Promise<void> {
     exchangeRates.stop()
+    recurring.stop()
     shutdownPromise ??= profiles.shutdown().then(() => {
       shutdownComplete = true
     })
@@ -282,6 +292,7 @@ function startApplication(): void {
       await profiles.recoverFromFailedShutdown()
       exchangeRates.start()
       void exchangeRates.refreshActive()
+      recurring.start()
       updateTray()
     },
   )

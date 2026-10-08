@@ -16,6 +16,14 @@ const bridge: AppBridge = {
         ipcRenderer.removeListener(IPC_CHANNELS.desktopQuickAdd, handler)
     },
   },
+  recurring: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.recurringList),
+    create: (input) => ipcRenderer.invoke(IPC_CHANNELS.recurringCreate, input),
+    update: (input) => ipcRenderer.invoke(IPC_CHANNELS.recurringUpdate, input),
+    pause: (input) => ipcRenderer.invoke(IPC_CHANNELS.recurringPause, input),
+    resume: (input) => ipcRenderer.invoke(IPC_CHANNELS.recurringResume, input),
+    delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.recurringDelete, input),
+  },
   reports: {
     cashFlow: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.reportsCashFlow, input),

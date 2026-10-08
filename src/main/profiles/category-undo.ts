@@ -21,6 +21,8 @@ interface CategoryAggregateImage {
   categories: StoredCategoryImage[]
   lineCategories: { lineId: string; categoryId: string }[]
   templateCategories: { templateId: string; categoryId: string }[]
+  recurringCategories: { recurringId: string; categoryId: string }[]
+  pendingCategories: { pendingId: string; categoryId: string }[]
   rules: CategorisationRulesImage | null
 }
 
@@ -36,6 +38,8 @@ function captureCategories(
       categories: [],
       lineCategories: [],
       templateCategories: [],
+      recurringCategories: [],
+      pendingCategories: [],
       rules: null,
     }
   const categories = database
@@ -74,6 +78,24 @@ function captureCategories(
       FROM transaction_templates WHERE category_id = ? ORDER BY id`,
             )
             .all(scope.id) as { templateId: string; categoryId: string }[])
+        : [],
+    recurringCategories:
+      scope.kind === 'delete'
+        ? (database
+            .prepare(
+              `SELECT id AS recurringId, category_id AS categoryId
+               FROM recurring_transactions WHERE category_id = ? ORDER BY id`,
+            )
+            .all(scope.id) as { recurringId: string; categoryId: string }[])
+        : [],
+    pendingCategories:
+      scope.kind === 'delete'
+        ? (database
+            .prepare(
+              `SELECT id AS pendingId, category_id AS categoryId
+               FROM pending_transactions WHERE category_id = ? ORDER BY id`,
+            )
+            .all(scope.id) as { pendingId: string; categoryId: string }[])
         : [],
     rules:
       scope.kind === 'delete'
@@ -118,6 +140,16 @@ function restoreCategories(
   )
   for (const association of image.templateCategories)
     restoreTemplate.run(association.categoryId, association.templateId)
+  const restoreRecurring = database.prepare(
+    'UPDATE recurring_transactions SET category_id = ? WHERE id = ?',
+  )
+  for (const association of image.recurringCategories)
+    restoreRecurring.run(association.categoryId, association.recurringId)
+  const restorePending = database.prepare(
+    'UPDATE pending_transactions SET category_id = ? WHERE id = ?',
+  )
+  for (const association of image.pendingCategories)
+    restorePending.run(association.categoryId, association.pendingId)
   restoreCategorisationRules(database, image.rules, false)
 }
 

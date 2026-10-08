@@ -184,6 +184,23 @@ import { getSpendingPace } from './profile-report-pace'
 import { getOverviewDashboard } from './profile-report-overview'
 import type { OverviewDashboard } from '../../shared/report-overview'
 import { getMonthlyTrend } from './profile-report-trend'
+import type {
+  CreateRecurringTransactionInput,
+  PendingTransaction,
+  RecurringTransaction,
+  UpdateRecurringTransactionInput,
+} from '../../shared/recurring'
+import {
+  generateRecurringTransactions,
+  listPendingTransactions,
+  listRecurringTransactions,
+} from './profile-recurring'
+import {
+  createRecurringUndoableCommand,
+  deleteRecurringUndoableCommand,
+  pauseRecurringUndoableCommand,
+  updateRecurringUndoableCommand,
+} from './recurring-undo'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -241,6 +258,8 @@ export interface OpenProfileApplicationOptions {
 }
 
 export interface ProfileQueries {
+  listPendingTransactions(): PendingTransaction[]
+  listRecurringTransactions(): RecurringTransaction[]
   getCashFlow(input: ReportDateRangeInput): CashFlowReport
   getSpendingPace(): SpendingPaceReport
   getOverviewDashboard(): OverviewDashboard
@@ -274,6 +293,16 @@ export interface ProfileQueries {
 }
 
 export interface ProfileCommands {
+  generateRecurringTransactions(): void
+  createRecurringTransaction(
+    input: CreateRecurringTransactionInput,
+  ): RecurringTransaction
+  updateRecurringTransaction(
+    input: UpdateRecurringTransactionInput,
+  ): RecurringTransaction
+  pauseRecurringTransaction(id: string): void
+  resumeRecurringTransaction(id: string): void
+  deleteRecurringTransaction(id: string): void
   refreshExchangeRates(source: ExchangeRateSource): Promise<void>
   updateTemplate(input: UpdateTemplateInput): TransactionTemplate
   deleteTemplate(id: string): void
@@ -820,6 +849,72 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
       DEFAULT 0 CHECK (privacy_mode IN (0, 1));
   `,
   ),
+  defineSqlMigration(
+    19,
+    'recurring and pending transactions',
+    `
+    CREATE TABLE recurring_transactions (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      kind TEXT NOT NULL CHECK (kind IN ('expense', 'income')),
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+      amount_minor INTEGER NOT NULL CHECK (
+        typeof(amount_minor) = 'integer' AND amount_minor BETWEEN 1 AND 9007199254740991
+      ),
+      payee_name TEXT CHECK (payee_name IS NULL OR length(trim(payee_name)) BETWEEN 1 AND 100),
+      category_id TEXT REFERENCES categories(id) ON DELETE SET NULL,
+      note TEXT NOT NULL CHECK (length(note) <= 1000),
+      schedule_type TEXT NOT NULL CHECK (schedule_type IN ('monthly', 'weekly', 'yearly')),
+      schedule_day INTEGER CHECK (schedule_day BETWEEN 1 AND 31),
+      schedule_month INTEGER CHECK (schedule_month BETWEEN 1 AND 12),
+      schedule_weekday INTEGER CHECK (schedule_weekday BETWEEN 0 AND 6),
+      schedule_interval INTEGER CHECK (schedule_interval > 0),
+      start_date TEXT NOT NULL CHECK (start_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+      end_date TEXT CHECK (end_date IS NULL OR end_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+      paused INTEGER NOT NULL CHECK (paused IN (0, 1)),
+      generated_through TEXT NOT NULL CHECK (generated_through GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      CHECK (end_date IS NULL OR end_date >= start_date),
+      CHECK (
+        (schedule_type = 'monthly' AND schedule_day IS NOT NULL AND schedule_month IS NULL AND schedule_weekday IS NULL AND schedule_interval IS NOT NULL) OR
+        (schedule_type = 'weekly' AND schedule_day IS NULL AND schedule_month IS NULL AND schedule_weekday IS NOT NULL AND schedule_interval IS NOT NULL) OR
+        (schedule_type = 'yearly' AND schedule_day IS NOT NULL AND schedule_month IS NOT NULL AND schedule_weekday IS NULL AND schedule_interval IS NULL)
+      )
+    );
+    CREATE INDEX recurring_transactions_account_id ON recurring_transactions(account_id);
+    CREATE INDEX recurring_transactions_category_id ON recurring_transactions(category_id);
+    CREATE TABLE recurring_transaction_tags (
+      recurring_id TEXT NOT NULL REFERENCES recurring_transactions(id) ON DELETE CASCADE,
+      tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (recurring_id, tag_id)
+    );
+    CREATE INDEX recurring_transaction_tags_tag_id ON recurring_transaction_tags(tag_id, recurring_id);
+    CREATE TABLE pending_transactions (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      recurring_id TEXT NOT NULL REFERENCES recurring_transactions(id) ON DELETE CASCADE,
+      due_date TEXT NOT NULL CHECK (due_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+      kind TEXT NOT NULL CHECK (kind IN ('expense', 'income')),
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+      amount_minor INTEGER NOT NULL CHECK (
+        typeof(amount_minor) = 'integer' AND amount_minor BETWEEN 1 AND 9007199254740991
+      ),
+      payee_name TEXT CHECK (payee_name IS NULL OR length(trim(payee_name)) BETWEEN 1 AND 100),
+      category_id TEXT REFERENCES categories(id) ON DELETE SET NULL,
+      note TEXT NOT NULL CHECK (length(note) <= 1000),
+      created_at TEXT NOT NULL,
+      UNIQUE (recurring_id, due_date)
+    );
+    CREATE INDEX pending_transactions_due_date ON pending_transactions(due_date, created_at, id);
+    CREATE INDEX pending_transactions_account_id ON pending_transactions(account_id);
+    CREATE INDEX pending_transactions_category_id ON pending_transactions(category_id);
+    CREATE TABLE pending_transaction_tags (
+      pending_id TEXT NOT NULL REFERENCES pending_transactions(id) ON DELETE CASCADE,
+      tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (pending_id, tag_id)
+    );
+    CREATE INDEX pending_transaction_tags_tag_id ON pending_transaction_tags(tag_id, pending_id);
+  `,
+  ),
 ]
 
 function validateMigrations(
@@ -962,6 +1057,30 @@ class OpenProfileApplication implements ProfileApplication {
     this.#options = options
     this.#clock = options.clock ?? (() => new Date())
     this.commands = {
+      generateRecurringTransactions: () =>
+        this.#executeBackgroundWrite(() =>
+          generateRecurringTransactions(this.#database, this.#clock),
+        ),
+      createRecurringTransaction: (input) =>
+        this.#executeUndoableCommand(
+          createRecurringUndoableCommand(this.#database, input, this.#clock),
+        ),
+      updateRecurringTransaction: (input) =>
+        this.#executeUndoableCommand(
+          updateRecurringUndoableCommand(this.#database, input, this.#clock),
+        ),
+      pauseRecurringTransaction: (id) =>
+        this.#executeUndoableCommand(
+          pauseRecurringUndoableCommand(this.#database, id, true, this.#clock),
+        ),
+      resumeRecurringTransaction: (id) =>
+        this.#executeUndoableCommand(
+          pauseRecurringUndoableCommand(this.#database, id, false, this.#clock),
+        ),
+      deleteRecurringTransaction: (id) =>
+        this.#executeUndoableCommand(
+          deleteRecurringUndoableCommand(this.#database, id),
+        ),
       refreshExchangeRates: (source) => this.#refreshExchangeRates(source),
       updateTemplate: (input) =>
         this.#executeUndoableCommand(
@@ -1162,6 +1281,14 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      listPendingTransactions: () => {
+        this.#assertAvailable()
+        return listPendingTransactions(this.#database)
+      },
+      listRecurringTransactions: () => {
+        this.#assertAvailable()
+        return listRecurringTransactions(this.#database)
+      },
       getCashFlow: (input) => {
         this.#assertAvailable()
         const range = resolveReportDateRange(
@@ -1681,6 +1808,7 @@ export async function openProfileApplication(
         options.clock ?? (() => new Date()),
       )
     }
+    application.commands.generateRecurringTransactions()
     return application
   } catch (error) {
     application.close()

@@ -70,7 +70,9 @@ function templateCommand(
       const removeUnused = database.prepare(`DELETE FROM tags WHERE id = ?
         AND NOT EXISTS (SELECT 1 FROM transaction_line_tags WHERE tag_id = tags.id)
         AND NOT EXISTS (SELECT 1 FROM transaction_template_tags WHERE tag_id = tags.id)
-        AND NOT EXISTS (SELECT 1 FROM categorisation_rule_tags WHERE tag_id = tags.id)`)
+        AND NOT EXISTS (SELECT 1 FROM categorisation_rule_tags WHERE tag_id = tags.id)
+        AND NOT EXISTS (SELECT 1 FROM recurring_transaction_tags WHERE tag_id = tags.id)
+        AND NOT EXISTS (SELECT 1 FROM pending_transaction_tags WHERE tag_id = tags.id)`)
       for (const id of after.createdTagIds) removeUnused.run(id)
     },
   }

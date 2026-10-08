@@ -2,12 +2,12 @@
 
 A local-first personal expense tracker for Windows, built with Electron, React,
 TypeScript, and SQLite. The app opens to a collapsible sidebar with Overview,
-Transactions, Reports, Accounts, and Settings pages. On start you pick or create
-a profile; each profile has its own SQLite database and data folder. Financial
-data stays local. Accounts track opening balances, signed expense/income
-transactions, both legs of transfers, and target-based balance adjustments.
-Settings includes payee alias/merge management, ordered categorisation rules,
-and two-level expense/income category management.
+Transactions, Recurring, Reports, Accounts, and Settings pages. On start you
+pick or create a profile; each profile has its own SQLite database and data
+folder. Financial data stays local. Accounts track opening balances, signed
+expense/income transactions, both legs of transfers, and target-based balance
+adjustments. Settings includes payee alias/merge management, ordered
+categorisation rules, and two-level expense/income category management.
 
 ## Requirements
 
@@ -130,8 +130,9 @@ them, and pattern matching cannot detect every possible form of sensitive data.
 
 The renderer has no Node access; a sandboxed, isolated preload exposes only the
 typed app, update, profile (including settings), account, category, transaction,
-transfer, balance adjustment, payee, tag, categorisation rule, transaction-template,
-and backup commands/queries. Every IPC input is validated in the main
+transfer, balance adjustment, payee, tag, categorisation rule,
+transaction-template, recurring-transaction, and backup commands/queries. Every
+IPC input is validated in the main
 process, and every handler rejects calls not sent by the app's own renderer frame.
 Production CSP permits only same-origin connections; localhost WebSockets are
 added only by the development server for hot reload. SQLite foreign-key
@@ -305,6 +306,37 @@ not off-device copies or backups of the separate data folder.
   main category and subcategory, monthly trends, spending pace, and cash flow.
   Overview shows this month's expenses, income, net, and top five expense
   categories compared with the full last month.
+
+## Recurring transactions
+
+- **Recurring** defines profile-scoped expense or income estimates with an
+  account, positive amount, optional payee/category/tags/note, start date,
+  optional end date, and a monthly, weekly, or yearly schedule. Monthly and
+  yearly dates clamp to the last day of shorter months (including leap years),
+  and monthly/weekly intervals are anchored to the start date.
+- Due occurrences become separate pending snapshots. They are generated on
+  profile open and hourly while the app runs, exactly once per recurring
+  transaction and due date. Occurrences before a definition's creation date are
+  intentionally not generated. Pending snapshots do not affect balances,
+  transaction-list totals, reports, CSV exports, or exchange-rate needs.
+- Editing changes only occurrences not yet created. Pausing stops generation;
+  resuming starts from yesterday, so dates passed during the pause are skipped.
+  Deleting removes still-pending occurrences. Create, edit, pause, resume and
+  delete are undoable. Confirming/skipping and the pending list arrive in the
+  follow-up ticket.
+
+### Manual recurring-transactions check
+
+Run `npm run dev`, create synthetic HUF/CHF accounts, tags, and expense/income
+categories, then open **Recurring**. In HU/EN/DE, create monthly (including day
+31 and every two months), weekly (including every two weeks), and yearly
+(including February 29) definitions. Verify translated schedule text, next due
+dates, the amount calculator, nullable category/tags/payee/note, start/end dates,
+and narrow-window/light/dark layouts. Edit a definition and check its list row;
+pause and resume it; delete it; use the Undo toast after each operation. Close
+and reopen the profile and verify definitions persist. Pending occurrences are
+not shown until the follow-up ticket; verify balances, Overview, Reports,
+Transactions totals and CSV remain unchanged when a definition becomes due.
 
 ## Exchange rates and base-currency conversion
 
