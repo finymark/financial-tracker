@@ -467,11 +467,12 @@ function assertNotLinkedFee(
   }
 }
 
-export function listTransactions(
+function withFilteredMovements<Result>(
   database: Database.Database,
   value: TransactionListInput | undefined,
   clock: () => Date,
-): TransactionPage {
+  read: (input: TransactionListInput) => Result,
+): Result {
   const input = parseTransactionListInput(value)
   const where: string[] = []
   const parameters: (string | number)[] = []
@@ -637,6 +638,45 @@ export function listTransactions(
       )
       .run(...adjustmentParameters)
 
+    return read(input)
+  })()
+}
+
+// CSV uses the same matched transaction identities as the list, but never its
+// paging, transfer/adjustment rows, or spending aggregates.
+export function listFilteredTransactions(
+  database: Database.Database,
+  input: TransactionListInput | undefined,
+  clock: () => Date,
+): Transaction[] {
+  return withFilteredMovements(database, input, clock, () => {
+    const ids = database
+      .prepare(
+        `
+      SELECT id FROM temp.filtered_movements WHERE row_kind = 'transaction'
+      ORDER BY date DESC, created_at DESC, id DESC
+    `,
+      )
+      .all() as { id: string }[]
+    const rows: Transaction[] = []
+    for (let offset = 0; offset < ids.length; offset += 500) {
+      rows.push(
+        ...getTransactions(
+          database,
+          ids.slice(offset, offset + 500).map(({ id }) => id),
+        ),
+      )
+    }
+    return rows
+  })
+}
+
+export function listTransactions(
+  database: Database.Database,
+  value: TransactionListInput | undefined,
+  clock: () => Date,
+): TransactionPage {
+  return withFilteredMovements(database, value, clock, (input) => {
     const pageRows = database
       .prepare(
         `SELECT id, row_kind AS rowKind FROM temp.filtered_movements
@@ -801,5 +841,5 @@ export function listTransactions(
       ),
       days,
     }
-  })()
+  })
 }

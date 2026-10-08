@@ -80,6 +80,8 @@ import type {
   UpdateBalanceAdjustmentInput,
 } from '../../shared/adjustments'
 import { listTransactions } from './profile-transactions'
+import { exportTransactionsCsv } from './profile-transaction-csv'
+import type { TransactionCsvInput } from '../../shared/transaction-csv'
 import { listPayeeAliases, listPayees, suggestPayees } from './profile-payees'
 import {
   addPayeeAliasUndoableCommand,
@@ -212,6 +214,7 @@ export interface ProfileQueries {
   getCategorisationAutofill(
     input: CategorisationRuleDraftInput,
   ): CategorisationAutofill
+  exportTransactionsCsv(input?: TransactionCsvInput): string
   listTransactions(input?: TransactionListInput): TransactionPage
   listPayees(): Payee[]
   listPayeeAliases(payeeId: string): PayeeAlias[]
@@ -1077,6 +1080,12 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      exportTransactionsCsv: (input) => {
+        this.#assertAvailable()
+        return this.#database.transaction(() =>
+          exportTransactionsCsv(this.#database, input, this.#clock),
+        )()
+      },
       listTemplates: () => {
         this.#assertAvailable()
         return listTemplates(this.#database)

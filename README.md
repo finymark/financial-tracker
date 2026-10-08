@@ -538,6 +538,52 @@ and light/dark themes.
   first page plus all aggregates with a generous 500 ms local bound, arranging
   the fixture through application commands in one outer transaction.
 
+### CSV export
+
+**Transactions → Export CSV**, beside **Apply filters**, exports the currently
+applied filters (not unsubmitted filter edits) across every page. The small
+export dialog defaults to the profile language's decimal separator and offers a
+dot/comma override. **Save CSV** opens a native save dialog with a dated default
+filename. Cancelling does not write a file; write failures remain visible in the
+export dialog. Export is a read-only query and does not change Undo history.
+
+The UTF-8 file includes a BOM for Excel and uses CRLF records with RFC 4180
+quoting. HU/DE use comma decimals and semicolon-separated fields; EN uses dot
+decimals and comma-separated fields. An override changes both separators but
+keeps headers, kinds, yes/no values, and default category names in the profile
+language. Amounts use exact signed integer hundredths, always with two decimals
+and no thousands grouping, even for HUF; no currency conversion is performed.
+
+Columns are date (ISO YYYY-MM-DD), account, kind, payee, main category,
+subcategory, amount, currency, note, tags, and excluded. Matching expenses and
+income produce one row per line, including every part of a matching split;
+parts share the transaction date/account/payee. Uncategorized lines have empty
+category cells. Notes prefer the line note, falling back to the transaction note;
+tags are comma-separated inside one cell. Excluded transactions follow the
+applied exclusion filter. Transfers and balance adjustments are never exported,
+but their ordinary linked fee expenses are. Text cells beginning with `=`, `+`,
+`-`, `@`, tab, or CR receive a leading single quote to prevent spreadsheet formula
+injection; signed numeric amount cells never receive that prefix.
+
+### Manual CSV export check
+
+Run `npm run dev` with synthetic data, then repeat in HU/EN/DE and light/dark
+appearance. Combine period, account, main/subcategory, payee, tag, search, and
+exclusion filters; apply them, change an unapplied filter, and verify export still
+uses the applied set across all pages. Include a split with different categories,
+notes, and tags, excluded expenses/income, uncategorized lines, transfers with
+fees, and balance adjustments. Verify one row per split part and no transfer or
+adjustment rows, while ordinary fee expenses remain. Check the dated filename,
+export-dialog Tab/Shift+Tab focus trapping, Esc/cancel focus restoration, native
+save cancellation (no success message), overwrite confirmation, and a failed
+write (translated error, no success message). Export using both decimal choices
+and open the files in Excel: verify delimiters, negative expenses, positive
+income, two decimals including HUF, `őűäöüß`, multiline/quoted notes, and text
+starting with formula characters remaining text. Verify export leaves Ctrl+Z
+available for the previous command. Native dialogs and Excel behavior remain
+manual checks; temporary SQLite application-API tests cover the CSV contents,
+filters, paging bypass, validation, exact money, and unchanged undo history.
+
 ### Duplicate and transaction templates
 
 - **Duplicate transaction** in an expense/income row or its edit drawer immediately

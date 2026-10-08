@@ -19,6 +19,7 @@ import type { Language, MessageKey } from './i18n'
 import { TransactionTable, Totals } from './components/transaction-table'
 import { TransactionDrawer } from './components/transactions/transaction-drawer'
 import { TagManager } from './components/transactions/tag-manager'
+import { ExportCsvDialog } from './components/transactions/export-csv-dialog'
 import {
   emptyForm,
   emptyAdjustmentForm,
@@ -104,6 +105,9 @@ export function TransactionsPage({
   }
   const [form, setForm] = useState<DrawerForm | null>(null)
   const createRef = useRef<HTMLButtonElement>(null)
+  const exportRef = useRef<HTMLButtonElement>(null)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [csvSaved, setCsvSaved] = useState(false)
   const [deleting, setDeleting] = useState<
     Transaction | Transfer | BalanceAdjustment | null
   >(null)
@@ -390,7 +394,38 @@ export function TransactionsPage({
         <Button type="submit" disabled={busy || loading} className="self-end">
           {t('transactions.applyFilters')}
         </Button>
+        <Button
+          ref={exportRef}
+          type="button"
+          variant="ghost"
+          disabled={busy || loading}
+          className="self-end"
+          onClick={() => {
+            setCsvSaved(false)
+            setExportOpen(true)
+          }}
+        >
+          {t('csv.export')}
+        </Button>
       </form>
+      {csvSaved && (
+        <p role="status" className="text-sm text-muted-foreground">
+          {t('csv.saved')}
+        </p>
+      )}
+      {exportOpen && (
+        <ExportCsvDialog
+          input={request}
+          language={language}
+          t={t}
+          exportRef={exportRef}
+          onClose={() => setExportOpen(false)}
+          onSaved={() => {
+            setCsvSaved(true)
+            setExportOpen(false)
+          }}
+        />
+      )}
       {loading ? (
         <p role="status" className="text-sm text-muted-foreground">
           {t('transactions.loading')}
