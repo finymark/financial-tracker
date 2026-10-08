@@ -3,10 +3,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import {
+  CURRENT_MIGRATIONS,
   openProfileApplication,
   type ProfileApplication,
 } from './profile-application'
 import { ProfileRegistry } from './profile-registry'
+import { parseAmountExpression } from '../../shared/amount-expression'
 
 const directories: string[] = []
 const applications: ProfileApplication[] = []
@@ -255,7 +257,7 @@ test('undoes transfer creation, editing, and deletion with its linked fee as one
     toAmountMinor: 1_000,
     date: '2026-01-15',
     note: 'Created',
-    fee: { amountMinor: 100 },
+    fee: { amountMinor: 100, excluded: true },
   })
   now = new Date('2026-01-15T11:00:00.000Z')
   const edited = application.commands.updateTransfer({
@@ -266,7 +268,7 @@ test('undoes transfer creation, editing, and deletion with its linked fee as one
     toAmountMinor: 2_000,
     date: '2026-01-14',
     note: 'Edited',
-    fee: { amountMinor: 200, categoryId: null },
+    fee: { amountMinor: 200, categoryId: null, excluded: false },
   })
   application.commands.deleteTransfer(edited.id)
   expect(application.queries.listTransactions().rows).toEqual([])
@@ -285,4 +287,252 @@ test('undoes transfer creation, editing, and deletion with its linked fee as one
   expect(application.queries.listTransactions().rows).toEqual([])
   expect(application.queries.getAccountBalance(from.id)).toBe(10_000)
   expect(application.queries.getAccountBalance(to.id)).toBe(0)
+})
+
+test('combines excluded transactions and transfer fees in filtered totals, balances, and undo', async () => {
+  const application = await setup()
+  const from = application.commands.createAccount({
+    name: 'Bank',
+    currency: 'CHF',
+    openingBalance: 20_000,
+    openingDate: '2026-01-01',
+  })
+  const to = application.commands.createAccount({
+    name: 'Cash',
+    currency: 'CHF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  const excludedExpense = application.commands.createTransaction({
+    accountId: from.id,
+    kind: 'expense',
+    date: '2026-01-15',
+    totalMinor: 1_000,
+    payeeName: 'Reimbursed',
+    categoryId: null,
+    note: 'Trip',
+    excluded: true,
+  })
+  const excludedIncome = application.commands.createTransaction({
+    accountId: from.id,
+    kind: 'income',
+    date: '2026-01-15',
+    totalMinor: 2_000,
+    payeeName: null,
+    categoryId: null,
+    note: 'Trip',
+    excluded: true,
+  })
+  const transfer = application.commands.createTransfer({
+    fromAccountId: from.id,
+    fromAmountMinor: 5_000,
+    toAccountId: to.id,
+    toAmountMinor: 5_000,
+    date: '2026-01-15',
+    note: 'Trip',
+    fee: { amountMinor: 250 },
+  })
+  const totals = [{ currency: 'CHF', expenseMinor: 250, incomeMinor: 0 }]
+  const zeroTotals = [{ currency: 'CHF', expenseMinor: 0, incomeMinor: 0 }]
+  const filters = {
+    accountId: from.id,
+    period: 'thisMonth' as const,
+    search: 'trip',
+  }
+  expect(application.queries.listTransactions(filters)).toMatchObject({
+    totalCount: 4,
+    totals,
+    days: [{ date: '2026-01-15', totals }],
+  })
+  expect(
+    application.queries.listTransactions({ ...filters, limit: 1 }).totals,
+  ).toEqual(totals)
+  expect(
+    application.queries.listTransactions({
+      ...filters,
+      exclusion: 'hideExcluded',
+    }),
+  ).toMatchObject({
+    totalCount: 2,
+    totals,
+    rows: expect.arrayContaining([transfer, transfer.fee]),
+  })
+  expect(
+    application.queries.listTransactions({
+      ...filters,
+      exclusion: 'onlyExcluded',
+    }),
+  ).toMatchObject({
+    totalCount: 2,
+    totals: zeroTotals,
+    rows: expect.arrayContaining([excludedExpense, excludedIncome]),
+    days: [{ date: '2026-01-15', totals: zeroTotals }],
+  })
+  expect(
+    application.queries.listTransactions({
+      accountId: to.id,
+      exclusion: 'hideExcluded',
+    }).rows,
+  ).toEqual([transfer])
+  expect(
+    application.queries.listTransactions({
+      accountId: to.id,
+      exclusion: 'onlyExcluded',
+    }).rows,
+  ).toEqual([])
+
+  const excludedFee = application.commands.updateTransfer({
+    ...transfer,
+    fee: { amountMinor: 250, excluded: true },
+  })
+  expect(excludedFee.fee?.excluded).toBe(true)
+  expect(application.queries.getAccountBalance(from.id)).toBe(15_750)
+  expect(application.queries.getAccountBalance(to.id)).toBe(5_000)
+  expect(application.queries.listTransactions(filters).totals).toEqual(
+    zeroTotals,
+  )
+  expect(
+    application.queries.listTransactions({
+      ...filters,
+      exclusion: 'hideExcluded',
+    }).rows,
+  ).toEqual([excludedFee])
+  expect(
+    application.queries.listTransactions({
+      ...filters,
+      exclusion: 'onlyExcluded',
+    }),
+  ).toMatchObject({
+    totalCount: 3,
+    totals: zeroTotals,
+    rows: expect.arrayContaining([
+      excludedExpense,
+      excludedIncome,
+      excludedFee.fee,
+    ]),
+  })
+  expect(
+    application.queries.listTransactions({
+      categoryId: transfer.fee!.line.categoryId!,
+    }).rows,
+  ).toEqual([excludedFee.fee])
+
+  const edited = application.commands.updateTransfer({
+    ...excludedFee,
+    note: 'Trip edited',
+    fee: { amountMinor: 300 },
+  })
+  expect(edited.fee?.excluded).toBe(true)
+  expect(application.queries.listTransactions().totals).toEqual(zeroTotals)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toContainEqual(
+    excludedFee,
+  )
+
+  application.commands.updateTransfer({ ...excludedFee, fee: null })
+  expect(application.queries.getAccountBalance(from.id)).toBe(16_000)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toContainEqual(
+    excludedFee,
+  )
+  expect(application.queries.getAccountBalance(from.id)).toBe(15_750)
+
+  application.commands.deleteTransfer(transfer.id)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toContainEqual(
+    excludedFee,
+  )
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toContainEqual(transfer)
+  expect(application.queries.listTransactions().totals).toEqual(totals)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toHaveLength(2)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toEqual([excludedExpense])
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toEqual([])
+})
+
+test('appends transfer migration 9 to an excluded version 8 profile without changing its history', async () => {
+  const directory = mkdtempSync(
+    join(tmpdir(), 'financial-tracker-transfer-upgrade-'),
+  )
+  directories.push(directory)
+  const registry = new ProfileRegistry({ userDataDirectory: directory, clock })
+  const profile = registry.createProfile('Transfer upgrade')
+  const paths = registry.getProfilePaths(profile.id)
+  const previous = await openProfileApplication({
+    profile,
+    paths,
+    clock,
+    migrations: CURRENT_MIGRATIONS.slice(0, 8),
+  })
+  applications.push(previous)
+  const from = previous.commands.createAccount({
+    name: 'Bank',
+    currency: 'HUF',
+    openingBalance: 500_000,
+    openingDate: '2026-01-01',
+  })
+  const to = previous.commands.createAccount({
+    name: 'Cash',
+    currency: 'CHF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  const original = previous.commands.createTransaction({
+    accountId: from.id,
+    kind: 'expense',
+    date: '2026-01-15',
+    totalMinor: 1_000,
+    payeeName: 'History',
+    categoryId: null,
+    note: 'Before transfers',
+    excluded: true,
+  })
+  expect(previous.queries.getProfileInfo().schemaVersion).toBe(8)
+  previous.close()
+  const upgraded = await openProfileApplication({ profile, paths, clock })
+  applications.push(upgraded)
+  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(9)
+  expect(upgraded.queries.listTransactions().rows).toEqual([original])
+  expect(upgraded.queries.getAccountBalance(from.id)).toBe(499_000)
+  const transfer = upgraded.commands.createTransfer({
+    fromAccountId: from.id,
+    fromAmountMinor: parseAmountExpression(
+      '1.234,5*2',
+      'HUF',
+      'transactions.error.amount',
+    ),
+    toAccountId: to.id,
+    toAmountMinor: parseAmountExpression(
+      '1/3*3',
+      'CHF',
+      'transactions.error.amount',
+    ),
+    date: '2026-01-15',
+    note: 'Calculated transfer',
+    fee: {
+      amountMinor: parseAmountExpression(
+        '100/2',
+        'HUF',
+        'transactions.error.amount',
+      ),
+      excluded: true,
+    },
+  })
+  expect(transfer.fromAmountMinor).toBe(246_900)
+  expect(transfer.toAmountMinor).toBe(100)
+  expect(transfer.fee?.totalMinor).toBe(5_000)
+  const rows = upgraded.queries.listTransactions().rows
+  upgraded.close()
+  const reopened = await openProfileApplication({ profile, paths, clock })
+  applications.push(reopened)
+  expect(reopened.queries.getProfileInfo().schemaVersion).toBe(9)
+  expect(reopened.queries.listTransactions().rows).toEqual(rows)
+  expect(reopened.queries.listTransactions().totals).toEqual([
+    { currency: 'HUF', expenseMinor: 0, incomeMinor: 0 },
+  ])
+  expect(reopened.queries.getAccountBalance(from.id)).toBe(247_100)
+  expect(reopened.queries.getAccountBalance(to.id)).toBe(100)
 })

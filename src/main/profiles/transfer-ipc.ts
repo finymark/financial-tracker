@@ -9,6 +9,7 @@ import {
   validateTransactionId,
   validateTransactionNote,
   validateTransactionTotal,
+  validateTransactionExcluded,
 } from './transaction-validation'
 
 function transferFields(value: unknown) {
@@ -18,6 +19,7 @@ function transferFields(value: unknown) {
     const feeInput = inputRecord(input.fee)
     fee = {
       amountMinor: validateTransactionTotal(feeInput.amountMinor),
+      excluded: validateTransactionExcluded(feeInput.excluded),
       ...(feeInput.categoryId === undefined
         ? {}
         : {

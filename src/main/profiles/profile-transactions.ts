@@ -20,6 +20,7 @@ import {
   validateTransactionPayeeName,
   validateTransactionTotal,
   validateTransactionId,
+  validateTransactionExcluded,
 } from './transaction-validation'
 import { today } from '../../shared/date'
 import { normalizePayeeKey } from '../db'
@@ -34,6 +35,8 @@ interface StoredTransaction {
   payeeId: string | null
   payeeName: string | null
   note: string
+  // Absent in pre-exclusion migration fixtures.
+  excluded?: number
   createdAt: string
   updatedAt: string
   lineId: string
@@ -44,14 +47,11 @@ interface StoredTransaction {
 }
 
 const TRANSACTION_SELECT = `
-  SELECT transactions.id,
+  SELECT transactions.*,
     transactions.account_id AS accountId,
-    transactions.kind,
-    transactions.date,
     transactions.total_minor AS totalMinor,
     transactions.payee_id AS payeeId,
     payees.name AS payeeName,
-    transactions.note,
     transactions.created_at AS createdAt,
     transactions.updated_at AS updatedAt,
     transaction_lines.id AS lineId,
@@ -77,6 +77,7 @@ function transactionView(row: StoredTransaction | undefined): Transaction {
     payeeId: row.payeeId,
     payeeName: row.payeeName,
     note: row.note,
+    excluded: row.excluded === 1,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     line: {
@@ -184,6 +185,7 @@ export function createTransaction(
   const payeeName = validateTransactionPayeeName(input.payeeName)
   const categoryId = validateTransactionCategoryId(input.categoryId)
   const note = validateTransactionNote(input.note)
+  const excluded = validateTransactionExcluded(input.excluded)
   validateReferences(database, accountId, kind, categoryId)
   const timestamp = clock().toISOString()
   const payeeId = resolvePayee(database, payeeName, timestamp)
@@ -211,6 +213,11 @@ export function createTransaction(
         (id, transaction_id, amount_minor, category_id) VALUES (?, ?, ?, ?)`,
     )
     .run(randomUUID(), id, totalMinor, categoryId)
+  if (excluded !== undefined) {
+    database
+      .prepare('UPDATE transactions SET excluded = ? WHERE id = ?')
+      .run(Number(excluded), id)
+  }
   return getTransaction(database, id)
 }
 
@@ -229,6 +236,7 @@ export function updateTransaction(
   const payeeName = validateTransactionPayeeName(input.payeeName)
   const categoryId = validateTransactionCategoryId(input.categoryId)
   const note = validateTransactionNote(input.note)
+  const excluded = validateTransactionExcluded(input.excluded)
   validateReferences(database, accountId, kind, categoryId, current)
   const timestamp = clock().toISOString()
   const payeeId = resolvePayee(database, payeeName, timestamp)
@@ -254,6 +262,11 @@ export function updateTransaction(
       'UPDATE transaction_lines SET amount_minor = ?, category_id = ? WHERE id = ?',
     )
     .run(totalMinor, categoryId, current.line.id)
+  if (excluded !== undefined) {
+    database
+      .prepare('UPDATE transactions SET excluded = ? WHERE id = ?')
+      .run(Number(excluded), current.id)
+  }
   return getTransaction(database, current.id)
 }
 
@@ -347,6 +360,11 @@ export function listTransactions(
       input.accountId,
     )
   }
+  if (input.exclusion === 'onlyExcluded') {
+    add('transactions.excluded = 1')
+    addTransfer('0 = 1')
+  }
+  if (input.exclusion === 'hideExcluded') add('transactions.excluded = 0')
   if (input.payeeId) add('transactions.payee_id = ?', input.payeeId)
   if (input.payeeId) addTransfer('0 = 1')
   if (input.categoryId) {
@@ -461,10 +479,10 @@ export function listTransactions(
     const aggregates = database
       .prepare(
         `SELECT filtered_transactions.date, filtered_transactions.currency,
-      SUM(CASE filtered_transactions.kind WHEN 'expense' THEN aggregate_lines.amount_minor ELSE 0 END) AS expenseMinor,
-      SUM(CASE filtered_transactions.kind WHEN 'income' THEN aggregate_lines.amount_minor ELSE 0 END) AS incomeMinor
+      SUM(CASE WHEN filtered_transactions.excluded = 0 AND filtered_transactions.kind = 'expense' THEN aggregate_lines.amount_minor ELSE 0 END) AS expenseMinor,
+      SUM(CASE WHEN filtered_transactions.excluded = 0 AND filtered_transactions.kind = 'income' THEN aggregate_lines.amount_minor ELSE 0 END) AS incomeMinor
       FROM (
-        SELECT transactions.id, transactions.date, transactions.kind, accounts.currency
+        SELECT transactions.id, transactions.date, transactions.kind, transactions.excluded, accounts.currency
         ${filtered}
       ) AS filtered_transactions
       JOIN transaction_lines AS aggregate_lines

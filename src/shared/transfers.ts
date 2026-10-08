@@ -3,6 +3,7 @@ import type { Transaction } from './transactions'
 
 export interface TransferFeeInput {
   amountMinor: number
+  excluded?: boolean
   /** Omit to use the active seeded Fees category; null keeps it uncategorized. */
   categoryId?: string | null
 }

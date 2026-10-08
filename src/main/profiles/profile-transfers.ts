@@ -179,6 +179,7 @@ function feeInput(
     payeeName: null,
     categoryId: feeCategoryId(database, fee),
     note: transfer.note,
+    excluded: fee.excluded,
   }
 }
 

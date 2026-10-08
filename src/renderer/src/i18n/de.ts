@@ -108,6 +108,15 @@ export const de = {
     'Erfasse Ausgaben, Einnahmen und Umbuchungen, damit deine Kontosalden aktuell bleiben.',
   'transactions.listDescription':
     'Transaktionen nach Zeitraum, Konto, Kategorie, Zahlungspartner oder Notiz filtern.',
+  'transactions.excluded': 'Ausgeschlossen',
+  'transactions.excludedHint':
+    'Im Kontostand enthalten, aber nicht in den Ausgaben- und Einnahmensummen.',
+  'transactions.exclusion': 'Ausgeschlossene Transaktionen',
+  'transactions.exclusion.all': 'Alle Transaktionen',
+  'transactions.exclusion.onlyExcluded': 'Nur ausgeschlossene',
+  'transactions.exclusion.hideExcluded': 'Ausgeschlossene ausblenden',
+  'transactions.error.excluded':
+    'Wähle, ob die Transaktion ausgeschlossen ist.',
   'transactions.filters': 'Transaktionsfilter',
   'transactions.period': 'Zeitraum',
   'transactions.period.all': 'Alle Daten',
@@ -152,8 +161,9 @@ export const de = {
   'transactions.transfer': 'Umbuchung',
   'transactions.date': 'Datum',
   'transactions.amount': 'Betrag',
+  'amount.result': 'Berechneter Betrag',
   'transactions.amountHint':
-    'Gib einen positiven Betrag mit Punkt oder Komma und höchstens zwei Nachkommastellen ein.',
+    'Verwende + - * /, Klammern, Punkt oder Komma als Dezimalzeichen und Tausendertrennzeichen (z. B. 1 234,50). Verlassen des Feldes oder Enter berechnet das auf Hundertstel gerundete Endergebnis.',
   'transactions.account': 'Konto',
   'transactions.fromAccount': 'Quellkonto',
   'transactions.toAccount': 'Zielkonto',
@@ -180,7 +190,7 @@ export const de = {
   'transactions.error.futureDate':
     'Das Transaktionsdatum darf nicht in der Zukunft liegen.',
   'transactions.error.amount':
-    'Gib einen positiven Betrag mit höchstens zwei Nachkommastellen ein.',
+    'Gib einen gültigen Ausdruck ein, der einen positiven Betrag bis 90.071.992.547.409,91 ergibt. Division durch null ist nicht erlaubt.',
   'transactions.error.payee':
     'Gib einen Zahlungspartner mit höchstens 100 Zeichen ein.',
   'transactions.error.category':
@@ -210,7 +220,7 @@ export const de = {
   'accounts.openingDate': 'Eröffnungsdatum',
   'accounts.balance': 'Saldo',
   'accounts.balanceHint':
-    'Punkt oder Komma und höchstens zwei Nachkommastellen verwenden, ohne Tausendertrennzeichen. Negative Salden sind erlaubt.',
+    'Verwende + - * /, Klammern, Punkt oder Komma als Dezimalzeichen und Tausendertrennzeichen. Verlassen des Feldes oder Enter berechnet das auf Hundertstel gerundete Endergebnis. Negative Salden und null sind erlaubt.',
   'accounts.empty': 'Erstelle ein Konto, um seinen Saldo zu verfolgen.',
   'accounts.loading': 'Konten werden geladen…',
   'accounts.rename': 'Umbenennen',
@@ -230,7 +240,7 @@ export const de = {
   'accounts.error.name': 'Gib einen Kontonamen mit 1 bis 100 Zeichen ein.',
   'accounts.error.currency': 'Wähle HUF oder CHF.',
   'accounts.error.balance':
-    'Gib einen gültigen Saldo mit höchstens zwei Nachkommastellen ohne Gruppierung und innerhalb von ±90.071.992.547.409,91 ein.',
+    'Gib einen gültigen Ausdruck ein, der einen Saldo innerhalb von ±90.071.992.547.409,91 ergibt. Division durch null ist nicht erlaubt.',
   'accounts.error.date': 'Gib ein gültiges Eröffnungsdatum ein.',
   'accounts.error.notFound':
     'Das Konto wurde nicht gefunden. Aktualisiere die Liste.',

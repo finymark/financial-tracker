@@ -299,8 +299,9 @@ not off-device copies or backups of the separate data folder.
 ## Accounts
 
 - Create an account with a name, HUF or CHF currency, an opening balance, and a
-  valid calendar opening date. Amount entry accepts a dot or comma with up to two
-  decimal places, no thousands separators, and allows negative opening balances.
+  valid calendar opening date. The shared calculator amount field accepts dot or
+  comma decimals and thousands grouping, and allows negative or zero opening
+  balances. See **Amount calculator** below.
 - Money is stored as exact integer hundredths for both currencies. CHF displays
   two decimal places; HUF displays no decimals (rounded for display only).
 - Rename accounts or change their currency while they have no transactions.
@@ -352,10 +353,13 @@ not off-device copies or backups of the separate data folder.
   displays the actual rate without storing a floating-point rate.
 - An optional transfer fee is a linked ordinary expense on the source account,
   defaulting to the seeded Fees category. Creating, editing, deleting, and undoing
-  a transfer changes its fee atomically as one command.
-- Amount entry accepts a dot or comma with up to two decimal places and no
-  thousands separators. Amounts are persisted as exact integer hundredths. HUF
-  is displayed without decimals; CHF is displayed with two decimals.
+  a transfer changes its fee atomically as one command. Transfer fees count in
+  expense totals unless marked Excluded in the transfer drawer. Transfers use
+  appended migration 9, after the unchanged excluded-transactions migration 8.
+- Amount entry uses the same calculator field as Accounts for expenses, income,
+  both transfer amounts, and optional fees, with a positive result required.
+  Amounts are persisted as exact integer hundredths. HUF is displayed without
+  decimals; CHF is displayed with two decimals.
 - Typing a new payee creates it in the active profile. An existing payee with the
   same Unicode-normalized name ignoring case is reused. Category choices are limited to active
   expense or income categories matching the transaction kind and preserve the
@@ -374,6 +378,16 @@ not off-device copies or backups of the separate data folder.
   History is in memory for the open profile only and is cleared by profile
   switching, restart, restore, or another profile write that has no declared undo
   aggregate. Account and category commands are not undoable yet.
+- Mark an expense or income as **Excluded** in the create/edit drawer when it
+  should affect its account balance but not spending/income totals (for example,
+  an expense awaiting reimbursement). The table shows an Excluded badge. The
+  **Excluded transactions** filter offers all transactions (default), only
+  excluded, or hide excluded and combines with the other filters. Only-excluded
+  hides transfers; hide-excluded keeps them (transfers have no exclusion flag). Filtered-set
+  and whole-day totals always ignore excluded amounts, including in the
+  only-excluded view, where matching days/currencies show zero totals. Saving a
+  flag change uses the same Undo toast and Ctrl+Z as other transaction edits.
+  Existing transactions remain included when upgrading via migration 8.
 - The dense table is newest first (date, creation timestamp, then UUID), grouped
   by day, with income/expense signs and icons. Transfers have a distinct row and
   icon and show both accounts and amounts. Each day shows totals for that
@@ -401,11 +415,59 @@ not off-device copies or backups of the separate data folder.
   bound, arranging the 20 000 transactions through application commands in one
   fixture transaction (outside the measured query).
 
+### Amount calculator
+
+Accounts opening balances, expense/income amounts, both transfer amounts, and
+optional fees use one pure parser in
+`src/shared/amount-expression.ts`, without `eval` or binary floating-point
+arithmetic. Expressions accept `+ - * /`, ordinary precedence, parentheses, and
+signed operands, up to 200 characters. Examples: `12000/2` → `6000`, `4490*3` →
+`13470`, and `100+250-30` → `320`.
+
+Both currencies have two-place **storage** precision (ADR 0002). Dot or comma
+can be a decimal separator; spaces (including non-breaking spaces), dots, and
+commas can group thousands. Groups must contain three digits. With both dot and
+comma, the last separator is decimal: `1.234,5`, `1,234.5`, and `1 234,50` all
+mean `1234.50`. A valid thousands grouping wins when the final group has more
+than two digits: `1.234` means `1234` in both currencies; `1,5` means `1.50`.
+For a single punctuation separator, a zero-leading input is treated as a
+decimal, so `0.005` is a decimal.
+
+Calculation uses exact BigInt rationals, with no intermediate rounding. The
+**final** result is rounded once to the nearest hundredth, ties away from zero:
+`1/3` → `0.33`, `2/3` → `0.67`, `0.005` → `0.01`, and `1/3*3` → `1.00`.
+Division by zero, malformed expressions, unsafe integer-hundredth results, and
+non-positive transaction results are rejected. Opening balances may be negative
+or zero.
+
+Leaving the field or pressing Enter evaluates it and shows a translated result
+preview before save. Enter in the amount field evaluates only; it does not save
+the form. The original expression stays editable. Changing it or the currency
+hides the previous preview until reevaluation. Previews use the existing money
+formatter: CHF shows two decimals, while HUF rounds to whole units for display
+only; the stored result still retains hundredths.
+
+### Manual Amount calculator check
+
+Run `npm run dev`. In Accounts and in the transaction create/edit drawer, enter
+`12000/2`, `4490*3`, `100+250-30`, `1,5`, `1.234`, `1 234,50`, `1.234,5`, and
+`1,234.5` for HUF and CHF. Blur or press Enter: verify the preview appears and
+Enter does not save. Check `1/3`, `2/3`, and `1/3*3` for final-only rounding
+(CHF previews `0.33`, `0.67`, and `1.00`). Change the expression or currency and
+verify the old preview disappears. Try `1+`, `1/0`, and `90071992547409.92`:
+check the inline validation and that saving does not create a record. Verify
+`100-250` is rejected for transactions but accepted as an opening balance, and
+that zero is accepted only for opening balances. Save valid results and reopen
+an edited transaction to check the stored amount. Repeat in HU/EN/DE and with
+keyboard navigation and light/dark themes. These renderer checks remain manual;
+the automated pure-parser tests cover arithmetic, ambiguous inputs, rounding,
+invalid expressions, sign constraints, and safe-integer bounds.
+
 ### Manual Transactions check
 
 Run `npm run dev`, open a profile with active HUF and CHF accounts, and navigate
 to Transactions. Record expenses, income, same-currency transfers, and a HUF↔CHF
-transfer using dot and comma decimals, a new
+transfer using calculator expressions and dot and comma decimals, a new
 payee, and main/subcategories; verify the list and account balances update and
 HUF is shown without decimals. Reuse the payee with different casing and confirm
 it appears with its original spelling. Try tomorrow's date and mismatched category
@@ -415,12 +477,24 @@ confirm neither appears in its drawer picker. Repeat in Hungarian, English, and
 German and check translated validation, keyboard focus, and light/dark themes.
 Verify the transfer row shows both accounts and the actual cross-currency rate,
 account filters include either leg, transfer legs do not alter expense/income
-totals, and an optional fee defaults to Fees. After create, edit, and delete, use
+totals, and an optional fee defaults to Fees. Try the calculator on both transfer
+amounts and the optional fee, including Enter without saving and leaving the fee
+blank. Mark a fee Excluded, check balances stay unchanged while expense totals
+omit it, then edit/delete/undo the transfer and verify the fee flag is restored.
+After create, edit, and delete, use
 both the toast action and `Ctrl+Z` and verify
 the exact previous transaction returns. While typing in amount, payee, note, or
 filter input, verify `Ctrl+Z` edits the field instead of undoing a transaction.
 Switch profiles after a change and verify the previous profile's command cannot
-be undone.
+be undone. Mark both an expense and income as Excluded in the drawer and verify
+that the badge appears, balances remain unchanged by toggling the flag, and both
+filtered-set and day totals omit their amounts. Try all three exclusion filter
+modes together with period/account/category/payee/search filters and paging;
+only-excluded totals must be zero. Save a flag toggle, undo it using the toast
+and Ctrl+Z, then delete an excluded transaction and undo the deletion; verify the
+flag, balances, and totals return. Restart and check flags persist. Repeat the
+badge, filter, and checkbox checks in HU/EN/DE, light/dark themes, and using only
+the keyboard.
 Combine all filters and compare whole-set totals with known amounts in both
 currencies. Check custom endpoints, year/month rollover, main-category versus
 subcategory selection, archived-history filters, and case/diacritic-insensitive
@@ -428,8 +502,8 @@ payee/note search. With more than 200 matching transactions, scroll to the botto
 and page forward/back; verify the day header totals still cover the whole day,
 the browser mounts only a small row window, and edit/delete refreshes the first
 page and totals. UI checks remain manual; the application-API tests cover filters,
-calendar boundaries, stable paging, exact totals, upgrade preservation, and the
-20 000-transaction query bound.
+calendar boundaries, stable paging, exact totals, excluded flags and filters,
+undo, upgrade preservation, persistence, and the 20 000-transaction query bound.
 
 ### Manual Categories check
 

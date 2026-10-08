@@ -28,6 +28,7 @@ interface StoredFeeImage {
   id: string
   accountId: string
   kind: 'expense'
+  excluded: number
   date: string
   totalMinor: number
   payeeId: null
@@ -64,7 +65,7 @@ function captureAggregate(
     ? ((database
         .prepare(
           `SELECT transactions.id, transactions.account_id AS accountId,
-            transactions.kind, transactions.date,
+            transactions.kind, transactions.excluded, transactions.date,
             transactions.total_minor AS totalMinor,
             transactions.payee_id AS payeeId, transactions.note,
             transactions.created_at AS createdAt,
@@ -102,9 +103,9 @@ function restoreAggregate(
     database
       .prepare(
         `INSERT INTO transactions
-          (id, account_id, kind, date, total_minor, payee_id, note,
+          (id, account_id, kind, date, total_minor, payee_id, note, excluded,
             created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         fee.id,
@@ -114,6 +115,7 @@ function restoreAggregate(
         fee.totalMinor,
         fee.payeeId,
         fee.note,
+        fee.excluded,
         fee.createdAt,
         fee.updatedAt,
       )

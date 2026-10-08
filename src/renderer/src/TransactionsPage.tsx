@@ -9,6 +9,7 @@ import type {
   TransactionPage,
   TransactionListInput,
   TransactionPeriod,
+  TransactionExclusionFilter,
 } from '../../shared/transactions'
 import type { Transfer } from '../../shared/transfers'
 import { Button } from './components/ui/button'
@@ -17,7 +18,8 @@ import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
 import { type Language, type MessageKey } from './i18n'
 import { TransactionTable, Totals } from './components/transaction-table'
-import { parseAmountInput } from './lib/amount-input'
+import { parseAmountExpression } from '../../shared/amount-expression'
+import { AmountInput } from './components/amount-input'
 import { today } from '../../shared/date'
 
 const errorKeys = [
@@ -29,6 +31,7 @@ const errorKeys = [
   'transactions.error.payee',
   'transactions.error.category',
   'transactions.error.note',
+  'transactions.error.excluded',
   'transactions.error.notFound',
   'transactions.error.lines',
   'transactions.error.filters',
@@ -67,6 +70,8 @@ interface FormState {
   toAmount: string
   feeAmount: string
   feeCategoryId: string
+  excluded: boolean
+  feeExcluded: boolean
 }
 
 function emptyForm(accountId = ''): FormState {
@@ -83,6 +88,8 @@ function emptyForm(accountId = ''): FormState {
     toAmount: '',
     feeAmount: '',
     feeCategoryId: '',
+    excluded: false,
+    feeExcluded: false,
   }
 }
 
@@ -111,6 +118,7 @@ export function TransactionsPage({
     categoryId: '',
     payeeId: '',
     search: '',
+    exclusion: 'all' as TransactionExclusionFilter,
   })
   const [revision, setRevision] = useState(0)
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -185,6 +193,7 @@ export function TransactionsPage({
       categoryId: filters.categoryId || undefined,
       payeeId: filters.payeeId || undefined,
       search: filters.search,
+      exclusion: filters.exclusion,
       limit: 200,
       offset: 0,
     })
@@ -217,24 +226,28 @@ export function TransactionsPage({
       if (form.kind === 'transfer') {
         const input = {
           fromAccountId: form.accountId,
-          fromAmountMinor: parseAmountInput(
+          fromAmountMinor: parseAmountExpression(
             form.amount,
+            selectedAccount?.currency ?? 'HUF',
             'transactions.error.amount',
           ),
           toAccountId: form.toAccountId,
-          toAmountMinor: parseAmountInput(
+          toAmountMinor: parseAmountExpression(
             form.toAmount,
+            selectedToAccount?.currency ?? 'HUF',
             'transactions.error.amount',
           ),
           date: form.date,
           note: form.note,
           fee: form.feeAmount
             ? {
-                amountMinor: parseAmountInput(
+                amountMinor: parseAmountExpression(
                   form.feeAmount,
+                  selectedAccount?.currency ?? 'HUF',
                   'transactions.error.amount',
                 ),
                 categoryId: form.feeCategoryId || null,
+                excluded: form.feeExcluded,
               }
             : null,
         }
@@ -246,10 +259,15 @@ export function TransactionsPage({
         accountId: form.accountId,
         kind: form.kind,
         date: form.date,
-        totalMinor: parseAmountInput(form.amount, 'transactions.error.amount'),
+        totalMinor: parseAmountExpression(
+          form.amount,
+          selectedAccount?.currency ?? 'HUF',
+          'transactions.error.amount',
+        ),
         payeeName: form.payeeName,
         categoryId: form.categoryId || null,
         note: form.note,
+        excluded: form.excluded,
       }
       return form.id
         ? window.app.transactions.update({ id: form.id, ...input })
@@ -428,6 +446,26 @@ export function TransactionsPage({
             }
           />
         </label>
+        <label className="space-y-1 text-xs font-medium">
+          {t('transactions.exclusion')}
+          <NativeSelect
+            value={filters.exclusion}
+            onChange={(event) =>
+              setFilters({
+                ...filters,
+                exclusion: event.target.value as TransactionExclusionFilter,
+              })
+            }
+          >
+            {(['all', 'onlyExcluded', 'hideExcluded'] as const).map(
+              (exclusion) => (
+                <option key={exclusion} value={exclusion}>
+                  {t(`transactions.exclusion.${exclusion}`)}
+                </option>
+              ),
+            )}
+          </NativeSelect>
+        </label>
         <Button type="submit" disabled={busy || loading} className="self-end">
           {t('transactions.applyFilters')}
         </Button>
@@ -480,6 +518,8 @@ export function TransactionsPage({
                             ? amountInput(transaction.fee.totalMinor)
                             : '',
                           feeCategoryId: transaction.fee?.line.categoryId ?? '',
+                          excluded: false,
+                          feeExcluded: transaction.fee?.excluded ?? false,
                         }
                       : {
                           id: transaction.id,
@@ -494,6 +534,8 @@ export function TransactionsPage({
                           toAmount: '',
                           feeAmount: '',
                           feeCategoryId: '',
+                          excluded: transaction.excluded,
+                          feeExcluded: false,
                         },
                   )
                 }
@@ -661,21 +703,17 @@ export function TransactionsPage({
                         : 'transactions.amount',
                     )}
                   </label>
-                  <Input
+                  <AmountInput
                     id="transaction-amount"
-                    inputMode="decimal"
                     value={form.amount}
-                    placeholder="0.00"
-                    maxLength={20}
-                    required
+                    currency={selectedAccount?.currency ?? 'HUF'}
+                    language={language}
+                    t={t}
+                    errorKey="transactions.error.amount"
+                    hintKey="transactions.amountHint"
                     disabled={busy}
-                    onChange={(event) =>
-                      setForm({ ...form, amount: event.target.value })
-                    }
+                    onChange={(amount) => setForm({ ...form, amount })}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    {t('transactions.amountHint')}
-                  </p>
                 </div>
               </div>
               <div className="space-y-2">
@@ -750,17 +788,16 @@ export function TransactionsPage({
                     >
                       {t('transactions.toAmount')}
                     </label>
-                    <Input
+                    <AmountInput
                       id="transfer-to-amount"
-                      inputMode="decimal"
                       value={form.toAmount}
-                      placeholder="0.00"
-                      maxLength={20}
-                      required
+                      currency={selectedToAccount?.currency ?? 'HUF'}
+                      language={language}
+                      t={t}
+                      errorKey="transactions.error.amount"
+                      hintKey="transactions.amountHint"
                       disabled={busy}
-                      onChange={(event) =>
-                        setForm({ ...form, toAmount: event.target.value })
-                      }
+                      onChange={(toAmount) => setForm({ ...form, toAmount })}
                     />
                   </div>
                 </>
@@ -829,17 +866,41 @@ export function TransactionsPage({
                     >
                       {t('transactions.fee')}
                     </label>
-                    <Input
+                    <AmountInput
                       id="transfer-fee"
-                      inputMode="decimal"
                       value={form.feeAmount}
+                      currency={selectedAccount?.currency ?? 'HUF'}
+                      language={language}
+                      t={t}
+                      errorKey="transactions.error.amount"
+                      hintKey="transactions.amountHint"
+                      required={false}
                       placeholder={t('transactions.optional')}
-                      maxLength={20}
                       disabled={busy}
-                      onChange={(event) =>
-                        setForm({ ...form, feeAmount: event.target.value })
-                      }
+                      onChange={(feeAmount) => setForm({ ...form, feeAmount })}
                     />
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                      <input
+                        type="checkbox"
+                        checked={form.feeExcluded}
+                        disabled={busy || !form.feeAmount}
+                        aria-describedby="transfer-fee-excluded-hint"
+                        onChange={(event) =>
+                          setForm({
+                            ...form,
+                            feeExcluded: event.target.checked,
+                          })
+                        }
+                        className="size-4 accent-primary"
+                      />
+                      {t('transactions.excluded')}
+                    </label>
+                    <p
+                      id="transfer-fee-excluded-hint"
+                      className="text-xs text-muted-foreground"
+                    >
+                      {t('transactions.excludedHint')}
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <label
@@ -889,6 +950,29 @@ export function TransactionsPage({
                   }
                 />
               </div>
+              {form.kind !== 'transfer' && (
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={form.excluded}
+                      disabled={busy}
+                      aria-describedby="transaction-excluded-hint"
+                      onChange={(event) =>
+                        setForm({ ...form, excluded: event.target.checked })
+                      }
+                      className="size-4 accent-primary"
+                    />
+                    {t('transactions.excluded')}
+                  </label>
+                  <p
+                    id="transaction-excluded-hint"
+                    className="text-xs text-muted-foreground"
+                  >
+                    {t('transactions.excludedHint')}
+                  </p>
+                </div>
+              )}
               <div className="flex gap-2 pt-2">
                 <Button type="submit" disabled={busy}>
                   {t('transactions.save')}

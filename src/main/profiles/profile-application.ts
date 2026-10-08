@@ -340,6 +340,13 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
   ),
   defineSqlMigration(
     8,
+    'excluded transactions',
+    `
+    ALTER TABLE transactions ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0 CHECK (excluded IN (0, 1));
+  `,
+  ),
+  defineSqlMigration(
+    9,
     'one-record transfers with linked fees',
     `
     CREATE TABLE transfers (

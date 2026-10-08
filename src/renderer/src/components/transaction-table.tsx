@@ -236,7 +236,19 @@ export function TransactionTable({
                   className="truncate px-3"
                   title={transaction.payeeName ?? ''}
                 >
-                  {transaction.payeeName ?? t('transactions.noPayee')}
+                  <span className="flex items-center gap-2">
+                    <span className="truncate">
+                      {transaction.payeeName ?? t('transactions.noPayee')}
+                    </span>
+                    {transaction.excluded && (
+                      <span
+                        className="shrink-0 rounded border px-1 text-xs text-muted-foreground"
+                        title={t('transactions.excludedHint')}
+                      >
+                        {t('transactions.excluded')}
+                      </span>
+                    )}
+                  </span>
                 </td>
                 <td className="truncate px-3" title={account?.name}>
                   {account?.name ?? t('transactions.unknownAccount')}
