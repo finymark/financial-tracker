@@ -61,6 +61,9 @@ import type {
   UpdateTransactionInput,
 } from '../../shared/transactions'
 import { listPayees, listTransactions } from './profile-transactions'
+import type { Tag, RenameTagInput } from '../../shared/tags'
+import { renameTagUndoableCommand, deleteTagUndoableCommand } from './tag-undo'
+import { listTags } from './profile-tags'
 import {
   createTransactionUndoableCommand,
   deleteTransactionUndoableCommand,
@@ -134,6 +137,7 @@ export interface OpenProfileApplicationOptions {
 export interface ProfileQueries {
   listTransactions(input?: TransactionListInput): TransactionPage
   listPayees(): Payee[]
+  listTags(): Tag[]
   hasCategoryTransactions(id: string): boolean
   listCategories(): Category[]
   listCategoryOptions(kind: CategoryKind): Category[]
@@ -150,6 +154,8 @@ export interface ProfileCommands {
   createTransaction(input: CreateTransactionInput): Transaction
   updateTransaction(input: UpdateTransactionInput): Transaction
   deleteTransaction(id: string): void
+  renameTag(input: RenameTagInput): Tag
+  deleteTag(id: string): void
   undoLast(): boolean
   createCategory(input: CreateCategoryInput): Category
   renameCategory(input: RenameCategoryInput): Category
@@ -325,6 +331,24 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
       BEGIN SELECT RAISE(ABORT, 'Invalid normalized payee name'); END;
   `,
   ),
+  defineSqlMigration(
+    8,
+    'tags on transaction lines',
+    `
+    CREATE TABLE tags (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 100),
+      normalized_name TEXT NOT NULL UNIQUE CHECK (normalized_name = payee_key(name)),
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE transaction_line_tags (
+      line_id TEXT NOT NULL REFERENCES transaction_lines(id) ON DELETE CASCADE,
+      tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (line_id, tag_id)
+    );
+    CREATE INDEX transaction_line_tags_tag_id ON transaction_line_tags(tag_id, line_id);
+  `,
+  ),
 ]
 
 function validateMigrations(
@@ -477,6 +501,14 @@ class OpenProfileApplication implements ProfileApplication {
         this.#executeUndoableCommand(
           deleteTransactionUndoableCommand(this.#database, id),
         ),
+      deleteTag: (id) =>
+        this.#executeUndoableCommand(
+          deleteTagUndoableCommand(this.#database, id),
+        ),
+      renameTag: (input) =>
+        this.#executeUndoableCommand(
+          renameTagUndoableCommand(this.#database, input),
+        ),
       undoLast: () => {
         this.#assertAvailable()
         return this.#undoHistory.undoLast(this.#database)
@@ -525,6 +557,10 @@ class OpenProfileApplication implements ProfileApplication {
       listTransactions: (input) => {
         this.#assertAvailable()
         return listTransactions(this.#database, input, this.#clock)
+      },
+      listTags: () => {
+        this.#assertAvailable()
+        return listTags(this.#database)
       },
       listPayees: () => {
         this.#assertAvailable()

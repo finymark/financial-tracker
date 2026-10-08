@@ -146,6 +146,7 @@ export function parseTransactionListInput(
     accountId: id(input.accountId),
     categoryId: id(input.categoryId),
     payeeId: id(input.payeeId),
+    tagId: id(input.tagId),
     search: (input.search as string | undefined)?.trim(),
     offset: offset as number,
     limit: limit as number,

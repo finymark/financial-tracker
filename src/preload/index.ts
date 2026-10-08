@@ -25,6 +25,11 @@ const bridge: AppBridge = {
   undo: {
     last: () => ipcRenderer.invoke(IPC_CHANNELS.undoLast),
   },
+  tags: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.tagsList),
+    rename: (input) => ipcRenderer.invoke(IPC_CHANNELS.tagsRename, input),
+    delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.tagsDelete, input),
+  },
   payees: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.payeesList),
   },

@@ -23,6 +23,9 @@ import {
 } from './transaction-validation'
 import { today } from '../../shared/date'
 import { normalizePayeeKey } from '../db'
+import { validateTagNames } from './tag-validation'
+import { getLineTags, getLinesTags, setLineTags } from './profile-tags'
+import type { Tag } from '../../shared/tags'
 
 interface StoredTransaction {
   id: string
@@ -62,7 +65,11 @@ const TRANSACTION_SELECT = `
   LEFT JOIN payees ON payees.id = transactions.payee_id
   LEFT JOIN transaction_lines ON transaction_lines.transaction_id = transactions.id`
 
-function transactionView(row: StoredTransaction | undefined): Transaction {
+function transactionView(
+  database: Database.Database,
+  row: StoredTransaction | undefined,
+  tags?: Tag[],
+): Transaction {
   if (!row) throw new Error('transactions.error.notFound')
   if (row.lineCount !== 1 || row.lineTotal !== row.totalMinor || !row.lineId) {
     throw new Error('transactions.error.lines')
@@ -82,6 +89,7 @@ function transactionView(row: StoredTransaction | undefined): Transaction {
       id: row.lineId,
       amountMinor: row.amountMinor,
       categoryId: row.categoryId,
+      tags: tags ?? getLineTags(database, row.lineId),
     },
   }
 }
@@ -91,6 +99,7 @@ export function getTransaction(
   id: string,
 ): Transaction {
   return transactionView(
+    database,
     database
       .prepare(`${TRANSACTION_SELECT} WHERE transactions.id = ?`)
       .get(id) as StoredTransaction | undefined,
@@ -183,6 +192,7 @@ export function createTransaction(
   const payeeName = validateTransactionPayeeName(input.payeeName)
   const categoryId = validateTransactionCategoryId(input.categoryId)
   const note = validateTransactionNote(input.note)
+  const tagNames = validateTagNames(input.tagNames)
   validateReferences(database, accountId, kind, categoryId)
   const timestamp = clock().toISOString()
   const payeeId = resolvePayee(database, payeeName, timestamp)
@@ -204,12 +214,14 @@ export function createTransaction(
       timestamp,
       timestamp,
     )
+  const lineId = randomUUID()
   database
     .prepare(
       `INSERT INTO transaction_lines
         (id, transaction_id, amount_minor, category_id) VALUES (?, ?, ?, ?)`,
     )
-    .run(randomUUID(), id, totalMinor, categoryId)
+    .run(lineId, id, totalMinor, categoryId)
+  setLineTags(database, lineId, tagNames, timestamp)
   return getTransaction(database, id)
 }
 
@@ -226,6 +238,10 @@ export function updateTransaction(
   const payeeName = validateTransactionPayeeName(input.payeeName)
   const categoryId = validateTransactionCategoryId(input.categoryId)
   const note = validateTransactionNote(input.note)
+  const tagNames =
+    input.tagNames === undefined
+      ? current.line.tags.map((tag) => tag.name)
+      : validateTagNames(input.tagNames)
   validateReferences(database, accountId, kind, categoryId, current)
   const timestamp = clock().toISOString()
   const payeeId = resolvePayee(database, payeeName, timestamp)
@@ -251,6 +267,7 @@ export function updateTransaction(
       'UPDATE transaction_lines SET amount_minor = ?, category_id = ? WHERE id = ?',
     )
     .run(totalMinor, categoryId, current.line.id)
+  setLineTags(database, current.line.id, tagNames, timestamp)
   return getTransaction(database, current.id)
 }
 
@@ -304,6 +321,15 @@ export function listTransactions(
   if (to) add('transactions.date <= ?', to)
   if (input.accountId) add('transactions.account_id = ?', input.accountId)
   if (input.payeeId) add('transactions.payee_id = ?', input.payeeId)
+  if (input.tagId)
+    add(
+      `EXISTS (
+        SELECT 1 FROM transaction_lines AS tagged_lines
+        JOIN transaction_line_tags ON transaction_line_tags.line_id = tagged_lines.id
+        WHERE tagged_lines.transaction_id = transactions.id AND transaction_line_tags.tag_id = ?
+      )`,
+      input.tagId,
+    )
   if (input.categoryId)
     add(
       `EXISTS (
@@ -329,16 +355,21 @@ export function listTransactions(
   // One read snapshot for rows and aggregates. Offset allows arbitrary virtual
   // windows; only the bounded page goes through the ledger line checks.
   return database.transaction(() => {
-    const rows = (
-      database
-        .prepare(
-          `${TRANSACTION_SELECT}
+    const storedRows = database
+      .prepare(
+        `${TRANSACTION_SELECT}
       WHERE transactions.id IN (SELECT transactions.id ${filtered}
         ORDER BY ${LIST_ORDER} LIMIT ? OFFSET ?)
       ORDER BY ${LIST_ORDER}`,
-        )
-        .all(...parameters, input.limit!, input.offset!) as StoredTransaction[]
-    ).map(transactionView)
+      )
+      .all(...parameters, input.limit!, input.offset!) as StoredTransaction[]
+    const lineTags = getLinesTags(
+      database,
+      storedRows.map((row) => row.lineId),
+    )
+    const rows = storedRows.map((row) =>
+      transactionView(database, row, lineTags.get(row.lineId) ?? []),
+    )
     const totalCount = Number(
       (
         database

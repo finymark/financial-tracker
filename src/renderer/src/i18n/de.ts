@@ -107,7 +107,7 @@ export const de = {
   'transactions.description':
     'Erfasse Ausgaben und Einnahmen, damit deine Kontosalden aktuell bleiben.',
   'transactions.listDescription':
-    'Transaktionen nach Zeitraum, Konto, Kategorie, Zahlungspartner oder Notiz filtern.',
+    'Transaktionen nach Zeitraum, Konto, Kategorie, Zahlungspartner, Tag oder Notiz filtern.',
   'transactions.filters': 'Transaktionsfilter',
   'transactions.period': 'Zeitraum',
   'transactions.period.all': 'Alle Daten',
@@ -181,7 +181,25 @@ export const de = {
     'Die Transaktion wurde nicht gefunden. Aktualisiere die Liste.',
   'transactions.error.lines':
     'Die Transaktionszeilen entsprechen nicht dem Gesamtbetrag.',
-  'undo.available': 'Transaktion geändert.',
+  'tags.title': 'Tags',
+  'tags.all': 'Alle Tags',
+  'tags.manage': 'Tags verwalten',
+  'tags.empty': 'Erstelle Tags im Transaktionsformular.',
+  'tags.name': 'Tag-Name',
+  'tags.rename': 'Umbenennen',
+  'tags.delete': 'Tag löschen',
+  'tags.save': 'Tag speichern',
+  'tags.add': 'Tag hinzufügen',
+  'tags.remove': 'Tag entfernen',
+  'tags.hint':
+    'Wähle ein vorhandenes Tag oder gib ein neues ein. Drücke Enter oder Tag hinzufügen; neue Tags werden beim Speichern erstellt.',
+  'tags.deleteConfirmation':
+    'Dieses Tag löschen und von allen Transaktionen entfernen?',
+  'tags.error.name': 'Tag-Namen müssen zwischen 1 und 100 Zeichen lang sein.',
+  'tags.error.notFound':
+    'Das Tag wurde nicht gefunden. Aktualisiere die Liste.',
+  'tags.error.duplicate': 'Ein Tag mit diesem Namen existiert bereits.',
+  'undo.available': 'Änderung gespeichert.',
   'undo.action': 'Rückgängig',
   'undo.error': 'Die Änderung konnte nicht rückgängig gemacht werden.',
   'accounts.title': 'Ein Platz für jedes Konto',

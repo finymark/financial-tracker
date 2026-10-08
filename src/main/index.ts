@@ -11,6 +11,7 @@ import { registerAccountIpc } from './profiles/account-ipc'
 import { registerProfileIpc } from './profiles/profile-ipc'
 import { registerTransactionIpc } from './profiles/transaction-ipc'
 import { registerUndoIpc } from './profiles/undo-ipc'
+import { registerTagIpc } from './profiles/tag-ipc'
 import { ProfileRegistry } from './profiles/profile-registry'
 import { registerIpcHandler } from './ipc'
 
@@ -89,6 +90,7 @@ void app.whenReady().then(() => {
   registerCategoryIpc(ipcMain, profiles)
   registerTransactionIpc(ipcMain, profiles)
   registerUndoIpc(ipcMain, profiles)
+  registerTagIpc(ipcMain, profiles)
 
   let shutdownPromise: Promise<void> | null = null
   let shutdownComplete = false
