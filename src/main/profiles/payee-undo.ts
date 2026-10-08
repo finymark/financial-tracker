@@ -40,6 +40,7 @@ interface MergePayeesImage {
   source: StoredPayee
   aliases: StoredAlias[]
   sourceTransactionIds: string[]
+  sourceRuleIds: string[]
 }
 
 function insertAlias(database: Database.Database, alias: StoredAlias): void {
@@ -117,7 +118,23 @@ export function mergePayeesUndoableCommand(
           )
           .all(source.id) as { id: string }[]
       ).map(({ id }) => id)
-      return { source, aliases, sourceTransactionIds }
+      const rulesAvailable = Boolean(
+        database
+          .prepare(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'categorisation_rules'",
+          )
+          .get(),
+      )
+      const sourceRuleIds = rulesAvailable
+        ? (
+            database
+              .prepare(
+                'SELECT id FROM categorisation_rules WHERE payee_id = ? ORDER BY sort_order, rowid',
+              )
+              .all(source.id) as { id: string }[]
+          ).map(({ id }) => id)
+        : []
+      return { source, aliases, sourceTransactionIds, sourceRuleIds }
     },
     execute: () => mergePayees(database, input, clock),
     captureAfter: () => null,
@@ -142,6 +159,14 @@ export function mergePayeesUndoableCommand(
       )
       for (const transactionId of before.sourceTransactionIds) {
         restoreTransaction.run(before.source.id, transactionId)
+      }
+      if (before.sourceRuleIds.length > 0) {
+        const restoreRule = database.prepare(
+          'UPDATE categorisation_rules SET payee_id = ? WHERE id = ?',
+        )
+        for (const ruleId of before.sourceRuleIds) {
+          restoreRule.run(before.source.id, ruleId)
+        }
       }
     },
   }

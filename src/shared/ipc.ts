@@ -58,6 +58,16 @@ import type {
   CreateBalanceAdjustmentInput,
   UpdateBalanceAdjustmentInput,
 } from './adjustments'
+import type {
+  CategorisationAutofill,
+  CategorisationRule,
+  CategorisationRuleApplicationPreview,
+  CategorisationRuleDraftInput,
+  CategorisationRuleIdInput,
+  CreateCategorisationRuleInput,
+  ReorderCategorisationRuleInput,
+  UpdateCategorisationRuleInput,
+} from './rules'
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
@@ -109,9 +119,29 @@ export const IPC_CHANNELS = {
   tagsList: 'tags:list',
   tagsRename: 'tags:rename',
   tagsDelete: 'tags:delete',
+  rulesList: 'rules:list',
+  rulesAutofill: 'rules:autofill',
+  rulesCreate: 'rules:create',
+  rulesUpdate: 'rules:update',
+  rulesReorder: 'rules:reorder',
+  rulesDelete: 'rules:delete',
+  rulesPreviewApplication: 'rules:preview-application',
+  rulesApply: 'rules:apply',
 } as const
 
 export interface AppBridge {
+  rules: {
+    list(): Promise<CategorisationRule[]>
+    autofill(
+      input: CategorisationRuleDraftInput,
+    ): Promise<CategorisationAutofill>
+    create(input: CreateCategorisationRuleInput): Promise<CategorisationRule>
+    update(input: UpdateCategorisationRuleInput): Promise<CategorisationRule>
+    reorder(input: ReorderCategorisationRuleInput): Promise<void>
+    delete(input: CategorisationRuleIdInput): Promise<void>
+    previewApplication(): Promise<CategorisationRuleApplicationPreview>
+    apply(): Promise<CategorisationRuleApplicationPreview>
+  }
   updates: {
     isReady(): Promise<boolean>
     onReady(listener: () => void): () => void

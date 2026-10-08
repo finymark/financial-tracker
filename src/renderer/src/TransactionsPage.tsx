@@ -27,6 +27,7 @@ import { today } from '../../shared/date'
 import { matchShortcut } from './lib/shortcuts'
 import { shortcutTargetContext } from './lib/shortcut-context'
 import { useDialogFocus } from './lib/use-dialog-focus'
+import { mergeRuleAutofill } from './lib/rule-autofill'
 
 const errorKeys = [
   'transactions.error.account',
@@ -199,6 +200,8 @@ export function TransactionsPage({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<MessageKey | null>(null)
   const [form, setForm] = useState<FormState | null>(null)
+  const autofillProtected = useRef({ category: false, tags: false })
+  const autofillRequest = useRef(0)
   const dialogRef = useRef<HTMLElement>(null)
   const amountRef = useRef<HTMLInputElement>(null)
   const createRef = useRef<HTMLButtonElement>(null)
@@ -216,6 +219,7 @@ export function TransactionsPage({
   useEffect(() => {
     if (!newTransactionRequested || loading || busy) return
     if (accountOptions.length > 0) {
+      autofillProtected.current = { category: false, tags: false }
       setError(null)
       setDeleting(null)
       setForm(emptyForm(accountOptions[0].id))
@@ -303,6 +307,71 @@ export function TransactionsPage({
     }
   }, [payeeQuery])
 
+  const autofillAccountId = form?.accountId
+  const autofillKind =
+    form?.kind === 'expense' || form?.kind === 'income' ? form.kind : null
+  const autofillAmount = form?.amount
+  const autofillNote = form?.note
+  const autofillPayeeName = form?.payeeName
+  const autofillSplit = form?.splitLines
+  const autofillId = form?.id
+  useEffect(() => {
+    const requestId = ++autofillRequest.current
+    if (
+      autofillId !== null ||
+      !autofillAccountId ||
+      !autofillKind ||
+      autofillSplit
+    )
+      return
+    let totalMinor: number | null = null
+    const account = accounts.find(
+      (candidate) => candidate.id === autofillAccountId,
+    )
+    if (autofillAmount && account) {
+      try {
+        totalMinor = parseAmountExpression(
+          autofillAmount,
+          account.currency,
+          'transactions.error.amount',
+        )
+      } catch {
+        totalMinor = null
+      }
+    }
+    void window.app.rules
+      .autofill({
+        accountId: autofillAccountId,
+        kind: autofillKind,
+        totalMinor,
+        payeeName: autofillPayeeName?.trim() || null,
+        note: autofillNote ?? '',
+      })
+      .then((autofill) => {
+        if (requestId !== autofillRequest.current) return
+        setForm((current) => {
+          if (
+            !current ||
+            current.id !== null ||
+            (current.kind !== 'expense' && current.kind !== 'income') ||
+            current.splitLines
+          )
+            return current
+          return mergeRuleAutofill(current, autofill, autofillProtected.current)
+        })
+      })
+      .catch(() => {})
+  }, [
+    accounts,
+    autofillAccountId,
+    autofillAmount,
+    autofillId,
+    autofillKind,
+    autofillNote,
+    autofillPayeeName,
+    autofillSplit,
+  ])
+
   function applyFilters(event: FormEvent) {
     event.preventDefault()
     setRequest({
@@ -334,7 +403,10 @@ export function TransactionsPage({
       setRequest((current) => ({ ...current, offset: 0 }))
       setRevision((current) => current + 1)
       setForm(nextForm)
-      if (nextForm) setFocusRevision((current) => current + 1)
+      if (nextForm) {
+        autofillProtected.current = { category: false, tags: false }
+        setFocusRevision((current) => current + 1)
+      }
       setDeleting(null)
       setRenamingTag(null)
       setDeletingTag(null)
@@ -490,6 +562,7 @@ export function TransactionsPage({
     const name = form.pendingTagName.trim()
     const key = (value: string) =>
       value.normalize('NFC').toLocaleLowerCase('und').normalize('NFC')
+    autofillProtected.current.tags = true
     setForm({
       ...form,
       tagNames: form.tagNames.some((tag) => key(tag) === key(name))
@@ -605,6 +678,7 @@ export function TransactionsPage({
             ref={createRef}
             disabled={busy || loading || accountOptions.length === 0}
             onClick={() => {
+              autofillProtected.current = { category: false, tags: false }
               setError(null)
               setDeleting(null)
               setForm(emptyForm(accountOptions[0]?.id))
@@ -813,7 +887,8 @@ export function TransactionsPage({
                 language={language}
                 t={t}
                 busy={busy}
-                onEdit={(transaction) =>
+                onEdit={(transaction) => {
+                  autofillProtected.current = { category: true, tags: true }
                   setForm(
                     transaction.kind === 'transfer'
                       ? {
@@ -891,7 +966,7 @@ export function TransactionsPage({
                                 : null,
                           },
                   )
-                }
+                }}
                 onDelete={setDeleting}
               />
             )}
@@ -1336,7 +1411,11 @@ export function TransactionsPage({
                     <Button
                       variant="ghost"
                       disabled={busy}
-                      onClick={() =>
+                      onClick={() => {
+                        autofillProtected.current = {
+                          category: true,
+                          tags: true,
+                        }
                         setForm({
                           ...form,
                           splitLines: [
@@ -1349,7 +1428,7 @@ export function TransactionsPage({
                             splitLine(),
                           ],
                         })
-                      }
+                      }}
                     >
                       {t('splits.split')}
                     </Button>
@@ -1359,6 +1438,10 @@ export function TransactionsPage({
                         variant="ghost"
                         disabled={busy}
                         onClick={() => {
+                          autofillProtected.current = {
+                            category: true,
+                            tags: true,
+                          }
                           const first = form.splitLines![0]
                           setForm({
                             ...form,
@@ -1638,9 +1721,13 @@ export function TransactionsPage({
                       id="transaction-category"
                       value={form.categoryId}
                       disabled={busy}
-                      onChange={(event) =>
-                        setForm({ ...form, categoryId: event.target.value })
-                      }
+                      onChange={(event) => {
+                        autofillProtected.current.category = true
+                        setForm({
+                          ...form,
+                          categoryId: event.target.value,
+                        })
+                      }}
                     >
                       <option value="">{t('transactions.noCategory')}</option>
                       {drawerCategories.map((category) => (
@@ -1746,12 +1833,13 @@ export function TransactionsPage({
                         value={form.pendingTagName}
                         maxLength={100}
                         disabled={busy}
-                        onChange={(event) =>
+                        onChange={(event) => {
+                          autofillProtected.current.tags = true
                           setForm({
                             ...form,
                             pendingTagName: event.target.value,
                           })
-                        }
+                        }}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter') {
                             event.preventDefault()
@@ -1787,14 +1875,15 @@ export function TransactionsPage({
                             className="size-7"
                             disabled={busy}
                             aria-label={`${t('tags.remove')}: ${name}`}
-                            onClick={() =>
+                            onClick={() => {
+                              autofillProtected.current.tags = true
                               setForm({
                                 ...form,
                                 tagNames: form.tagNames.filter(
                                   (_, candidate) => candidate !== index,
                                 ),
                               })
-                            }
+                            }}
                           >
                             <X aria-hidden="true" className="size-3" />
                           </Button>

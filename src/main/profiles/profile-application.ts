@@ -114,6 +114,27 @@ import {
   deleteBalanceAdjustmentUndoableCommand,
   updateBalanceAdjustmentUndoableCommand,
 } from './adjustment-undo'
+import type {
+  CategorisationAutofill,
+  CategorisationRule,
+  CategorisationRuleApplicationPreview,
+  CategorisationRuleDraftInput,
+  CreateCategorisationRuleInput,
+  ReorderCategorisationRuleInput,
+  UpdateCategorisationRuleInput,
+} from '../../shared/rules'
+import {
+  getCategorisationAutofill,
+  listCategorisationRules,
+  previewCategorisationRuleApplication,
+} from './profile-rules'
+import {
+  applyCategorisationRulesUndoableCommand,
+  createCategorisationRuleUndoableCommand,
+  deleteCategorisationRuleUndoableCommand,
+  reorderCategorisationRuleUndoableCommand,
+  updateCategorisationRuleUndoableCommand,
+} from './rule-undo'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -168,6 +189,11 @@ export interface OpenProfileApplicationOptions {
 }
 
 export interface ProfileQueries {
+  listCategorisationRules(): CategorisationRule[]
+  getCategorisationAutofill(
+    input: CategorisationRuleDraftInput,
+  ): CategorisationAutofill
+  previewCategorisationRuleApplication(): CategorisationRuleApplicationPreview
   listTransactions(input?: TransactionListInput): TransactionPage
   listPayees(): Payee[]
   listPayeeAliases(payeeId: string): PayeeAlias[]
@@ -186,6 +212,15 @@ export interface ProfileQueries {
 }
 
 export interface ProfileCommands {
+  createCategorisationRule(
+    input: CreateCategorisationRuleInput,
+  ): CategorisationRule
+  updateCategorisationRule(
+    input: UpdateCategorisationRuleInput,
+  ): CategorisationRule
+  reorderCategorisationRule(input: ReorderCategorisationRuleInput): void
+  deleteCategorisationRule(id: string): void
+  applyCategorisationRules(): CategorisationRuleApplicationPreview
   createTransaction(input: CreateTransactionInput): Transaction
   updateTransaction(input: UpdateTransactionInput): Transaction
   deleteTransaction(id: string): void
@@ -493,6 +528,53 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
     );
   `,
   ),
+  defineSqlMigration(
+    14,
+    'categorisation rules',
+    `
+    CREATE TABLE categorisation_rules (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+      sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
+      payee_id TEXT REFERENCES payees(id) ON DELETE RESTRICT,
+      text_contains TEXT CHECK (
+        text_contains IS NULL OR length(trim(text_contains)) BETWEEN 1 AND 1000
+      ),
+      account_id TEXT REFERENCES accounts(id) ON DELETE RESTRICT,
+      min_amount_minor INTEGER CHECK (
+        min_amount_minor IS NULL OR
+        (typeof(min_amount_minor) = 'integer' AND min_amount_minor >= 0)
+      ),
+      max_amount_minor INTEGER CHECK (
+        max_amount_minor IS NULL OR
+        (typeof(max_amount_minor) = 'integer' AND max_amount_minor > 0)
+      ),
+      category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      CHECK (payee_id IS NOT NULL OR text_contains IS NOT NULL),
+      CHECK (
+        min_amount_minor IS NULL OR max_amount_minor IS NULL OR
+        min_amount_minor <= max_amount_minor
+      )
+    );
+    CREATE INDEX categorisation_rules_priority
+      ON categorisation_rules(sort_order);
+    CREATE INDEX categorisation_rules_payee_id
+      ON categorisation_rules(payee_id);
+    CREATE INDEX categorisation_rules_account_id
+      ON categorisation_rules(account_id);
+    CREATE INDEX categorisation_rules_category_id
+      ON categorisation_rules(category_id);
+    CREATE TABLE categorisation_rule_tags (
+      rule_id TEXT NOT NULL REFERENCES categorisation_rules(id) ON DELETE CASCADE,
+      tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (rule_id, tag_id)
+    );
+    CREATE INDEX categorisation_rule_tags_tag_id
+      ON categorisation_rule_tags(tag_id, rule_id);
+  `,
+  ),
 ]
 
 function validateMigrations(
@@ -633,6 +715,34 @@ class OpenProfileApplication implements ProfileApplication {
     this.#options = options
     this.#clock = options.clock ?? (() => new Date())
     this.commands = {
+      createCategorisationRule: (input) =>
+        this.#executeUndoableCommand(
+          createCategorisationRuleUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+          ),
+        ),
+      updateCategorisationRule: (input) =>
+        this.#executeUndoableCommand(
+          updateCategorisationRuleUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+          ),
+        ),
+      reorderCategorisationRule: (input) =>
+        this.#executeUndoableCommand(
+          reorderCategorisationRuleUndoableCommand(this.#database, input),
+        ),
+      deleteCategorisationRule: (id) =>
+        this.#executeUndoableCommand(
+          deleteCategorisationRuleUndoableCommand(this.#database, id),
+        ),
+      applyCategorisationRules: () =>
+        this.#executeUndoableCommand(
+          applyCategorisationRulesUndoableCommand(this.#database),
+        ),
       createTransaction: (input) =>
         this.#executeUndoableCommand(
           createTransactionUndoableCommand(this.#database, input, this.#clock),
@@ -742,6 +852,18 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      listCategorisationRules: () => {
+        this.#assertAvailable()
+        return listCategorisationRules(this.#database)
+      },
+      getCategorisationAutofill: (input) => {
+        this.#assertAvailable()
+        return getCategorisationAutofill(this.#database, input)
+      },
+      previewCategorisationRuleApplication: () => {
+        this.#assertAvailable()
+        return previewCategorisationRuleApplication(this.#database)
+      },
       listTransactions: (input) => {
         this.#assertAvailable()
         return listTransactions(this.#database, input, this.#clock)

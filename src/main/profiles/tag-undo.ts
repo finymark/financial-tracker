@@ -3,6 +3,11 @@ import type { RenameTagInput, Tag } from '../../shared/tags'
 import { normalizePayeeKey } from '../db'
 import { validateTagId, validateTagName } from './tag-validation'
 import type { UndoableCommand } from './undo-history'
+import {
+  captureCategorisationRules,
+  restoreCategorisationRules,
+  type CategorisationRulesImage,
+} from './rule-undo'
 
 function captureTag(database: Database.Database, id: string): Tag {
   const tag = database
@@ -42,6 +47,7 @@ export function renameTagUndoableCommand(
 interface DeletedTagImage {
   tag: Tag
   lineIds: string[]
+  rules: CategorisationRulesImage | null
 }
 
 export function deleteTagUndoableCommand(
@@ -58,8 +64,28 @@ export function deleteTagUndoableCommand(
           )
           .all(id) as { lineId: string }[]
       ).map((association) => association.lineId),
+      rules: captureCategorisationRules(database),
     }),
     execute: () => {
+      const rulesAvailable = Boolean(
+        database
+          .prepare(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'categorisation_rules'",
+          )
+          .get(),
+      )
+      if (rulesAvailable) {
+        database
+          .prepare(
+            `DELETE FROM categorisation_rules
+             WHERE category_id IS NULL
+               AND 1 = (SELECT COUNT(*) FROM categorisation_rule_tags
+                        WHERE rule_id = categorisation_rules.id)
+               AND EXISTS (SELECT 1 FROM categorisation_rule_tags
+                           WHERE rule_id = categorisation_rules.id AND tag_id = ?)`,
+          )
+          .run(id)
+      }
       database.prepare('DELETE FROM tags WHERE id = ?').run(id)
     },
     // Cascading foreign keys remove the associations with the tag; capture the
@@ -70,7 +96,7 @@ export function deleteTagUndoableCommand(
           'SELECT id, name, created_at AS createdAt FROM tags WHERE id = ?',
         )
         .get(id) as Tag | undefined) ?? null,
-    restoreBefore: ({ tag, lineIds }) => {
+    restoreBefore: ({ tag, lineIds, rules }) => {
       database
         .prepare(
           'INSERT INTO tags (id, name, normalized_name, created_at) VALUES (?, ?, ?, ?)',
@@ -80,6 +106,7 @@ export function deleteTagUndoableCommand(
         'INSERT INTO transaction_line_tags (line_id, tag_id) VALUES (?, ?)',
       )
       for (const lineId of lineIds) insert.run(lineId, tag.id)
+      restoreCategorisationRules(database, rules)
     },
   }
 }

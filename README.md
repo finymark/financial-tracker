@@ -6,8 +6,8 @@ Transactions, Accounts, and Settings pages. On start you pick or create a
 profile; each profile has its own SQLite database and data folder. Financial
 data stays local. Accounts track opening balances, signed expense/income
 transactions, both legs of transfers, and target-based balance adjustments.
-Settings includes payee alias/merge management and two-level expense/income
-category management.
+Settings includes payee alias/merge management, ordered categorisation rules,
+and two-level expense/income category management.
 
 ## Requirements
 
@@ -130,7 +130,8 @@ them, and pattern matching cannot detect every possible form of sensitive data.
 
 The renderer has no Node access; a sandboxed, isolated preload exposes only the
 typed app, update, profile (including settings), account, category, transaction,
-transfer, balance adjustment, payee, tag, and backup commands/queries. Every IPC input is validated in the main
+transfer, balance adjustment, payee, tag, categorisation rule, and backup
+commands/queries. Every IPC input is validated in the main
 process, and every handler rejects calls not sent by the app's own renderer frame.
 Production CSP permits only same-origin connections; localhost WebSockets are
 added only by the development server for hot reload. SQLite foreign-key
@@ -400,6 +401,39 @@ not off-device copies or backups of the separate data folder.
   surviving payee, keeps the merged name as an alias, and is undoable as one
   command. Payee aliases use appended migration 12 after the unchanged tag and
   target-based balance-adjustment migrations 10–11.
+- **Settings → Categorisation rules** manages profile-scoped, enabled/disabled
+  rules in explicit priority order. The first matching rule wins. A rule requires
+  a canonical payee (aliases resolve to it) and/or text contained in the canonical
+  payee name plus note, ignoring case and diacritics. Account and inclusive
+  amount bounds are optional. Actions set a category and/or add existing tags.
+  Matching is deterministic and entirely local; it uses no AI or network service.
+  Create, edit, delete, reorder, and applying rules are undoable commands.
+- In a new unsplit expense/income drawer, category and tags are prefilled from
+  the first matching rule, otherwise from the latest unsplit transaction for the
+  canonical payee, otherwise left empty. This is prefill only: a category or tag
+  field the user has changed is never overwritten by later asynchronous
+  reevaluation, and all values remain editable before save.
+- Settings can preview how many existing transactions would change, then apply
+  the current ordered rules as one undoable command. It touches only matching
+  unsplit lines that are still uncategorized; categorized and split transactions
+  are left unchanged. Categorisation rules use appended migration 14 after the
+  per-line-note migration 13.
+
+### Manual Categorisation rules check
+
+Run `npm run dev` with synthetic payees, aliases, tags, categorized and
+uncategorized transactions. In **Settings → Categorisation rules**, create two
+rules that both match and move them up/down; verify only the first one prefills a
+new drawer. Check canonical and alias payee input, accented/unaccented text in
+the payee and note, account and inclusive amount boundaries, disabled rules,
+and category-only/tag-only actions. With no matching rule, verify the latest
+unsplit category and tags for that payee are used; with no payee history, verify
+both stay empty. Change category/tags by hand, then alter amount, account, payee,
+or note and verify asynchronous reevaluation never overwrites those changes.
+Preview and apply existing rules: only matching unsplit uncategorized rows may
+change, and one Undo restores the whole batch. Also undo create, edit, reorder,
+enable/disable, and delete. Repeat in HU/EN/DE and light/dark themes.
+
 - Mark an expense or income as **Excluded** in the create/edit drawer when it
   should affect its account balance but not spending/income totals (for example,
   an expense awaiting reimbursement). The table shows an Excluded badge. The
