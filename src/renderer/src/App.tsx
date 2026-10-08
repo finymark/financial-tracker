@@ -5,6 +5,7 @@ import {
   ArrowLeftRight,
   ChartPie,
   CalendarClock,
+  Inbox,
   LayoutDashboard,
   PanelLeftClose,
   PanelLeftOpen,
@@ -57,10 +58,12 @@ import { OverviewPage } from './OverviewPage'
 import type { TransactionListInput } from '../../shared/transactions'
 import { RecurringPage } from './RecurringPage'
 import type { RecurringPrefill } from './lib/recurring-prefill'
+import { ReceiptInboxPage } from './ReceiptInboxPage'
 
 const pages = [
   { id: 'overview', icon: LayoutDashboard },
   { id: 'transactions', icon: ArrowLeftRight },
+  { id: 'receipts', icon: Inbox },
   { id: 'recurring', icon: CalendarClock },
   { id: 'reports', icon: ChartPie },
   { id: 'accounts', icon: Wallet },
@@ -381,6 +384,7 @@ function Shell({
   const [recurringPrefill, setRecurringPrefill] =
     useState<RecurringPrefill | null>(null)
   const [duePendingCount, setDuePendingCount] = useState(0)
+  const [receiptCount, setReceiptCount] = useState(0)
   const [showShortcutHelp, setShowShortcutHelp] = useState(false)
   const transactionRequestHandled = useCallback(
     () => setNewTransactionRequested(false),
@@ -456,6 +460,26 @@ function Shell({
     }
     load()
     const unsubscribe = window.app.rates.onStatusChanged(load)
+    return () => {
+      ignore = true
+      unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    let ignore = false
+    const load = () => {
+      void window.app.receipts
+        .count()
+        .then((count) => {
+          if (!ignore) setReceiptCount(count)
+        })
+        .catch(() => {
+          if (!ignore) setReceiptCount(0)
+        })
+    }
+    load()
+    const unsubscribe = window.app.receipts.onChanged(load)
     return () => {
       ignore = true
       unsubscribe()
@@ -651,6 +675,18 @@ function Shell({
                   {duePendingCount}
                 </span>
               )}
+              {id === 'receipts' && receiptCount > 0 && (
+                <span
+                  className={cn(
+                    'rounded-full bg-error px-2 py-0.5 text-xs text-white',
+                    !collapsed && 'ml-auto',
+                    collapsed && 'absolute -top-1 -right-1',
+                  )}
+                  aria-label={`${t('receipts.count')}: ${receiptCount}`}
+                >
+                  {receiptCount}
+                </span>
+              )}
             </Button>
           ))}
         </nav>
@@ -786,6 +822,18 @@ function Shell({
                   setPage('recurring')
                 }}
                 initialReportFilter={reportTransactionFilter}
+              />
+            )}
+            {page === 'receipts' && (
+              <ReceiptInboxPage
+                key={`${active.id}:${undoRevision}`}
+                language={language}
+                t={t}
+                undoRevision={undoRevision}
+                onChanged={() => {
+                  setUndoError(false)
+                  setUndoOffered(true)
+                }}
               />
             )}
             {page === 'overview' && (
@@ -1059,6 +1107,9 @@ export default function App() {
   const [startupShortcutFailure, setStartupShortcutFailure] = useState<
     string | null
   >(null)
+  const [dropActive, setDropActive] = useState(false)
+  const [dropBusy, setDropBusy] = useState(false)
+  const [dropError, setDropError] = useState<MessageKey | null>(null)
   const { language, theme } = active?.settings ?? DEFAULT_PROFILE_SETTINGS
   const t: Translate = (key) => translate(language, key)
   useTheme(theme)
@@ -1083,6 +1134,84 @@ export default function App() {
       })
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    let depth = 0
+    const canIntake = Boolean(active && !showPicker)
+    const hasFiles = (event: DragEvent) =>
+      event.dataTransfer?.types.includes('Files') === true
+    const enter = (event: DragEvent) => {
+      event.preventDefault()
+      if (!canIntake || !hasFiles(event)) return
+      depth += 1
+      setDropActive(true)
+    }
+    const attachmentEnter = (event: DragEvent) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest('[data-transaction-attachment-drop-zone]')
+      ) {
+        depth = 0
+        setDropActive(false)
+      }
+    }
+    const over = (event: DragEvent) => {
+      event.preventDefault()
+      if (canIntake && event.dataTransfer)
+        event.dataTransfer.dropEffect = 'copy'
+    }
+    const leave = (event: DragEvent) => {
+      event.preventDefault()
+      if (!canIntake) return
+      depth = Math.max(0, depth - 1)
+      if (depth === 0) setDropActive(false)
+    }
+    const drop = (event: DragEvent) => {
+      event.preventDefault()
+      depth = 0
+      setDropActive(false)
+      if (!canIntake || dropBusy) return
+      const paths = [...(event.dataTransfer?.files ?? [])]
+        .map((file) => window.app.files.path(file))
+        .filter(Boolean)
+      if (paths.length === 0) return
+      setDropBusy(true)
+      setDropError(null)
+      void (async () => {
+        let firstError: MessageKey | null = null
+        for (const path of paths) {
+          try {
+            await window.app.receipts.intake({
+              intake: { path },
+              source: 'drop',
+            })
+          } catch (caught) {
+            const keys = [
+              'receipts.error.type',
+              'receipts.error.size',
+              'receipts.error.path',
+            ] as const satisfies readonly MessageKey[]
+            firstError ??=
+              keys.find((key) => String(caught).includes(key)) ??
+              'receipts.error'
+          }
+        }
+        setDropError(firstError)
+      })().finally(() => setDropBusy(false))
+    }
+    document.addEventListener('dragenter', attachmentEnter, true)
+    document.addEventListener('dragenter', enter)
+    document.addEventListener('dragover', over)
+    document.addEventListener('dragleave', leave)
+    document.addEventListener('drop', drop)
+    return () => {
+      document.removeEventListener('dragenter', attachmentEnter, true)
+      document.removeEventListener('dragenter', enter)
+      document.removeEventListener('dragover', over)
+      document.removeEventListener('dragleave', leave)
+      document.removeEventListener('drop', drop)
+    }
+  }, [active, showPicker, dropBusy])
 
   useEffect(() => {
     const unsubscribeProfile = window.app.desktop.onProfileChanged(() => {
@@ -1163,6 +1292,24 @@ export default function App() {
             variant="ghost"
             onClick={() => setStartupShortcutFailure(null)}
           >
+            {t('tray.noticeOk')}
+          </Button>
+        </aside>
+      )}
+      {(dropActive || dropBusy) && active && !showPicker && (
+        <div className="pointer-events-none fixed inset-0 z-[100] grid place-items-center bg-foreground/25 p-8">
+          <div className="rounded-xl border-2 border-dashed bg-background p-10 text-center text-lg font-semibold shadow-xl">
+            {t(dropBusy ? 'receipts.dropProcessing' : 'receipts.dropOverlay')}
+          </div>
+        </div>
+      )}
+      {dropError && (
+        <aside
+          role="alert"
+          className="fixed right-4 bottom-4 z-[101] flex max-w-md items-center gap-3 rounded-lg border bg-card p-4 text-sm text-error shadow-lg"
+        >
+          <p>{t(dropError)}</p>
+          <Button variant="ghost" onClick={() => setDropError(null)}>
             {t('tray.noticeOk')}
           </Button>
         </aside>

@@ -19,6 +19,7 @@ import {
   type AttachmentMediaType,
   type StagedAttachment,
 } from '../../shared/attachments'
+import type { ReceiptIntake } from '../../shared/receipts'
 import { validateTransactionId } from './transaction-validation'
 
 interface DetectedType {
@@ -45,6 +46,31 @@ function hasAttachmentTable(database: Database.Database): boolean {
       )
       .get(),
   )
+}
+
+function hasReceiptInboxTable(database: Database.Database): boolean {
+  return Boolean(
+    database
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'receipt_inbox_items'",
+      )
+      .get(),
+  )
+}
+
+function referencedStoredNames(database: Database.Database): string[] {
+  const receiptUnion = hasReceiptInboxTable(database)
+    ? `UNION
+       SELECT stored_name FROM receipt_inbox_items
+       WHERE status IN ('received', 'read')`
+    : ''
+  return (
+    database
+      .prepare(
+        `SELECT stored_name AS storedName FROM attachments ${receiptUnion}`,
+      )
+      .all() as { storedName: string }[]
+  ).map(({ storedName }) => storedName)
 }
 
 export function attachmentDirectory(dataDirectory: string): string {
@@ -125,9 +151,13 @@ function atomicStore(directory: string, name: string, bytes: Buffer): void {
 }
 
 export async function importAttachment(
-  sourcePath: string,
+  source: string | ReceiptIntake,
   directory: string,
 ): Promise<StagedAttachment> {
+  if (typeof source !== 'string' && source.path === undefined) {
+    return importAttachmentBytes(source.bytes, source.name, directory)
+  }
+  const sourcePath = typeof source === 'string' ? source : source.path
   if (
     typeof sourcePath !== 'string' ||
     !isAbsolute(sourcePath) ||
@@ -153,16 +183,86 @@ export async function importAttachment(
   if (sourceBytes.length > ATTACHMENT_MAX_SOURCE_BYTES)
     throw new Error('attachments.error.size')
   const type = detectType(sourceBytes)
+  return storeImportedAttachment(
+    sourceBytes,
+    basename(sourcePath),
+    type,
+    directory,
+  )
+}
+
+async function importAttachmentBytes(
+  value: Uint8Array,
+  name: string,
+  directory: string,
+): Promise<StagedAttachment> {
+  if (
+    !(value instanceof Uint8Array) ||
+    typeof name !== 'string' ||
+    name.length < 1 ||
+    name.length > 255 ||
+    name.includes('\0') ||
+    basename(name) !== name ||
+    name === '.' ||
+    name === '..'
+  )
+    throw new Error('attachments.error.path')
+  if (value.byteLength > ATTACHMENT_MAX_SOURCE_BYTES)
+    throw new Error('attachments.error.size')
+  const bytes = Buffer.from(value)
+  const type = detectType(bytes)
+  return storeImportedAttachment(bytes, name, type, directory)
+}
+
+async function storeImportedAttachment(
+  sourceBytes: Buffer,
+  originalFileName: string,
+  type: DetectedType,
+  directory: string,
+): Promise<StagedAttachment> {
+  if (
+    originalFileName.length < 1 ||
+    originalFileName.length > 255 ||
+    originalFileName.includes('\0') ||
+    basename(originalFileName) !== originalFileName ||
+    originalFileName === '.' ||
+    originalFileName === '..'
+  )
+    throw new Error('attachments.error.path')
   const storedBytes = await processImage(sourceBytes, type)
   const hash = createHash('sha256').update(storedBytes).digest('hex')
   const storedName = `${hash}.${type.extension}`
   atomicStore(directory, storedName, storedBytes)
   return {
-    originalFileName: basename(sourcePath),
+    originalFileName,
     storedName,
     mediaType: type.mediaType,
     byteSize: storedBytes.length,
   }
+}
+
+export type StoredImageAttachment = StagedAttachment & {
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp'
+}
+
+export async function importReceiptPhoto(
+  source: ReceiptIntake,
+  directory: string,
+): Promise<StoredImageAttachment> {
+  let attachment: StagedAttachment
+  try {
+    attachment = await importAttachment(source, directory)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : ''
+    if (message === 'attachments.error.size')
+      throw new Error('receipts.error.size', { cause: error })
+    if (message === 'attachments.error.path')
+      throw new Error('receipts.error.path', { cause: error })
+    throw new Error('receipts.error.type', { cause: error })
+  }
+  if (attachment.mediaType === 'application/pdf')
+    throw new Error('receipts.error.type')
+  return attachment as StoredImageAttachment
 }
 
 export function validateStagedAttachment(
@@ -359,13 +459,7 @@ export function sweepUnreferencedAttachments(
 ): void {
   if (!hasAttachmentTable(database)) return
   mkdirSync(directory, { recursive: true })
-  const referenced = new Set(
-    (
-      database
-        .prepare('SELECT DISTINCT stored_name AS storedName FROM attachments')
-        .all() as { storedName: string }[]
-    ).map(({ storedName }) => storedName),
-  )
+  const referenced = new Set(referencedStoredNames(database))
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     if (
       entry.isFile() &&
@@ -404,9 +498,5 @@ export function copyAttachmentForOpening(
 
 export function storedAttachmentNames(database: Database.Database): string[] {
   if (!hasAttachmentTable(database)) return []
-  return (
-    database
-      .prepare('SELECT DISTINCT stored_name AS storedName FROM attachments')
-      .all() as { storedName: string }[]
-  ).map(({ storedName }) => storedName)
+  return referencedStoredNames(database)
 }
