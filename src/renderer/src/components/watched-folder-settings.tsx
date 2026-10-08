@@ -26,21 +26,22 @@ export function WatchedFolderSettings({
 
   useEffect(() => {
     let ignore = false
-    const refresh = () => {
-      void window.app.profiles
-        .watchedFolderStatus()
-        .then((next) => {
-          if (!ignore) setStatus(next)
-        })
-        .catch(() => {
-          if (!ignore) setStatus(watchedFolder ? 'unavailable' : null)
-        })
-    }
-    refresh()
-    const interval = window.setInterval(refresh, 30_000)
+    void window.app.profiles
+      .watchedFolderStatus()
+      .then((next) => {
+        if (!ignore) setStatus(next)
+      })
+      .catch(() => {
+        if (!ignore) setStatus(watchedFolder ? 'unavailable' : null)
+      })
+    const unsubscribe = window.app.profiles.onWatchedFolderStatusChanged(
+      (next) => {
+        if (!ignore) setStatus(next)
+      },
+    )
     return () => {
       ignore = true
-      window.clearInterval(interval)
+      unsubscribe()
     }
   }, [watchedFolder])
 

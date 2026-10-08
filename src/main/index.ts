@@ -17,6 +17,10 @@ import { registerUpdates } from './updates'
 import { openDatabase } from './db'
 import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 import { ProfileController } from './profiles/profile-controller'
+import type {
+  WatchedFolderFailure,
+  WatchedFolderStatus,
+} from '../shared/settings'
 import { registerCategoryIpc } from './profiles/category-ipc'
 import { registerAccountIpc } from './profiles/account-ipc'
 import { registerProfileIpc } from './profiles/profile-ipc'
@@ -265,6 +269,20 @@ function startApplication(): void {
     if (mainWindow && !mainWindow.isDestroyed())
       mainWindow.webContents.send(IPC_CHANNELS.receiptsChanged)
   }
+  const onWatchedFolderStatusChanged = (status: WatchedFolderStatus | null) => {
+    if (mainWindow && !mainWindow.isDestroyed())
+      mainWindow.webContents.send(
+        IPC_CHANNELS.profilesWatchedFolderStatusChanged,
+        status,
+      )
+  }
+  const onWatchedFolderFailure = (failure: WatchedFolderFailure) => {
+    if (mainWindow && !mainWindow.isDestroyed())
+      mainWindow.webContents.send(
+        IPC_CHANNELS.profilesWatchedFolderFailure,
+        failure,
+      )
+  }
   const profiles = new ProfileController(
     new ProfileRegistry({ userDataDirectory: app.getPath('userData') }),
     app.getLocale(),
@@ -273,6 +291,8 @@ function startApplication(): void {
       onRateStatusChanged,
       onPendingTransactionsChanged,
       onReceiptInboxChanged,
+      onWatchedFolderStatusChanged,
+      onWatchedFolderFailure,
     },
   )
   const exchangeRates = new ExchangeRateScheduler(profiles, rateSource, {

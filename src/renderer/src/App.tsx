@@ -50,6 +50,7 @@ import {
   baseCurrencies,
   DEFAULT_PROFILE_SETTINGS,
   type ProfileSettingsChanges,
+  type WatchedFolderFailure,
 } from '../../shared/settings'
 import { cn } from './lib/utils'
 import type { RateStatus } from '../../shared/exchange-rates'
@@ -72,6 +73,22 @@ const pages = [
 ] as const
 type Page = (typeof pages)[number]['id']
 type Translate = (key: MessageKey) => string
+
+const receiptIntakeErrorKeys = [
+  'receipts.error.type',
+  'receipts.error.size',
+  'receipts.error.path',
+  'receipts.error.source',
+  'receipts.error',
+] as const satisfies readonly MessageKey[]
+
+function watchedFolderFailureMessage(
+  t: Translate,
+  failure: WatchedFolderFailure,
+): string {
+  const reason = receiptIntakeErrorKeys.find((key) => key === failure.reasonKey)
+  return `${t('watchedFolder.intakeFailure')}: ${failure.fileName}. ${t(reason ?? 'receipts.error')}`
+}
 
 const emptySnapshot: ProfileRegistrySnapshot = {
   profiles: [],
@@ -406,6 +423,9 @@ function Shell({
   const [undoBusy, setUndoBusy] = useState(false)
   const [undoError, setUndoError] = useState(false)
   const [rateStatus, setRateStatus] = useState<RateStatus | null>(null)
+  const [watchedFolderFailures, setWatchedFolderFailures] = useState<
+    WatchedFolderFailure[]
+  >([])
   const format = createFormatters(language)
   const privacyShortcut = shortcuts.find(
     (item) => item.action === 'privacy',
@@ -437,6 +457,14 @@ function Shell({
           setUndoError(false)
           setUndoOffered(true)
         }
+      }),
+    [],
+  )
+
+  useEffect(
+    () =>
+      window.app.profiles.onWatchedFolderFailure((failure) => {
+        setWatchedFolderFailures((current) => [...current, failure])
       }),
     [],
   )
@@ -1106,6 +1134,24 @@ function Shell({
             onClick={undoLast}
           >
             {t('undo.action')}
+          </Button>
+        </aside>
+      )}
+      {watchedFolderFailures[0] && (
+        <aside
+          role="alert"
+          className="fixed right-4 bottom-24 z-50 flex max-w-md items-center gap-3 rounded-lg border bg-card p-4 text-card-foreground shadow-lg"
+        >
+          <p className="text-sm">
+            {watchedFolderFailureMessage(t, watchedFolderFailures[0])}
+          </p>
+          <Button
+            variant="ghost"
+            onClick={() =>
+              setWatchedFolderFailures((current) => current.slice(1))
+            }
+          >
+            {t('watchedFolder.dismissFailure')}
           </Button>
         </aside>
       )}

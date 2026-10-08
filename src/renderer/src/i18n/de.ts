@@ -664,6 +664,9 @@ export const de = {
   'watchedFolder.status.unavailable': 'Ordner nicht verfügbar',
   'watchedFolder.choose': 'Ordner auswählen',
   'watchedFolder.clear': 'Entfernen',
+  'watchedFolder.intakeFailure':
+    'Ein überwachtes Belegfoto konnte nicht hinzugefügt werden',
+  'watchedFolder.dismissFailure': 'Schließen',
   'backups.title': 'Sicherungen',
   'backups.description':
     'Bei jedem Öffnen dieses Profils wird die Datenbank gesichert. Die letzten 10 Startsicherungen bleiben erhalten; Sicherungen vor Migrationen werden getrennt gespeichert.',

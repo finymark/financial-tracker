@@ -1,5 +1,4 @@
 import { BrowserWindow, dialog, type IpcMain } from 'electron'
-import { statSync } from 'node:fs'
 import { IPC_CHANNELS, type AppBridge } from '../../shared/ipc'
 import type {
   CreateProfileInput,
@@ -81,7 +80,6 @@ export function registerProfileIpc(
   onProfileNeedsRateRefresh: () => void = () => {},
   onProfileClosed: () => void = () => {},
   onProfileLanguageChanged: () => void = () => {},
-  onWatchedFolderChanged: () => void = () => {},
 ): void {
   registerIpcHandler(
     ipcMain,
@@ -166,16 +164,16 @@ export function registerProfileIpc(
   registerIpcHandler(
     ipcMain,
     IPC_CHANNELS.profilesUpdateSettings,
-    (
+    async (
       _event,
       value: unknown,
-    ): Awaited<ReturnType<AppBridge['profiles']['updateSettings']>> => {
+    ): Promise<
+      Awaited<ReturnType<AppBridge['profiles']['updateSettings']>>
+    > => {
       const input = parseUpdateSettingsInput(value)
-      const settings = controller.updateSettings(input)
+      const settings = await controller.updateSettings(input)
       if (input.settings.language) onProfileLanguageChanged()
       if (input.settings.baseCurrency) onProfileNeedsRateRefresh()
-      if (Object.hasOwn(input.settings, 'watchedFolder'))
-        onWatchedFolderChanged()
       return settings
     },
   )
@@ -193,22 +191,16 @@ export function registerProfileIpc(
   registerIpcHandler(
     ipcMain,
     IPC_CHANNELS.profilesWatchedFolderStatus,
-    (): ReturnType<AppBridge['profiles']['watchedFolderStatus']> => {
-      const folder = controller.getActive()?.settings.watchedFolder
-      if (!folder) return Promise.resolve(null)
-      try {
-        return Promise.resolve(
-          statSync(folder).isDirectory() ? 'watching' : 'unavailable',
-        )
-      } catch {
-        return Promise.resolve('unavailable')
-      }
+    (): Awaited<ReturnType<AppBridge['profiles']['watchedFolderStatus']>> =>
+      controller.getWatchedFolderStatus(),
+  )
+  registerIpcHandler(
+    ipcMain,
+    IPC_CHANNELS.profilesClose,
+    async (): Promise<void> => {
+      await controller.close()
+      onProfileClosed()
+      onProfileLanguageChanged()
     },
   )
-  registerIpcHandler(ipcMain, IPC_CHANNELS.profilesClose, (): Promise<void> => {
-    controller.close()
-    onProfileClosed()
-    onProfileLanguageChanged()
-    return Promise.resolve()
-  })
 }

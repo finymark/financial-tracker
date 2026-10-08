@@ -8,6 +8,11 @@ export const baseCurrencies = ['HUF', 'CHF'] as const
 export type BaseCurrency = (typeof baseCurrencies)[number]
 export type WatchedFolderStatus = 'watching' | 'unavailable'
 
+export interface WatchedFolderFailure {
+  fileName: string
+  reasonKey: string
+}
+
 export interface ProfileSettings {
   language: Language
   theme: ThemeMode

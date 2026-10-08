@@ -636,6 +636,8 @@ export const en = {
   'watchedFolder.status.unavailable': 'Folder unavailable',
   'watchedFolder.choose': 'Choose folder',
   'watchedFolder.clear': 'Clear',
+  'watchedFolder.intakeFailure': 'A watched receipt photo could not be added',
+  'watchedFolder.dismissFailure': 'Dismiss',
   'backups.title': 'Backups',
   'backups.description':
     'A database backup is taken whenever you open this profile. The last 10 startup backups are kept; pre-migration backups are stored separately.',

@@ -638,6 +638,9 @@ export const hu = {
   'watchedFolder.status.unavailable': 'A mappa nem érhető el',
   'watchedFolder.choose': 'Mappa kiválasztása',
   'watchedFolder.clear': 'Törlés',
+  'watchedFolder.intakeFailure':
+    'Egy figyelt nyugtafotót nem sikerült hozzáadni',
+  'watchedFolder.dismissFailure': 'Bezárás',
   'backups.title': 'Biztonsági mentések',
   'backups.description':
     'A profil minden megnyitásakor adatbázismentés készül. Az utolsó 10 indítási mentés marad meg; a migráció előtti mentések külön tárolódnak.',

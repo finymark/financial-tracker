@@ -7,7 +7,10 @@ import {
   watch,
 } from 'node:fs'
 import { join, parse } from 'node:path'
-import type { WatchedFolderStatus } from '../shared/settings'
+import type {
+  WatchedFolderFailure,
+  WatchedFolderStatus,
+} from '../shared/settings'
 
 const RESCAN_INTERVAL_MS = 30_000
 const STABLE_FOR_MS = 2_000
@@ -17,14 +20,9 @@ const IMAGE_EXTENSION = /\.(?:jpe?g|png|webp)$/i
 const TEMPORARY_NAME = /(?:^\.|^~\$|\.(?:tmp|partial|crdownload)(?:\.|$))/i
 
 export type ReceiptIntake = (
-  input: { path: string } | { bytes: Buffer; name: string },
+  input: { path: string } | { bytes: Uint8Array; name: string },
   source: 'drop' | 'folder' | 'phone',
 ) => Promise<unknown>
-
-export interface WatchedFolderFailure {
-  fileName: string
-  reasonKey: string
-}
 
 interface WatchedFolderEntry {
   name: string
@@ -103,7 +101,7 @@ function errorCode(error: unknown): string | undefined {
 function failureReason(error: unknown): string {
   if (error instanceof Error && error.message.length > 0) return error.message
   if (typeof error === 'string' && error.length > 0) return error
-  return 'receiptInbox.error.intake'
+  return 'receipts.error'
 }
 
 function isCandidate(name: string): boolean {
