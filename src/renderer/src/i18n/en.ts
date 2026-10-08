@@ -1,4 +1,50 @@
+import { categoryNames } from '../../../shared/category-translations'
 export const en = {
+  ...categoryNames.en,
+  'categories.title': 'Categories',
+  'categories.description':
+    'Expense and income categories have at most two levels. Default names follow your language; custom names stay unchanged. Archiving a main category also hides its subcategories from pickers.',
+  'categories.expense': 'Expense',
+  'categories.income': 'Income',
+  'categories.loading': 'Loading categories…',
+  'categories.name': 'Category name',
+  'categories.kind': 'Expense or income',
+  'categories.parent': 'Main category',
+  'categories.main': 'No parent (main category)',
+  'categories.create': 'Create category',
+  'categories.rename': 'Rename',
+  'categories.archive': 'Archive',
+  'categories.archived': 'Archived — hidden from category pickers',
+  'categories.delete': 'Delete',
+  'categories.deleteConfirmation': 'Permanently delete this category?',
+  'categories.confirmDelete': 'Delete category permanently',
+  'categories.replacement': 'Replacement category',
+  'categories.chooseReplacement': 'Choose a replacement',
+  'categories.noReplacement': 'No replacement (unused category)',
+  'categories.save': 'Save',
+  'categories.cancel': 'Cancel',
+  'categories.refresh': 'Refresh',
+  'categories.up': 'Move up',
+  'categories.down': 'Move down',
+  'categories.error':
+    'The category operation could not be completed. Refresh and try again.',
+  'categories.error.name':
+    'Enter a category name between 1 and 100 characters.',
+  'categories.error.kind': 'Choose expense or income.',
+  'categories.error.notFound':
+    'The category could not be found. Refresh the list.',
+  'categories.error.parent':
+    'Choose an active main category of the same kind. Categories have at most two levels.',
+  'categories.error.order': 'Choose a valid position among sibling categories.',
+  'categories.error.children':
+    'Delete subcategories before deleting their main category.',
+  'categories.error.replacementRequired':
+    'This category has transactions. Choose a replacement to preserve them.',
+  'categories.error.replacement':
+    'Choose a different, active replacement of the same kind.',
+  'categories.error.transactionIntegration':
+    'Transaction reassignment is not available in this version. The category was not deleted.',
+
   'app.name': 'Financial Tracker',
   'app.tagline': 'Your finances, on your PC.',
   'navigation.label': 'Main navigation',

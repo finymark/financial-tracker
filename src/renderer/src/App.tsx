@@ -14,6 +14,7 @@ import type {
   ProfileRegistrySnapshot,
 } from '../../shared/profiles'
 import { BackupSettings } from './components/backup-settings'
+import { CategorySettings } from './components/category-settings'
 import { AccountsPage } from './AccountsPage'
 import { Button } from './components/ui/button'
 import {
@@ -339,6 +340,8 @@ function Shell({
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsError, setSettingsError] = useState(false)
   const [backupBusy, setBackupBusy] = useState(false)
+  const [categoryBusy, setCategoryBusy] = useState(false)
+  const [categoryRevision, setCategoryRevision] = useState(0)
   const format = createFormatters(language)
 
   async function saveSettings(changes: ProfileSettingsChanges) {
@@ -404,7 +407,7 @@ function Shell({
               aria-label={t(`navigation.${id}`)}
               aria-current={page === id ? 'page' : undefined}
               title={collapsed ? t(`navigation.${id}`) : undefined}
-              disabled={backupBusy}
+              disabled={backupBusy || categoryBusy}
               onClick={() => setPage(id)}
             >
               <Icon aria-hidden="true" />
@@ -423,7 +426,7 @@ function Shell({
           title={
             collapsed ? `${active.name} — ${t('profile.switch')}` : undefined
           }
-          disabled={backupBusy}
+          disabled={backupBusy || categoryBusy}
           onClick={onSwitchProfile}
         >
           <UsersRound className="size-5 shrink-0" aria-hidden="true" />
@@ -472,7 +475,7 @@ function Shell({
                     <NativeSelect
                       id="language"
                       value={language}
-                      disabled={savingSettings || backupBusy}
+                      disabled={savingSettings || backupBusy || categoryBusy}
                       onChange={(event) => {
                         const value = languages.find(
                           (item) => item === event.target.value,
@@ -494,7 +497,7 @@ function Shell({
                     <NativeSelect
                       id="theme"
                       value={theme}
-                      disabled={savingSettings || backupBusy}
+                      disabled={savingSettings || backupBusy || categoryBusy}
                       onChange={(event) => {
                         const value = themeModes.find(
                           (item) => item === event.target.value,
@@ -519,7 +522,7 @@ function Shell({
                     <NativeSelect
                       id="base-currency"
                       value={baseCurrency}
-                      disabled={savingSettings || backupBusy}
+                      disabled={savingSettings || backupBusy || categoryBusy}
                       onChange={(event) => {
                         const value = baseCurrencies.find(
                           (item) => item === event.target.value,
@@ -573,13 +576,24 @@ function Shell({
             )}
           </Card>
           {page === 'settings' && (
+            <CategorySettings
+              key={`${active.id}:${categoryRevision}`}
+              t={t}
+              disabled={savingSettings || backupBusy}
+              onBusyChange={setCategoryBusy}
+            />
+          )}
+          {page === 'settings' && (
             <BackupSettings
               key={active.id}
               language={language}
               t={t}
-              onRestored={onRestored}
+              onRestored={(profile) => {
+                onRestored(profile)
+                setCategoryRevision((revision) => revision + 1)
+              }}
               onBusyChange={setBackupBusy}
-              disabled={savingSettings}
+              disabled={savingSettings || categoryBusy}
             />
           )}
         </div>
