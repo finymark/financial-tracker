@@ -11,6 +11,7 @@ import type {
   TransactionPeriod,
   TransactionExclusionFilter,
 } from '../../shared/transactions'
+import type { Transfer } from '../../shared/transfers'
 import { Button } from './components/ui/button'
 import { CardContent } from './components/ui/card'
 import { Input } from './components/ui/input'
@@ -35,6 +36,10 @@ const errorKeys = [
   'transactions.error.lines',
   'transactions.error.filters',
   'transactions.error.totals',
+  'transfers.error.accountsDiffer',
+  'transfers.error.equalAmounts',
+  'transfers.error.notFound',
+  'transfers.error.linkedFee',
 ] as const satisfies readonly MessageKey[]
 
 function amountInput(minor: number): string {
@@ -54,14 +59,19 @@ interface TransactionsPageProps {
 
 interface FormState {
   id: string | null
-  kind: TransactionKind
+  kind: TransactionKind | 'transfer'
   date: string
   accountId: string
   amount: string
   payeeName: string
   categoryId: string
   note: string
+  toAccountId: string
+  toAmount: string
+  feeAmount: string
+  feeCategoryId: string
   excluded: boolean
+  feeExcluded: boolean
 }
 
 function emptyForm(accountId = ''): FormState {
@@ -74,7 +84,12 @@ function emptyForm(accountId = ''): FormState {
     payeeName: '',
     categoryId: '',
     note: '',
+    toAccountId: '',
+    toAmount: '',
+    feeAmount: '',
+    feeCategoryId: '',
     excluded: false,
+    feeExcluded: false,
   }
 }
 
@@ -117,7 +132,7 @@ export function TransactionsPage({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<MessageKey | null>(null)
   const [form, setForm] = useState<FormState | null>(null)
-  const [deleting, setDeleting] = useState<Transaction | null>(null)
+  const [deleting, setDeleting] = useState<Transaction | Transfer | null>(null)
 
   useEffect(() => {
     let ignore = false
@@ -208,6 +223,38 @@ export function TransactionsPage({
     event.preventDefault()
     if (!form) return
     void run(() => {
+      if (form.kind === 'transfer') {
+        const input = {
+          fromAccountId: form.accountId,
+          fromAmountMinor: parseAmountExpression(
+            form.amount,
+            selectedAccount?.currency ?? 'HUF',
+            'transactions.error.amount',
+          ),
+          toAccountId: form.toAccountId,
+          toAmountMinor: parseAmountExpression(
+            form.toAmount,
+            selectedToAccount?.currency ?? 'HUF',
+            'transactions.error.amount',
+          ),
+          date: form.date,
+          note: form.note,
+          fee: form.feeAmount
+            ? {
+                amountMinor: parseAmountExpression(
+                  form.feeAmount,
+                  selectedAccount?.currency ?? 'HUF',
+                  'transactions.error.amount',
+                ),
+                categoryId: form.feeCategoryId || null,
+                excluded: form.feeExcluded,
+              }
+            : null,
+        }
+        return form.id
+          ? window.app.transfers.update({ id: form.id, ...input })
+          : window.app.transfers.create(input)
+      }
       const input = {
         accountId: form.accountId,
         kind: form.kind,
@@ -237,12 +284,25 @@ export function TransactionsPage({
   const drawerAccounts = selectedAccount?.archived
     ? [selectedAccount, ...accountOptions]
     : accountOptions
-  const drawerCategories = form
-    ? selectedCategory &&
-      !categoryOptions[form.kind].some(({ id }) => id === selectedCategory.id)
-      ? [selectedCategory, ...categoryOptions[form.kind]]
-      : categoryOptions[form.kind]
-    : []
+  const drawerCategories =
+    form && form.kind !== 'transfer'
+      ? selectedCategory &&
+        !categoryOptions[form.kind].some(({ id }) => id === selectedCategory.id)
+        ? [selectedCategory, ...categoryOptions[form.kind]]
+        : categoryOptions[form.kind]
+      : []
+  const selectedToAccount = form
+    ? accounts.find((account) => account.id === form.toAccountId)
+    : undefined
+  const transferAccounts = [
+    ...[selectedAccount, selectedToAccount].filter(
+      (account): account is Account => Boolean(account?.archived),
+    ),
+    ...accountOptions,
+  ].filter(
+    (account, index, all) =>
+      all.findIndex((candidate) => candidate.id === account.id) === index,
+  )
 
   return (
     <CardContent className="space-y-6">
@@ -441,17 +501,43 @@ export function TransactionsPage({
                 t={t}
                 busy={busy}
                 onEdit={(transaction) =>
-                  setForm({
-                    id: transaction.id,
-                    kind: transaction.kind,
-                    date: transaction.date,
-                    accountId: transaction.accountId,
-                    amount: amountInput(transaction.totalMinor),
-                    payeeName: transaction.payeeName ?? '',
-                    categoryId: transaction.line.categoryId ?? '',
-                    note: transaction.note,
-                    excluded: transaction.excluded,
-                  })
+                  setForm(
+                    transaction.kind === 'transfer'
+                      ? {
+                          id: transaction.id,
+                          kind: 'transfer',
+                          date: transaction.date,
+                          accountId: transaction.fromAccountId,
+                          amount: amountInput(transaction.fromAmountMinor),
+                          payeeName: '',
+                          categoryId: '',
+                          note: transaction.note,
+                          toAccountId: transaction.toAccountId,
+                          toAmount: amountInput(transaction.toAmountMinor),
+                          feeAmount: transaction.fee
+                            ? amountInput(transaction.fee.totalMinor)
+                            : '',
+                          feeCategoryId: transaction.fee?.line.categoryId ?? '',
+                          excluded: false,
+                          feeExcluded: transaction.fee?.excluded ?? false,
+                        }
+                      : {
+                          id: transaction.id,
+                          kind: transaction.kind,
+                          date: transaction.date,
+                          accountId: transaction.accountId,
+                          amount: amountInput(transaction.totalMinor),
+                          payeeName: transaction.payeeName ?? '',
+                          categoryId: transaction.line.categoryId ?? '',
+                          note: transaction.note,
+                          toAccountId: '',
+                          toAmount: '',
+                          feeAmount: '',
+                          feeCategoryId: '',
+                          excluded: transaction.excluded,
+                          feeExcluded: false,
+                        },
+                  )
                 }
                 onDelete={setDeleting}
               />
@@ -502,7 +588,10 @@ export function TransactionsPage({
               disabled={busy || loading}
               onClick={() =>
                 void run(
-                  () => window.app.transactions.delete({ id: deleting.id }),
+                  () =>
+                    deleting.kind === 'transfer'
+                      ? window.app.transfers.delete({ id: deleting.id })
+                      : window.app.transactions.delete({ id: deleting.id }),
                   true,
                 )
               }
@@ -565,13 +654,22 @@ export function TransactionsPage({
                   onChange={(event) =>
                     setForm({
                       ...form,
-                      kind: event.target.value as TransactionKind,
+                      kind: event.target.value as TransactionKind | 'transfer',
                       categoryId: '',
+                      feeCategoryId:
+                        event.target.value === 'transfer'
+                          ? (categories.find(
+                              (category) =>
+                                category.seedKey === 'expense.fees' &&
+                                !category.archived,
+                            )?.id ?? '')
+                          : '',
                     })
                   }
                 >
                   <option value="expense">{t('transactions.expense')}</option>
                   <option value="income">{t('transactions.income')}</option>
+                  <option value="transfer">{t('transactions.transfer')}</option>
                 </NativeSelect>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -599,7 +697,11 @@ export function TransactionsPage({
                     htmlFor="transaction-amount"
                     className="text-sm font-medium"
                   >
-                    {t('transactions.amount')}
+                    {t(
+                      form.kind === 'transfer'
+                        ? 'transactions.fromAmount'
+                        : 'transactions.amount',
+                    )}
                   </label>
                   <AmountInput
                     id="transaction-amount"
@@ -619,7 +721,11 @@ export function TransactionsPage({
                   htmlFor="transaction-account"
                   className="text-sm font-medium"
                 >
-                  {t('transactions.account')}
+                  {t(
+                    form.kind === 'transfer'
+                      ? 'transactions.fromAccount'
+                      : 'transactions.account',
+                  )}
                 </label>
                 <NativeSelect
                   id="transaction-account"
@@ -633,62 +739,199 @@ export function TransactionsPage({
                   <option value="" disabled>
                     {t('transactions.chooseAccount')}
                   </option>
-                  {drawerAccounts.map((account) => (
+                  {(form.kind === 'transfer'
+                    ? transferAccounts
+                    : drawerAccounts
+                  ).map((account) => (
                     <option key={account.id} value={account.id}>
                       {account.name} ({account.currency})
                     </option>
                   ))}
                 </NativeSelect>
               </div>
-              <div className="space-y-2">
-                <label
-                  htmlFor="transaction-payee"
-                  className="text-sm font-medium"
-                >
-                  {t('transactions.payee')}
-                </label>
-                <Input
-                  id="transaction-payee"
-                  list="transaction-payees"
-                  value={form.payeeName}
-                  maxLength={100}
-                  disabled={busy}
-                  onChange={(event) =>
-                    setForm({ ...form, payeeName: event.target.value })
-                  }
-                />
-                <datalist id="transaction-payees">
-                  {payees.map((payee) => (
-                    <option key={payee.id} value={payee.name} />
-                  ))}
-                </datalist>
-                <p className="text-xs text-muted-foreground">
-                  {t('transactions.payeeHint')}
-                </p>
-              </div>
-              <div className="space-y-2">
-                <label
-                  htmlFor="transaction-category"
-                  className="text-sm font-medium"
-                >
-                  {t('transactions.category')}
-                </label>
-                <NativeSelect
-                  id="transaction-category"
-                  value={form.categoryId}
-                  disabled={busy}
-                  onChange={(event) =>
-                    setForm({ ...form, categoryId: event.target.value })
-                  }
-                >
-                  <option value="">{t('transactions.noCategory')}</option>
-                  {drawerCategories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.parentId ? `— ${category.name}` : category.name}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </div>
+              {form.kind === 'transfer' && (
+                <>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="transfer-to-account"
+                      className="text-sm font-medium"
+                    >
+                      {t('transactions.toAccount')}
+                    </label>
+                    <NativeSelect
+                      id="transfer-to-account"
+                      value={form.toAccountId}
+                      required
+                      disabled={busy}
+                      onChange={(event) =>
+                        setForm({ ...form, toAccountId: event.target.value })
+                      }
+                    >
+                      <option value="" disabled>
+                        {t('transactions.chooseAccount')}
+                      </option>
+                      {transferAccounts.map((account) => (
+                        <option
+                          key={account.id}
+                          value={account.id}
+                          disabled={account.id === form.accountId}
+                        >
+                          {account.name} ({account.currency})
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </div>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="transfer-to-amount"
+                      className="text-sm font-medium"
+                    >
+                      {t('transactions.toAmount')}
+                    </label>
+                    <AmountInput
+                      id="transfer-to-amount"
+                      value={form.toAmount}
+                      currency={selectedToAccount?.currency ?? 'HUF'}
+                      language={language}
+                      t={t}
+                      errorKey="transactions.error.amount"
+                      hintKey="transactions.amountHint"
+                      disabled={busy}
+                      onChange={(toAmount) => setForm({ ...form, toAmount })}
+                    />
+                  </div>
+                </>
+              )}
+              {form.kind !== 'transfer' && (
+                <div className="space-y-2">
+                  <label
+                    htmlFor="transaction-payee"
+                    className="text-sm font-medium"
+                  >
+                    {t('transactions.payee')}
+                  </label>
+                  <Input
+                    id="transaction-payee"
+                    list="transaction-payees"
+                    value={form.payeeName}
+                    maxLength={100}
+                    disabled={busy}
+                    onChange={(event) =>
+                      setForm({ ...form, payeeName: event.target.value })
+                    }
+                  />
+                  <datalist id="transaction-payees">
+                    {payees.map((payee) => (
+                      <option key={payee.id} value={payee.name} />
+                    ))}
+                  </datalist>
+                  <p className="text-xs text-muted-foreground">
+                    {t('transactions.payeeHint')}
+                  </p>
+                </div>
+              )}
+              {form.kind !== 'transfer' && (
+                <div className="space-y-2">
+                  <label
+                    htmlFor="transaction-category"
+                    className="text-sm font-medium"
+                  >
+                    {t('transactions.category')}
+                  </label>
+                  <NativeSelect
+                    id="transaction-category"
+                    value={form.categoryId}
+                    disabled={busy}
+                    onChange={(event) =>
+                      setForm({ ...form, categoryId: event.target.value })
+                    }
+                  >
+                    <option value="">{t('transactions.noCategory')}</option>
+                    {drawerCategories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.parentId
+                          ? `— ${category.name}`
+                          : category.name}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </div>
+              )}
+              {form.kind === 'transfer' && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="transfer-fee"
+                      className="text-sm font-medium"
+                    >
+                      {t('transactions.fee')}
+                    </label>
+                    <AmountInput
+                      id="transfer-fee"
+                      value={form.feeAmount}
+                      currency={selectedAccount?.currency ?? 'HUF'}
+                      language={language}
+                      t={t}
+                      errorKey="transactions.error.amount"
+                      hintKey="transactions.amountHint"
+                      required={false}
+                      placeholder={t('transactions.optional')}
+                      disabled={busy}
+                      onChange={(feeAmount) => setForm({ ...form, feeAmount })}
+                    />
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                      <input
+                        type="checkbox"
+                        checked={form.feeExcluded}
+                        disabled={busy || !form.feeAmount}
+                        aria-describedby="transfer-fee-excluded-hint"
+                        onChange={(event) =>
+                          setForm({
+                            ...form,
+                            feeExcluded: event.target.checked,
+                          })
+                        }
+                        className="size-4 accent-primary"
+                      />
+                      {t('transactions.excluded')}
+                    </label>
+                    <p
+                      id="transfer-fee-excluded-hint"
+                      className="text-xs text-muted-foreground"
+                    >
+                      {t('transactions.excludedHint')}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="transfer-fee-category"
+                      className="text-sm font-medium"
+                    >
+                      {t('transactions.feeCategory')}
+                    </label>
+                    <NativeSelect
+                      id="transfer-fee-category"
+                      value={form.feeCategoryId}
+                      disabled={busy || !form.feeAmount}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          feeCategoryId: event.target.value,
+                        })
+                      }
+                    >
+                      <option value="">{t('transactions.noCategory')}</option>
+                      {categoryOptions.expense.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.parentId
+                            ? `— ${category.name}`
+                            : category.name}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </div>
+                </div>
+              )}
               <div className="space-y-2">
                 <label
                   htmlFor="transaction-note"
@@ -707,27 +950,29 @@ export function TransactionsPage({
                   }
                 />
               </div>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-medium">
-                  <input
-                    type="checkbox"
-                    checked={form.excluded}
-                    disabled={busy}
-                    aria-describedby="transaction-excluded-hint"
-                    onChange={(event) =>
-                      setForm({ ...form, excluded: event.target.checked })
-                    }
-                    className="size-4 accent-primary"
-                  />
-                  {t('transactions.excluded')}
-                </label>
-                <p
-                  id="transaction-excluded-hint"
-                  className="text-xs text-muted-foreground"
-                >
-                  {t('transactions.excludedHint')}
-                </p>
-              </div>
+              {form.kind !== 'transfer' && (
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={form.excluded}
+                      disabled={busy}
+                      aria-describedby="transaction-excluded-hint"
+                      onChange={(event) =>
+                        setForm({ ...form, excluded: event.target.checked })
+                      }
+                      className="size-4 accent-primary"
+                    />
+                    {t('transactions.excluded')}
+                  </label>
+                  <p
+                    id="transaction-excluded-hint"
+                    className="text-xs text-muted-foreground"
+                  >
+                    {t('transactions.excludedHint')}
+                  </p>
+                </div>
+              )}
               <div className="flex gap-2 pt-2">
                 <Button type="submit" disabled={busy}>
                   {t('transactions.save')}

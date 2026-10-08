@@ -99,7 +99,7 @@ export const hu = {
     'A pénzügyek összesített áttekintése később lesz itt elérhető.',
   'transactions.title': 'Tranzakcióid egy helyen',
   'transactions.description':
-    'Rögzítsd kiadásaidat és bevételeidet, hogy a számlaegyenlegek naprakészek legyenek.',
+    'Rögzítsd kiadásaidat, bevételeidet és átvezetéseidet, hogy a számlaegyenlegek naprakészek legyenek.',
   'transactions.listDescription':
     'Szűrd a tranzakciókat időszak, számla, kategória, partner vagy megjegyzés szerint.',
   'transactions.excluded': 'Kizárt',
@@ -148,15 +148,24 @@ export const hu = {
   'transactions.noAccounts':
     'Tranzakció rögzítése előtt hozz létre egy aktív számlát.',
   'transactions.refresh': 'Frissítés',
-  'transactions.kind': 'Kiadás vagy bevétel',
+  'transactions.kind': 'Tranzakció típusa',
   'transactions.expense': 'Kiadás',
   'transactions.income': 'Bevétel',
+  'transactions.transfer': 'Átvezetés',
   'transactions.date': 'Dátum',
   'transactions.amount': 'Összeg',
   'amount.result': 'Kiszámított összeg',
   'transactions.amountHint':
     'Használhatsz + - * / műveleteket, zárójeleket, pontot vagy vesszőt tizedesjelként és ezres tagolást (pl. 1 234,50). A mező elhagyása vagy Enter kiszámítja a századokra kerekített végeredményt.',
   'transactions.account': 'Számla',
+  'transactions.fromAccount': 'Forrásszámla',
+  'transactions.toAccount': 'Célszámla',
+  'transactions.fromAmount': 'Küldött összeg',
+  'transactions.toAmount': 'Fogadott összeg',
+  'transactions.actualRate': 'Tényleges árfolyam',
+  'transactions.fee': 'Díj összege',
+  'transactions.feeCategory': 'Díj kategóriája',
+  'transactions.optional': 'Nem kötelező',
   'transactions.chooseAccount': 'Válassz aktív számlát',
   'transactions.payee': 'Kedvezményezett',
   'transactions.payeeHint':
@@ -184,6 +193,12 @@ export const hu = {
     'A tranzakció nem található. Frissítsd a listát.',
   'transactions.error.lines':
     'A tranzakció sorainak összege nem egyezik a végösszeggel.',
+  'transfers.error.accountsDiffer': 'Válassz két különböző számlát.',
+  'transfers.error.equalAmounts':
+    'Azonos pénznemű számláknál a két összegnek egyeznie kell.',
+  'transfers.error.notFound': 'Az átvezetés nem található. Frissítsd a listát.',
+  'transfers.error.linkedFee':
+    'Ezt a díjat a hozzá tartozó átvezetésen keresztül módosítsd vagy töröld.',
   'undo.available': 'A tranzakció módosult.',
   'undo.action': 'Visszavonás',
   'undo.error': 'A módosítást nem sikerült visszavonni.',

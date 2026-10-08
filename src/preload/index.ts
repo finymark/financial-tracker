@@ -22,6 +22,11 @@ const bridge: AppBridge = {
     delete: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.transactionsDelete, input),
   },
+  transfers: {
+    create: (input) => ipcRenderer.invoke(IPC_CHANNELS.transfersCreate, input),
+    update: (input) => ipcRenderer.invoke(IPC_CHANNELS.transfersUpdate, input),
+    delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.transfersDelete, input),
+  },
   undo: {
     last: () => ipcRenderer.invoke(IPC_CHANNELS.undoLast),
   },

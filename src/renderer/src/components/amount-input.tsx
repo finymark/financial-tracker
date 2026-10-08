@@ -19,6 +19,8 @@ interface AmountInputProps {
   allowNegative?: boolean
   allowZero?: boolean
   disabled?: boolean
+  required?: boolean
+  placeholder?: string
 }
 
 export function AmountInput({
@@ -33,6 +35,8 @@ export function AmountInput({
   allowNegative,
   allowZero,
   disabled,
+  required = true,
+  placeholder = '0.00',
 }: AmountInputProps) {
   const [evaluated, setEvaluated] = useState<{
     input: string
@@ -45,6 +49,10 @@ export function AmountInput({
       : null
 
   function evaluate() {
+    if (!required && value.trim() === '') {
+      setEvaluated(null)
+      return
+    }
     let minor: number | null = null
     try {
       minor = parseAmountExpression(value, currency, errorKey, {
@@ -63,9 +71,9 @@ export function AmountInput({
         id={id}
         inputMode="decimal"
         value={value}
-        placeholder="0.00"
+        placeholder={placeholder}
         maxLength={MAX_AMOUNT_EXPRESSION_LENGTH}
-        required
+        required={required}
         disabled={disabled}
         aria-describedby={`${id}-hint ${id}-result`}
         aria-invalid={preview?.minor === null || undefined}

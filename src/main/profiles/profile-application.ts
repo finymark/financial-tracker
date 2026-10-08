@@ -60,6 +60,11 @@ import type {
   Transaction,
   UpdateTransactionInput,
 } from '../../shared/transactions'
+import type {
+  CreateTransferInput,
+  Transfer,
+  UpdateTransferInput,
+} from '../../shared/transfers'
 import { listPayees, listTransactions } from './profile-transactions'
 import {
   createTransactionUndoableCommand,
@@ -78,6 +83,11 @@ import {
 } from './profile-accounts'
 import { formatBackupTimestamp } from './backup-timestamp'
 import { UndoHistory, type UndoableCommand } from './undo-history'
+import {
+  createTransferUndoableCommand,
+  deleteTransferUndoableCommand,
+  updateTransferUndoableCommand,
+} from './transfer-undo'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -150,6 +160,9 @@ export interface ProfileCommands {
   createTransaction(input: CreateTransactionInput): Transaction
   updateTransaction(input: UpdateTransactionInput): Transaction
   deleteTransaction(id: string): void
+  createTransfer(input: CreateTransferInput): Transfer
+  updateTransfer(input: UpdateTransferInput): Transfer
+  deleteTransfer(id: string): void
   undoLast(): boolean
   createCategory(input: CreateCategoryInput): Category
   renameCategory(input: RenameCategoryInput): Category
@@ -332,6 +345,36 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
     ALTER TABLE transactions ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0 CHECK (excluded IN (0, 1));
   `,
   ),
+  defineSqlMigration(
+    9,
+    'one-record transfers with linked fees',
+    `
+    CREATE TABLE transfers (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      from_account_id TEXT NOT NULL REFERENCES accounts(id),
+      from_amount_minor INTEGER NOT NULL CHECK (
+        typeof(from_amount_minor) = 'integer' AND
+        from_amount_minor BETWEEN 1 AND 9007199254740991
+      ),
+      to_account_id TEXT NOT NULL REFERENCES accounts(id),
+      to_amount_minor INTEGER NOT NULL CHECK (
+        typeof(to_amount_minor) = 'integer' AND
+        to_amount_minor BETWEEN 1 AND 9007199254740991
+      ),
+      date TEXT NOT NULL CHECK (date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+      note TEXT NOT NULL CHECK (length(note) <= 1000),
+      fee_transaction_id TEXT UNIQUE REFERENCES transactions(id) ON DELETE RESTRICT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      CHECK (from_account_id <> to_account_id)
+    );
+    CREATE INDEX transfers_newest ON transfers(date DESC, created_at DESC, id DESC);
+    CREATE INDEX transfers_from_account_newest
+      ON transfers(from_account_id, date DESC, created_at DESC, id DESC);
+    CREATE INDEX transfers_to_account_newest
+      ON transfers(to_account_id, date DESC, created_at DESC, id DESC);
+  `,
+  ),
 ]
 
 function validateMigrations(
@@ -483,6 +526,18 @@ class OpenProfileApplication implements ProfileApplication {
       deleteTransaction: (id) =>
         this.#executeUndoableCommand(
           deleteTransactionUndoableCommand(this.#database, id),
+        ),
+      createTransfer: (input) =>
+        this.#executeUndoableCommand(
+          createTransferUndoableCommand(this.#database, input, this.#clock),
+        ),
+      updateTransfer: (input) =>
+        this.#executeUndoableCommand(
+          updateTransferUndoableCommand(this.#database, input, this.#clock),
+        ),
+      deleteTransfer: (id) =>
+        this.#executeUndoableCommand(
+          deleteTransferUndoableCommand(this.#database, id),
         ),
       undoLast: () => {
         this.#assertAvailable()

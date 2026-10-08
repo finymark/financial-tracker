@@ -98,7 +98,7 @@ export const en = {
     'A summarized financial overview will be available here later.',
   'transactions.title': 'Your transactions in one place',
   'transactions.description':
-    'Record expenses and income, then keep account balances up to date.',
+    'Record expenses, income and transfers, then keep account balances up to date.',
   'transactions.listDescription':
     'Filter transactions by period, account, category, payee or note.',
   'transactions.excluded': 'Excluded',
@@ -147,15 +147,24 @@ export const en = {
   'transactions.noAccounts':
     'Create an active account before recording a transaction.',
   'transactions.refresh': 'Refresh',
-  'transactions.kind': 'Expense or income',
+  'transactions.kind': 'Transaction type',
   'transactions.expense': 'Expense',
   'transactions.income': 'Income',
+  'transactions.transfer': 'Transfer',
   'transactions.date': 'Date',
   'transactions.amount': 'Amount',
   'amount.result': 'Calculated amount',
   'transactions.amountHint':
     'Use + - * /, parentheses, dot or comma decimals, and thousands grouping (e.g. 1 234,50). Blur or Enter calculates; the final result is rounded to hundredths.',
   'transactions.account': 'Account',
+  'transactions.fromAccount': 'From account',
+  'transactions.toAccount': 'To account',
+  'transactions.fromAmount': 'Amount sent',
+  'transactions.toAmount': 'Amount received',
+  'transactions.actualRate': 'Actual rate',
+  'transactions.fee': 'Fee amount',
+  'transactions.feeCategory': 'Fee category',
+  'transactions.optional': 'Optional',
   'transactions.chooseAccount': 'Choose an active account',
   'transactions.payee': 'Payee',
   'transactions.payeeHint':
@@ -181,6 +190,12 @@ export const en = {
   'transactions.error.notFound':
     'The transaction could not be found. Refresh the list.',
   'transactions.error.lines': 'The transaction lines do not match its total.',
+  'transfers.error.accountsDiffer': 'Choose two different accounts.',
+  'transfers.error.equalAmounts':
+    'Amounts must be equal when both accounts use the same currency.',
+  'transfers.error.notFound':
+    'The transfer could not be found. Refresh the list.',
+  'transfers.error.linkedFee': 'Edit or delete this fee through its transfer.',
   'undo.available': 'Transaction changed.',
   'undo.action': 'Undo',
   'undo.error': 'The change could not be undone.',

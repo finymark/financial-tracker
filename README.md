@@ -4,8 +4,9 @@ A local-first personal expense tracker for Windows, built with Electron, React,
 TypeScript, and SQLite. The app opens to a collapsible sidebar with Overview,
 Transactions, Accounts, and Settings pages. On start you pick or create a
 profile; each profile has its own SQLite database and data folder. Financial
-data stays local. Accounts track opening balances and signed expense/income
-transactions. Settings includes two-level expense/income category management.
+data stays local. Accounts track opening balances, signed expense/income
+transactions, and both legs of transfers. Settings includes two-level
+expense/income category management.
 
 ## Requirements
 
@@ -310,9 +311,9 @@ not off-device copies or backups of the separate data folder.
   accounts remain visible on Accounts with their balance and opening date.
 - Delete an account after confirming in the page. An opening balance alone does
   not prevent deletion: "empty" means no transactions.
-- Balances equal opening balances plus income and minus expenses. Accounts with
-  transactions cannot be deleted or have their currency changed; archive them
-  instead.
+- Balances equal opening balances plus income, minus expenses (including linked
+  transfer fees), and both signed transfer legs. Accounts with transactions or
+  transfers cannot be deleted or have their currency changed; archive them instead.
 
 ## Categories
 
@@ -321,8 +322,7 @@ not off-device copies or backups of the separate data folder.
   translated defaults through migration 4: Food (Groceries, Restaurants), Housing
   (Rent, Utilities), Transport (Public transport, Car), Health, Entertainment,
   Clothing, Subscriptions, Other expenses, Fees, Salary, and Other income.
-  Fees is reserved as a sensible default for later transfer fees; transfers are
-  not implemented yet.
+  Fees is the default category for optional transfer fees.
 - Default names follow the profile language immediately (HU/EN/DE). Renaming
   stores a custom name that always wins over translation. User-created categories
   always have a custom name. UUIDs and immutable default seed keys stay stable;
@@ -343,26 +343,38 @@ not off-device copies or backups of the separate data folder.
 
 ## Transactions
 
-- **Transactions → Record transaction** opens a right-side drawer for an expense
-  or income. Choose a non-archived account, a calendar date no later than today,
-  a positive amount, an optional payee and category, and a note.
-- Amount entry uses the same calculator field as Accounts, with a positive
-  result required. Amounts are persisted as exact integer hundredths. HUF is
-  displayed without decimals; CHF is displayed with two decimals.
+- **Transactions → Record transaction** opens a right-side drawer for an expense,
+  income, or transfer. Expenses and income choose one non-archived account, a
+  calendar date no later than today, a positive amount, an optional payee and
+  category, and a note.
+- A transfer is one record containing source and destination accounts and positive
+  amounts, date, and note. The accounts must differ. Same-currency amounts must
+  match; cross-currency amounts are both authoritative and the list derives and
+  displays the actual rate without storing a floating-point rate.
+- An optional transfer fee is a linked ordinary expense on the source account,
+  defaulting to the seeded Fees category. Creating, editing, deleting, and undoing
+  a transfer changes its fee atomically as one command. Transfer fees count in
+  expense totals unless marked Excluded in the transfer drawer. Transfers use
+  appended migration 9, after the unchanged excluded-transactions migration 8.
+- Amount entry uses the same calculator field as Accounts for expenses, income,
+  both transfer amounts, and optional fees, with a positive result required.
+  Amounts are persisted as exact integer hundredths. HUF is displayed without
+  decimals; CHF is displayed with two decimals.
 - Typing a new payee creates it in the active profile. An existing payee with the
   same Unicode-normalized name ignoring case is reused. Category choices are limited to active
   expense or income categories matching the transaction kind and preserve the
   two-level hierarchy.
 - Each transaction currently has exactly one line whose amount equals its total.
   This is the unsplit ledger shape; split transactions are not included yet.
-- Edit any listed transaction from the same drawer, or delete it after
+- Edit any listed transaction or transfer from the same drawer, or delete it after
   confirmation. Create, edit, delete, category reassignment, and balance updates
   run through the profile application command boundary in one SQLite transaction.
-- After a transaction is created, edited, or deleted, a toast offers **Undo**.
+- After a transaction or transfer is created, edited, or deleted, a toast offers **Undo**.
   `Ctrl+Z` also undoes the latest transaction command unless focus is in a text
   editing control. Undo restores the transaction header, all of its lines,
   timestamps, identifiers, payee reference, and any payee created by that command
   from before/after aggregate images captured in the original write transaction.
+  Transfer undo includes both legs and its linked fee.
   History is in memory for the open profile only and is cleared by profile
   switching, restart, restore, or another profile write that has no declared undo
   aggregate. Account and category commands are not undoable yet.
@@ -370,13 +382,15 @@ not off-device copies or backups of the separate data folder.
   should affect its account balance but not spending/income totals (for example,
   an expense awaiting reimbursement). The table shows an Excluded badge. The
   **Excluded transactions** filter offers all transactions (default), only
-  excluded, or hide excluded and combines with the other filters. Filtered-set
+  excluded, or hide excluded and combines with the other filters. Only-excluded
+  hides transfers; hide-excluded keeps them (transfers have no exclusion flag). Filtered-set
   and whole-day totals always ignore excluded amounts, including in the
   only-excluded view, where matching days/currencies show zero totals. Saving a
   flag change uses the same Undo toast and Ctrl+Z as other transaction edits.
   Existing transactions remain included when upgrading via migration 8.
 - The dense table is newest first (date, creation timestamp, then UUID), grouped
-  by day, with income/expense signs and icons. Each day shows totals for that
+  by day, with income/expense signs and icons. Transfers have a distinct row and
+  icon and show both accounts and amounts. Each day shows totals for that
   whole filtered day, even when it continues onto another page. Only the visible
   rows plus a small overscan are mounted in the fixed-height scrolling viewport.
 - Combine period (all dates, this month, last month, this year, or an inclusive
@@ -385,7 +399,8 @@ not off-device copies or backups of the separate data folder.
   includes its subcategories; archived accounts/categories remain filterable.
   Free text matches payee name or note, ignoring case and diacritics, and treats
   punctuation literally. Different filters combine with AND.
-- Filtered-set and daily expense/income totals aggregate transaction lines and
+- Account filters include either transfer leg. Filtered-set and daily
+  expense/income totals aggregate transaction lines, never transfer legs, and
   stay separate by currency (HUF and CHF), without conversion, and include all matching transactions, not only
   the current page. Queries return bounded pages (default 100, maximum 500);
   the UI uses 200-row pages. Row and aggregate queries share one read snapshot.
@@ -402,7 +417,8 @@ not off-device copies or backups of the separate data folder.
 
 ### Amount calculator
 
-Accounts opening balances and transaction amounts use one pure parser in
+Accounts opening balances, expense/income amounts, both transfer amounts, and
+optional fees use one pure parser in
 `src/shared/amount-expression.ts`, without `eval` or binary floating-point
 arithmetic. Expressions accept `+ - * /`, ordinary precedence, parentheses, and
 signed operands, up to 200 characters. Examples: `12000/2` → `6000`, `4490*3` →
@@ -450,15 +466,23 @@ invalid expressions, sign constraints, and safe-integer bounds.
 ### Manual Transactions check
 
 Run `npm run dev`, open a profile with active HUF and CHF accounts, and navigate
-to Transactions. Record expenses and income using calculator expressions and dot
-and comma decimals, a new payee, and main/subcategories; verify the list and account balances update and
+to Transactions. Record expenses, income, same-currency transfers, and a HUF↔CHF
+transfer using calculator expressions and dot and comma decimals, a new
+payee, and main/subcategories; verify the list and account balances update and
 HUF is shown without decimals. Reuse the payee with different casing and confirm
 it appears with its original spelling. Try tomorrow's date and mismatched category
 kinds, then edit the date, account, kind, amount, payee, category, and note. Delete
 after first cancelling the confirmation. Archive an account and category and
 confirm neither appears in its drawer picker. Repeat in Hungarian, English, and
 German and check translated validation, keyboard focus, and light/dark themes.
-After create, edit, and delete, use both the toast action and `Ctrl+Z` and verify
+Verify the transfer row shows both accounts and the actual cross-currency rate,
+account filters include either leg, transfer legs do not alter expense/income
+totals, and an optional fee defaults to Fees. Try the calculator on both transfer
+amounts and the optional fee, including Enter without saving and leaving the fee
+blank. Mark a fee Excluded, check balances stay unchanged while expense totals
+omit it, then edit/delete/undo the transfer and verify the fee flag is restored.
+After create, edit, and delete, use
+both the toast action and `Ctrl+Z` and verify
 the exact previous transaction returns. While typing in amount, payee, note, or
 filter input, verify `Ctrl+Z` edits the field instead of undoing a transaction.
 Switch profiles after a change and verify the previous profile's command cannot
