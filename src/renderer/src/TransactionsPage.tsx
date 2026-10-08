@@ -12,6 +12,9 @@ import type {
   TransactionPeriod,
   TransactionExclusionFilter,
 } from '../../shared/transactions'
+import type { TransactionTemplate } from '../../shared/templates'
+import { TemplateEditor } from './components/template-editor'
+import { amountInput } from './lib/amount-input-value'
 import type { PayeeSuggestion } from '../../shared/payees'
 import type { Transfer } from '../../shared/transfers'
 import type { BalanceAdjustment } from '../../shared/adjustments'
@@ -27,9 +30,15 @@ import { today } from '../../shared/date'
 import { matchShortcut } from './lib/shortcuts'
 import { shortcutTargetContext } from './lib/shortcut-context'
 import { useDialogFocus } from './lib/use-dialog-focus'
-import { mergeRuleAutofill } from './lib/rule-autofill'
+import {
+  mergeRuleAutofill,
+  templateAutofillProtection,
+} from './lib/rule-autofill'
 
 const errorKeys = [
+  'templates.error.name',
+  'templates.error.notFound',
+  'templates.error.split',
   'transactions.error.account',
   'transactions.error.kind',
   'transactions.error.date',
@@ -57,15 +66,6 @@ const errorKeys = [
   'adjustments.error.note',
   'adjustments.error.notFound',
 ] as const satisfies readonly MessageKey[]
-
-function amountInput(minor: number): string {
-  const signed = BigInt(minor)
-  const value = signed < 0n ? -signed : signed
-  const fraction = String(value % 100n).padStart(2, '0')
-  const amount =
-    fraction === '00' ? String(value / 100n) : `${value / 100n}.${fraction}`
-  return signed < 0n ? `-${amount}` : amount
-}
 
 interface TransactionsPageProps {
   language: Language
@@ -190,6 +190,14 @@ export function TransactionsPage({
   const [payeeSuggestions, setPayeeSuggestions] = useState<PayeeSuggestion[]>(
     [],
   )
+  const [templates, setTemplates] = useState<TransactionTemplate[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
+  const [templateEditor, setTemplateEditor] = useState<
+    TransactionTemplate | 'new' | null
+  >(null)
+  const [deletingTemplate, setDeletingTemplate] =
+    useState<TransactionTemplate | null>(null)
+  const [saveTemplateName, setSaveTemplateName] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [renamingTag, setRenamingTag] = useState<{
     id: string
@@ -248,6 +256,7 @@ export function TransactionsPage({
       ]),
       window.app.payees.list(),
       window.app.tags.list(),
+      window.app.templates.list(),
     ])
       .then(
         ([
@@ -258,6 +267,7 @@ export function TransactionsPage({
           [expenseOptions, incomeOptions],
           nextPayees,
           nextTags,
+          nextTemplates,
         ]) => {
           if (ignore) return
           setPage(nextPage)
@@ -267,6 +277,7 @@ export function TransactionsPage({
           setCategoryOptions({ expense: expenseOptions, income: incomeOptions })
           setPayees(nextPayees)
           setTags(nextTags)
+          setTemplates(nextTemplates)
         },
       )
       .catch((error: unknown) => {
@@ -361,6 +372,9 @@ export function TransactionsPage({
         })
       })
       .catch(() => {})
+    return () => {
+      autofillRequest.current += 1
+    }
   }, [
     accounts,
     autofillAccountId,
@@ -370,7 +384,18 @@ export function TransactionsPage({
     autofillNote,
     autofillPayeeName,
     autofillSplit,
+    // Template use may change only protected fields, not the rule conditions.
+    focusRevision,
   ])
+
+  function closeDrawer() {
+    autofillRequest.current += 1
+    setForm(null)
+    setTemplateEditor(null)
+    setDeletingTemplate(null)
+    setSaveTemplateName(null)
+    setSelectedTemplateId('')
+  }
 
   function applyFilters(event: FormEvent) {
     event.preventDefault()
@@ -402,6 +427,7 @@ export function TransactionsPage({
       if (offerUndo) onTransactionChanged()
       setRequest((current) => ({ ...current, offset: 0 }))
       setRevision((current) => current + 1)
+      closeDrawer()
       setForm(nextForm)
       if (nextForm) {
         autofillProtected.current = { category: false, tags: false }
@@ -557,6 +583,33 @@ export function TransactionsPage({
     )
   }
 
+  function applyTemplate(template: TransactionTemplate) {
+    autofillRequest.current += 1
+    autofillProtected.current = templateAutofillProtection(template)
+    const kind =
+      template.kind ??
+      categories.find((category) => category.id === template.categoryId)
+        ?.kind ??
+      'expense'
+    const categoryId = template.categoryId ?? ''
+    const accountId = template.accountId ?? accountOptions[0]?.id ?? ''
+    setForm({
+      ...emptyForm(accountId),
+      kind,
+      categoryId,
+      amount:
+        template.totalMinor === null ? '' : amountInput(template.totalMinor),
+      payeeName: template.payeeName ?? '',
+      note: template.note ?? '',
+      tagNames: template.tagNames,
+    })
+    setTemplateEditor(null)
+    setSaveTemplateName(null)
+    setDeletingTemplate(null)
+    setError(null)
+    setFocusRevision((current) => current + 1)
+  }
+
   function addTag() {
     if (!form || !form.pendingTagName.trim()) return
     const name = form.pendingTagName.trim()
@@ -597,6 +650,13 @@ export function TransactionsPage({
     })
   }
 
+  const savedTransaction = form?.id
+    ? page.rows.find(
+        (row): row is Transaction =>
+          row.id === form.id &&
+          (row.kind === 'expense' || row.kind === 'income'),
+      )
+    : undefined
   const selectedAccount = form
     ? accounts.find((account) => account.id === form.accountId)
     : undefined
@@ -667,6 +727,13 @@ export function TransactionsPage({
           {t('transactions.listDescription')}
         </p>
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="ghost"
+            disabled={busy || loading}
+            onClick={() => setForm(emptyForm(accountOptions[0]?.id))}
+          >
+            {t('templates.title')}
+          </Button>
           <Button
             variant="ghost"
             disabled={busy || loading || accountOptions.length === 0}
@@ -967,6 +1034,13 @@ export function TransactionsPage({
                           },
                   )
                 }}
+                onDuplicate={(transaction) =>
+                  void run(
+                    () =>
+                      window.app.transactions.duplicate({ id: transaction.id }),
+                    true,
+                  )
+                }
                 onDelete={setDeleting}
               />
             )}
@@ -1156,7 +1230,7 @@ export function TransactionsPage({
         <div
           className="fixed inset-0 z-50 bg-foreground/20"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !busy) setForm(null)
+            if (event.target === event.currentTarget && !busy) closeDrawer()
           }}
         >
           <section
@@ -1168,6 +1242,13 @@ export function TransactionsPage({
                 ...shortcutTargetContext(event.target),
               })
               if (!action) return
+              if (
+                action !== 'close' &&
+                (templateEditor ||
+                  (event.target instanceof Element &&
+                    event.target.closest('[data-template-controls]')))
+              )
+                return
               // Let datalist fields accept a suggestion and tag fields add a
               // tag with Enter. Ctrl+Enter remains the batch-entry shortcut.
               if (
@@ -1179,7 +1260,7 @@ export function TransactionsPage({
               event.preventDefault()
               event.stopPropagation()
               if (busy) return
-              if (action === 'close') setForm(null)
+              if (action === 'close') closeDrawer()
               else if (
                 action === 'expense' ||
                 action === 'income' ||
@@ -1219,221 +1300,408 @@ export function TransactionsPage({
                 size="icon"
                 aria-label={t('transactions.close')}
                 disabled={busy}
-                onClick={() => setForm(null)}
+                onClick={closeDrawer}
               >
                 <X aria-hidden="true" />
               </Button>
             </div>
 
-            <form ref={formRef} className="space-y-4" onSubmit={submit}>
-              <div className="grid gap-4 sm:grid-cols-2">
+            {error && (templateEditor || saveTemplateName !== null) && (
+              <p role="alert" className="mb-4 text-sm text-error">
+                {t(error)}
+              </p>
+            )}
+            <section
+              data-template-controls
+              className="mb-6 space-y-3 rounded-md border p-3"
+              aria-label={t('templates.title')}
+            >
+              <label className="block space-y-1 text-sm font-medium">
+                {t('templates.title')}
+                <NativeSelect
+                  value={selectedTemplateId}
+                  disabled={busy}
+                  onChange={(event) => {
+                    setSelectedTemplateId(event.target.value)
+                    setDeletingTemplate(null)
+                    setTemplateEditor(null)
+                  }}
+                >
+                  <option value="">{t('templates.choose')}</option>
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  disabled={busy || !selectedTemplateId}
+                  onClick={() => {
+                    const template = templates.find(
+                      ({ id }) => id === selectedTemplateId,
+                    )
+                    if (template) applyTemplate(template)
+                  }}
+                >
+                  {t('templates.use')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => {
+                    setTemplateEditor('new')
+                    setSaveTemplateName(null)
+                    setDeletingTemplate(null)
+                  }}
+                >
+                  {t('templates.create')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={busy || !selectedTemplateId}
+                  onClick={() => {
+                    setTemplateEditor(
+                      templates.find(({ id }) => id === selectedTemplateId) ??
+                        null,
+                    )
+                    setSaveTemplateName(null)
+                    setDeletingTemplate(null)
+                  }}
+                >
+                  {t('templates.edit')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={busy || !selectedTemplateId}
+                  onClick={() => {
+                    setDeletingTemplate(
+                      templates.find(({ id }) => id === selectedTemplateId) ??
+                        null,
+                    )
+                    setTemplateEditor(null)
+                    setSaveTemplateName(null)
+                  }}
+                >
+                  {t('templates.delete')}
+                </Button>
+              </div>
+              {savedTransaction && (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="ghost"
+                    disabled={busy || savedTransaction.lines.length > 1}
+                    onClick={() => {
+                      setSaveTemplateName('')
+                      setTemplateEditor(null)
+                      setDeletingTemplate(null)
+                    }}
+                  >
+                    {t('templates.saveTransaction')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() =>
+                      void run(
+                        () =>
+                          window.app.transactions.duplicate({
+                            id: savedTransaction.id,
+                          }),
+                        true,
+                      )
+                    }
+                  >
+                    {t('transactions.duplicate')}
+                  </Button>
+                </div>
+              )}
+              {saveTemplateName !== null &&
+                savedTransaction?.lines.length === 1 && (
+                  <form
+                    className="space-y-2"
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      void run(
+                        () =>
+                          window.app.templates.saveTransaction({
+                            transactionId: savedTransaction.id,
+                            name: saveTemplateName,
+                          }),
+                        true,
+                      )
+                    }}
+                  >
+                    <p className="text-xs text-muted-foreground">
+                      {t('templates.savedTransactionHint')}
+                    </p>
+                    <label className="block space-y-1 text-sm font-medium">
+                      {t('templates.name')}
+                      <Input
+                        value={saveTemplateName}
+                        required
+                        maxLength={100}
+                        disabled={busy}
+                        onChange={(event) =>
+                          setSaveTemplateName(event.target.value)
+                        }
+                      />
+                    </label>
+                    <Button type="submit" disabled={busy}>
+                      {t('templates.save')}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() => setSaveTemplateName(null)}
+                    >
+                      {t('transactions.cancel')}
+                    </Button>
+                  </form>
+                )}
+              {deletingTemplate && (
+                <section role="alert" className="space-y-2">
+                  <p>
+                    {t('templates.deleteConfirmation')}{' '}
+                    <strong>{deletingTemplate.name}</strong>
+                  </p>
+                  <Button
+                    disabled={busy}
+                    onClick={() =>
+                      void run(
+                        () =>
+                          window.app.templates.delete({
+                            id: deletingTemplate.id,
+                          }),
+                        true,
+                      )
+                    }
+                  >
+                    {t('templates.delete')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => setDeletingTemplate(null)}
+                  >
+                    {t('transactions.cancel')}
+                  </Button>
+                </section>
+              )}
+            </section>
+            {templateEditor ? (
+              <TemplateEditor
+                key={templateEditor === 'new' ? 'new' : templateEditor.id}
+                template={templateEditor === 'new' ? undefined : templateEditor}
+                accounts={accounts}
+                categories={categories}
+                language={language}
+                t={t}
+                busy={busy}
+                onCancel={() => setTemplateEditor(null)}
+                onSave={(input) =>
+                  void run(
+                    () =>
+                      templateEditor === 'new'
+                        ? window.app.templates.create(input)
+                        : window.app.templates.update({
+                            id: templateEditor.id,
+                            ...input,
+                          }),
+                    true,
+                  )
+                }
+              />
+            ) : (
+              <form ref={formRef} className="space-y-4" onSubmit={submit}>
+                {selectedTemplateId && !form.amount && (
+                  <p role="status" className="text-sm text-muted-foreground">
+                    {t('templates.amountRequired')}
+                  </p>
+                )}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="transaction-amount"
+                      className="text-sm font-medium"
+                    >
+                      {t(
+                        form.kind === 'transfer'
+                          ? 'transactions.fromAmount'
+                          : form.kind === 'adjustment'
+                            ? 'adjustments.observedBalance'
+                            : 'transactions.amount',
+                      )}
+                    </label>
+                    <AmountInput
+                      id="transaction-amount"
+                      ref={amountRef}
+                      value={form.amount}
+                      currency={selectedAccount?.currency ?? 'HUF'}
+                      language={language}
+                      t={t}
+                      errorKey={
+                        form.kind === 'adjustment'
+                          ? 'adjustments.error.balance'
+                          : 'transactions.error.amount'
+                      }
+                      hintKey="transactions.amountHint"
+                      allowNegative={form.kind === 'adjustment'}
+                      allowZero={form.kind === 'adjustment'}
+                      disabled={busy}
+                      onChange={(amount) => setForm({ ...form, amount })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="transaction-date"
+                      className="text-sm font-medium"
+                    >
+                      {t('transactions.date')}
+                    </label>
+                    <Input
+                      id="transaction-date"
+                      type="date"
+                      max={today()}
+                      value={form.date}
+                      required
+                      disabled={busy}
+                      onChange={(event) =>
+                        setForm({ ...form, date: event.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                {form.kind !== 'adjustment' && (
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="transaction-kind"
+                      className="text-sm font-medium"
+                    >
+                      {t('transactions.kind')}
+                    </label>
+                    <NativeSelect
+                      id="transaction-kind"
+                      value={form.kind}
+                      disabled={busy}
+                      onChange={(event) =>
+                        changeKind(
+                          event.target.value as TransactionKind | 'transfer',
+                        )
+                      }
+                    >
+                      <option
+                        value="expense"
+                        disabled={Boolean(form.id && form.kind === 'transfer')}
+                      >
+                        {t('transactions.expense')}
+                      </option>
+                      <option
+                        value="income"
+                        disabled={Boolean(form.id && form.kind === 'transfer')}
+                      >
+                        {t('transactions.income')}
+                      </option>
+                      <option
+                        value="transfer"
+                        disabled={Boolean(form.id && form.kind !== 'transfer')}
+                      >
+                        {t('transactions.transfer')}
+                      </option>
+                    </NativeSelect>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <label
-                    htmlFor="transaction-amount"
+                    htmlFor="transaction-account"
                     className="text-sm font-medium"
                   >
                     {t(
                       form.kind === 'transfer'
-                        ? 'transactions.fromAmount'
-                        : form.kind === 'adjustment'
-                          ? 'adjustments.observedBalance'
-                          : 'transactions.amount',
+                        ? 'transactions.fromAccount'
+                        : 'transactions.account',
                     )}
                   </label>
-                  <AmountInput
-                    id="transaction-amount"
-                    ref={amountRef}
-                    value={form.amount}
-                    currency={selectedAccount?.currency ?? 'HUF'}
-                    language={language}
-                    t={t}
-                    errorKey={
-                      form.kind === 'adjustment'
-                        ? 'adjustments.error.balance'
-                        : 'transactions.error.amount'
-                    }
-                    hintKey="transactions.amountHint"
-                    allowNegative={form.kind === 'adjustment'}
-                    allowZero={form.kind === 'adjustment'}
-                    disabled={busy}
-                    onChange={(amount) => setForm({ ...form, amount })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label
-                    htmlFor="transaction-date"
-                    className="text-sm font-medium"
-                  >
-                    {t('transactions.date')}
-                  </label>
-                  <Input
-                    id="transaction-date"
-                    type="date"
-                    max={today()}
-                    value={form.date}
+                  <NativeSelect
+                    id="transaction-account"
+                    value={form.accountId}
                     required
                     disabled={busy}
                     onChange={(event) =>
-                      setForm({ ...form, date: event.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              {form.kind !== 'adjustment' && (
-                <div className="space-y-2">
-                  <label
-                    htmlFor="transaction-kind"
-                    className="text-sm font-medium"
-                  >
-                    {t('transactions.kind')}
-                  </label>
-                  <NativeSelect
-                    id="transaction-kind"
-                    value={form.kind}
-                    disabled={busy}
-                    onChange={(event) =>
-                      changeKind(
-                        event.target.value as TransactionKind | 'transfer',
-                      )
+                      setForm({ ...form, accountId: event.target.value })
                     }
                   >
-                    <option
-                      value="expense"
-                      disabled={Boolean(form.id && form.kind === 'transfer')}
-                    >
-                      {t('transactions.expense')}
+                    <option value="" disabled>
+                      {t('transactions.chooseAccount')}
                     </option>
-                    <option
-                      value="income"
-                      disabled={Boolean(form.id && form.kind === 'transfer')}
-                    >
-                      {t('transactions.income')}
-                    </option>
-                    <option
-                      value="transfer"
-                      disabled={Boolean(form.id && form.kind !== 'transfer')}
-                    >
-                      {t('transactions.transfer')}
-                    </option>
+                    {(form.kind === 'transfer'
+                      ? transferAccounts
+                      : drawerAccounts
+                    ).map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.name} ({account.currency})
+                      </option>
+                    ))}
                   </NativeSelect>
                 </div>
-              )}
-              <div className="space-y-2">
-                <label
-                  htmlFor="transaction-account"
-                  className="text-sm font-medium"
-                >
-                  {t(
-                    form.kind === 'transfer'
-                      ? 'transactions.fromAccount'
-                      : 'transactions.account',
-                  )}
-                </label>
-                <NativeSelect
-                  id="transaction-account"
-                  value={form.accountId}
-                  required
-                  disabled={busy}
-                  onChange={(event) =>
-                    setForm({ ...form, accountId: event.target.value })
-                  }
-                >
-                  <option value="" disabled>
-                    {t('transactions.chooseAccount')}
-                  </option>
-                  {(form.kind === 'transfer'
-                    ? transferAccounts
-                    : drawerAccounts
-                  ).map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.name} ({account.currency})
-                    </option>
-                  ))}
-                </NativeSelect>
-              </div>
-              {form.kind === 'transfer' && (
-                <>
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="transfer-to-account"
-                      className="text-sm font-medium"
-                    >
-                      {t('transactions.toAccount')}
-                    </label>
-                    <NativeSelect
-                      id="transfer-to-account"
-                      value={form.toAccountId}
-                      required
-                      disabled={busy}
-                      onChange={(event) =>
-                        setForm({ ...form, toAccountId: event.target.value })
-                      }
-                    >
-                      <option value="" disabled>
-                        {t('transactions.chooseAccount')}
-                      </option>
-                      {transferAccounts.map((account) => (
-                        <option
-                          key={account.id}
-                          value={account.id}
-                          disabled={account.id === form.accountId}
-                        >
-                          {account.name} ({account.currency})
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  </div>
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="transfer-to-amount"
-                      className="text-sm font-medium"
-                    >
-                      {t('transactions.toAmount')}
-                    </label>
-                    <AmountInput
-                      id="transfer-to-amount"
-                      value={form.toAmount}
-                      currency={selectedToAccount?.currency ?? 'HUF'}
-                      language={language}
-                      t={t}
-                      errorKey="transactions.error.amount"
-                      hintKey="transactions.amountHint"
-                      disabled={busy}
-                      onChange={(toAmount) => setForm({ ...form, toAmount })}
-                    />
-                  </div>
-                </>
-              )}
-
-              {(form.kind === 'expense' || form.kind === 'income') && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {!form.splitLines ? (
-                    <Button
-                      variant="ghost"
-                      disabled={busy}
-                      onClick={() => {
-                        autofillProtected.current = {
-                          category: true,
-                          tags: true,
+                {form.kind === 'transfer' && (
+                  <>
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="transfer-to-account"
+                        className="text-sm font-medium"
+                      >
+                        {t('transactions.toAccount')}
+                      </label>
+                      <NativeSelect
+                        id="transfer-to-account"
+                        value={form.toAccountId}
+                        required
+                        disabled={busy}
+                        onChange={(event) =>
+                          setForm({ ...form, toAccountId: event.target.value })
                         }
-                        setForm({
-                          ...form,
-                          splitLines: [
-                            splitLine({
-                              categoryId: form.categoryId,
-                              note: form.note,
-                              tagNames: form.tagNames,
-                              pendingTagName: form.pendingTagName,
-                            }),
-                            splitLine(),
-                          ],
-                        })
-                      }}
-                    >
-                      {t('splits.split')}
-                    </Button>
-                  ) : (
-                    <>
+                      >
+                        <option value="" disabled>
+                          {t('transactions.chooseAccount')}
+                        </option>
+                        {transferAccounts.map((account) => (
+                          <option
+                            key={account.id}
+                            value={account.id}
+                            disabled={account.id === form.accountId}
+                          >
+                            {account.name} ({account.currency})
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    </div>
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="transfer-to-amount"
+                        className="text-sm font-medium"
+                      >
+                        {t('transactions.toAmount')}
+                      </label>
+                      <AmountInput
+                        id="transfer-to-amount"
+                        value={form.toAmount}
+                        currency={selectedToAccount?.currency ?? 'HUF'}
+                        language={language}
+                        t={t}
+                        errorKey="transactions.error.amount"
+                        hintKey="transactions.amountHint"
+                        disabled={busy}
+                        onChange={(toAmount) => setForm({ ...form, toAmount })}
+                      />
+                    </div>
+                  </>
+                )}
+
+                {(form.kind === 'expense' || form.kind === 'income') && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {!form.splitLines ? (
                       <Button
                         variant="ghost"
                         disabled={busy}
@@ -1442,140 +1710,126 @@ export function TransactionsPage({
                             category: true,
                             tags: true,
                           }
-                          const first = form.splitLines![0]
                           setForm({
                             ...form,
-                            categoryId: first.categoryId,
-                            note: first.note,
-                            tagNames: first.tagNames,
-                            pendingTagName: first.pendingTagName,
-                            splitLines: null,
+                            splitLines: [
+                              splitLine({
+                                categoryId: form.categoryId,
+                                note: form.note,
+                                tagNames: form.tagNames,
+                                pendingTagName: form.pendingTagName,
+                              }),
+                              splitLine(),
+                            ],
                           })
                         }}
                       >
-                        {t('splits.unsplit')}
+                        {t('splits.split')}
                       </Button>
-                      <span
-                        className={`text-sm font-medium ${splitRemaining === 0 ? '' : 'text-error'}`}
-                        role="status"
-                      >
-                        {t('splits.remaining')}:{' '}
-                        {splitRemaining === null || !selectedAccount
-                          ? '—'
-                          : createFormatters(language).money(
-                              splitRemaining,
-                              selectedAccount.currency,
-                            )}
-                      </span>
-                    </>
-                  )}
-                </div>
-              )}
-              {(form.kind === 'expense' || form.kind === 'income') &&
-                form.splitLines && (
-                  <div className="space-y-3">
-                    <datalist id="transaction-tags">
-                      {tags.map((tag) => (
-                        <option key={tag.id} value={tag.name} />
-                      ))}
-                    </datalist>
-                    {form.splitLines.map((line, lineIndex) => (
-                      <section
-                        key={line.key}
-                        className="space-y-3 rounded-md border p-3"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <h3 className="text-sm font-semibold">
-                            {t('splits.part')} {lineIndex + 1}
-                          </h3>
-                          <Button
-                            variant="ghost"
-                            disabled={busy || form.splitLines!.length <= 1}
-                            onClick={() =>
-                              setForm({
-                                ...form,
-                                splitLines: form.splitLines!.filter(
-                                  (candidate) => candidate.key !== line.key,
-                                ),
-                              })
+                    ) : (
+                      <>
+                        <Button
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() => {
+                            autofillProtected.current = {
+                              category: true,
+                              tags: true,
                             }
-                          >
-                            {t('splits.remove')}
-                          </Button>
-                        </div>
-                        <div className="space-y-2">
-                          <label
-                            htmlFor={`split-amount-${line.key}`}
-                            className="text-sm font-medium"
-                          >
-                            {t('transactions.amount')}
-                          </label>
-                          <AmountInput
-                            id={`split-amount-${line.key}`}
-                            value={line.amount}
-                            currency={selectedAccount?.currency ?? 'HUF'}
-                            language={language}
-                            t={t}
-                            errorKey="transactions.error.amount"
-                            hintKey="transactions.amountHint"
-                            disabled={busy}
-                            onChange={(amount) =>
-                              setForm({
-                                ...form,
-                                splitLines: form.splitLines!.map((candidate) =>
-                                  candidate.key === line.key
-                                    ? { ...candidate, amount }
-                                    : candidate,
-                                ),
-                              })
-                            }
-                          />
-                        </div>
-                        <label className="block space-y-1 text-sm font-medium">
-                          {t('transactions.category')}
-                          <NativeSelect
-                            value={line.categoryId}
-                            disabled={busy}
-                            onChange={(event) =>
-                              setForm({
-                                ...form,
-                                splitLines: form.splitLines!.map((candidate) =>
-                                  candidate.key === line.key
-                                    ? {
-                                        ...candidate,
-                                        categoryId: event.target.value,
-                                      }
-                                    : candidate,
-                                ),
-                              })
-                            }
-                          >
-                            <option value="">
-                              {t('transactions.noCategory')}
-                            </option>
-                            {drawerCategories.map((category) => (
-                              <option key={category.id} value={category.id}>
-                                {category.parentId
-                                  ? `— ${category.name}`
-                                  : category.name}
-                              </option>
-                            ))}
-                          </NativeSelect>
-                        </label>
-                        <div className="space-y-1">
-                          <label
-                            htmlFor={`split-tag-${line.key}`}
-                            className="text-sm font-medium"
-                          >
-                            {t('tags.title')}
-                          </label>
-                          <div className="flex gap-2">
-                            <Input
-                              id={`split-tag-${line.key}`}
-                              data-native-enter
-                              list="transaction-tags"
-                              value={line.pendingTagName}
-                              maxLength={100}
+                            const first = form.splitLines![0]
+                            setForm({
+                              ...form,
+                              categoryId: first.categoryId,
+                              note: first.note,
+                              tagNames: first.tagNames,
+                              pendingTagName: first.pendingTagName,
+                              splitLines: null,
+                            })
+                          }}
+                        >
+                          {t('splits.unsplit')}
+                        </Button>
+                        <span
+                          className={`text-sm font-medium ${splitRemaining === 0 ? '' : 'text-error'}`}
+                          role="status"
+                        >
+                          {t('splits.remaining')}:{' '}
+                          {splitRemaining === null || !selectedAccount
+                            ? '—'
+                            : createFormatters(language).money(
+                                splitRemaining,
+                                selectedAccount.currency,
+                              )}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
+                {(form.kind === 'expense' || form.kind === 'income') &&
+                  form.splitLines && (
+                    <div className="space-y-3">
+                      <datalist id="transaction-tags">
+                        {tags.map((tag) => (
+                          <option key={tag.id} value={tag.name} />
+                        ))}
+                      </datalist>
+                      {form.splitLines.map((line, lineIndex) => (
+                        <section
+                          key={line.key}
+                          className="space-y-3 rounded-md border p-3"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="text-sm font-semibold">
+                              {t('splits.part')} {lineIndex + 1}
+                            </h3>
+                            <Button
+                              variant="ghost"
+                              disabled={busy || form.splitLines!.length <= 1}
+                              onClick={() =>
+                                setForm({
+                                  ...form,
+                                  splitLines: form.splitLines!.filter(
+                                    (candidate) => candidate.key !== line.key,
+                                  ),
+                                })
+                              }
+                            >
+                              {t('splits.remove')}
+                            </Button>
+                          </div>
+                          <div className="space-y-2">
+                            <label
+                              htmlFor={`split-amount-${line.key}`}
+                              className="text-sm font-medium"
+                            >
+                              {t('transactions.amount')}
+                            </label>
+                            <AmountInput
+                              id={`split-amount-${line.key}`}
+                              value={line.amount}
+                              currency={selectedAccount?.currency ?? 'HUF'}
+                              language={language}
+                              t={t}
+                              errorKey="transactions.error.amount"
+                              hintKey="transactions.amountHint"
+                              disabled={busy}
+                              onChange={(amount) =>
+                                setForm({
+                                  ...form,
+                                  splitLines: form.splitLines!.map(
+                                    (candidate) =>
+                                      candidate.key === line.key
+                                        ? { ...candidate, amount }
+                                        : candidate,
+                                  ),
+                                })
+                              }
+                            />
+                          </div>
+                          <label className="block space-y-1 text-sm font-medium">
+                            {t('transactions.category')}
+                            <NativeSelect
+                              value={line.categoryId}
                               disabled={busy}
                               onChange={(event) =>
                                 setForm({
@@ -1585,390 +1839,436 @@ export function TransactionsPage({
                                       candidate.key === line.key
                                         ? {
                                             ...candidate,
-                                            pendingTagName: event.target.value,
+                                            categoryId: event.target.value,
                                           }
                                         : candidate,
                                   ),
                                 })
                               }
-                              onKeyDown={(event) => {
-                                if (event.key === 'Enter') {
-                                  event.preventDefault()
-                                  addSplitTag(line.key)
-                                }
-                              }}
-                            />
-                            <Button
-                              disabled={busy || !line.pendingTagName.trim()}
-                              onClick={() => addSplitTag(line.key)}
                             >
-                              {t('tags.add')}
-                            </Button>
-                          </div>
-                          <ul className="flex flex-wrap gap-2">
-                            {line.tagNames.map((name, tagIndex) => (
-                              <li
-                                key={`${name}-${tagIndex}`}
-                                className="inline-flex items-center rounded-md bg-muted px-2 text-sm"
-                              >
-                                {name}
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="size-7"
-                                  disabled={busy}
-                                  aria-label={`${t('tags.remove')}: ${name}`}
-                                  onClick={() =>
-                                    setForm({
-                                      ...form,
-                                      splitLines: form.splitLines!.map(
-                                        (candidate) =>
-                                          candidate.key === line.key
-                                            ? {
-                                                ...candidate,
-                                                tagNames:
-                                                  candidate.tagNames.filter(
-                                                    (_, index) =>
-                                                      index !== tagIndex,
-                                                  ),
-                                              }
-                                            : candidate,
-                                      ),
-                                    })
+                              <option value="">
+                                {t('transactions.noCategory')}
+                              </option>
+                              {drawerCategories.map((category) => (
+                                <option key={category.id} value={category.id}>
+                                  {category.parentId
+                                    ? `— ${category.name}`
+                                    : category.name}
+                                </option>
+                              ))}
+                            </NativeSelect>
+                          </label>
+                          <div className="space-y-1">
+                            <label
+                              htmlFor={`split-tag-${line.key}`}
+                              className="text-sm font-medium"
+                            >
+                              {t('tags.title')}
+                            </label>
+                            <div className="flex gap-2">
+                              <Input
+                                id={`split-tag-${line.key}`}
+                                data-native-enter
+                                list="transaction-tags"
+                                value={line.pendingTagName}
+                                maxLength={100}
+                                disabled={busy}
+                                onChange={(event) =>
+                                  setForm({
+                                    ...form,
+                                    splitLines: form.splitLines!.map(
+                                      (candidate) =>
+                                        candidate.key === line.key
+                                          ? {
+                                              ...candidate,
+                                              pendingTagName:
+                                                event.target.value,
+                                            }
+                                          : candidate,
+                                    ),
+                                  })
+                                }
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault()
+                                    addSplitTag(line.key)
                                   }
+                                }}
+                              />
+                              <Button
+                                disabled={busy || !line.pendingTagName.trim()}
+                                onClick={() => addSplitTag(line.key)}
+                              >
+                                {t('tags.add')}
+                              </Button>
+                            </div>
+                            <ul className="flex flex-wrap gap-2">
+                              {line.tagNames.map((name, tagIndex) => (
+                                <li
+                                  key={`${name}-${tagIndex}`}
+                                  className="inline-flex items-center rounded-md bg-muted px-2 text-sm"
                                 >
-                                  <X aria-hidden="true" className="size-3" />
-                                </Button>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                        <label className="block space-y-1 text-sm font-medium">
-                          {t('transactions.note')}
-                          <textarea
-                            className="min-h-16 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                            value={line.note}
-                            maxLength={1000}
-                            disabled={busy}
-                            onChange={(event) =>
-                              setForm({
-                                ...form,
-                                splitLines: form.splitLines!.map((candidate) =>
-                                  candidate.key === line.key
-                                    ? { ...candidate, note: event.target.value }
-                                    : candidate,
-                                ),
-                              })
-                            }
-                          />
-                        </label>
-                      </section>
-                    ))}
-                    <Button
-                      variant="ghost"
-                      disabled={busy}
-                      onClick={() =>
-                        setForm({
-                          ...form,
-                          splitLines: [...form.splitLines!, splitLine()],
-                        })
-                      }
-                    >
-                      {t('splits.addPart')}
-                    </Button>
-                  </div>
-                )}
-              {(form.kind === 'expense' || form.kind === 'income') && (
-                <div className="space-y-2">
-                  <label
-                    htmlFor="transaction-payee"
-                    className="text-sm font-medium"
-                  >
-                    {t('transactions.payee')}
-                  </label>
-                  <Input
-                    id="transaction-payee"
-                    data-native-enter
-                    list="transaction-payees"
-                    value={form.payeeName}
-                    maxLength={100}
-                    disabled={busy}
-                    onChange={(event) =>
-                      setForm({ ...form, payeeName: event.target.value })
-                    }
-                  />
-                  <datalist id="transaction-payees">
-                    {payeeSuggestions.map((payee) => (
-                      <option key={payee.id} value={payee.name} />
-                    ))}
-                  </datalist>
-                  <p className="text-xs text-muted-foreground">
-                    {t('transactions.payeeHint')}
-                  </p>
-                </div>
-              )}
-
-              {(form.kind === 'expense' || form.kind === 'income') &&
-                !form.splitLines && (
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="transaction-category"
-                      className="text-sm font-medium"
-                    >
-                      {t('transactions.category')}
-                    </label>
-                    <NativeSelect
-                      id="transaction-category"
-                      value={form.categoryId}
-                      disabled={busy}
-                      onChange={(event) => {
-                        autofillProtected.current.category = true
-                        setForm({
-                          ...form,
-                          categoryId: event.target.value,
-                        })
-                      }}
-                    >
-                      <option value="">{t('transactions.noCategory')}</option>
-                      {drawerCategories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.parentId
-                            ? `— ${category.name}`
-                            : category.name}
-                        </option>
+                                  {name}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="size-7"
+                                    disabled={busy}
+                                    aria-label={`${t('tags.remove')}: ${name}`}
+                                    onClick={() =>
+                                      setForm({
+                                        ...form,
+                                        splitLines: form.splitLines!.map(
+                                          (candidate) =>
+                                            candidate.key === line.key
+                                              ? {
+                                                  ...candidate,
+                                                  tagNames:
+                                                    candidate.tagNames.filter(
+                                                      (_, index) =>
+                                                        index !== tagIndex,
+                                                    ),
+                                                }
+                                              : candidate,
+                                        ),
+                                      })
+                                    }
+                                  >
+                                    <X aria-hidden="true" className="size-3" />
+                                  </Button>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                          <label className="block space-y-1 text-sm font-medium">
+                            {t('transactions.note')}
+                            <textarea
+                              className="min-h-16 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                              value={line.note}
+                              maxLength={1000}
+                              disabled={busy}
+                              onChange={(event) =>
+                                setForm({
+                                  ...form,
+                                  splitLines: form.splitLines!.map(
+                                    (candidate) =>
+                                      candidate.key === line.key
+                                        ? {
+                                            ...candidate,
+                                            note: event.target.value,
+                                          }
+                                        : candidate,
+                                  ),
+                                })
+                              }
+                            />
+                          </label>
+                        </section>
                       ))}
-                    </NativeSelect>
-                  </div>
-                )}
-              {form.kind === 'transfer' && (
-                <div className="grid gap-4 sm:grid-cols-2">
+                      <Button
+                        variant="ghost"
+                        disabled={busy}
+                        onClick={() =>
+                          setForm({
+                            ...form,
+                            splitLines: [...form.splitLines!, splitLine()],
+                          })
+                        }
+                      >
+                        {t('splits.addPart')}
+                      </Button>
+                    </div>
+                  )}
+                {(form.kind === 'expense' || form.kind === 'income') && (
                   <div className="space-y-2">
                     <label
-                      htmlFor="transfer-fee"
+                      htmlFor="transaction-payee"
                       className="text-sm font-medium"
                     >
-                      {t('transactions.fee')}
+                      {t('transactions.payee')}
                     </label>
-                    <AmountInput
-                      id="transfer-fee"
-                      value={form.feeAmount}
-                      currency={selectedAccount?.currency ?? 'HUF'}
-                      language={language}
-                      t={t}
-                      errorKey="transactions.error.amount"
-                      hintKey="transactions.amountHint"
-                      required={false}
-                      placeholder={t('transactions.optional')}
+                    <Input
+                      id="transaction-payee"
+                      data-native-enter
+                      list="transaction-payees"
+                      value={form.payeeName}
+                      maxLength={100}
                       disabled={busy}
-                      onChange={(feeAmount) => setForm({ ...form, feeAmount })}
+                      onChange={(event) =>
+                        setForm({ ...form, payeeName: event.target.value })
+                      }
                     />
-                    <label className="flex items-center gap-2 text-sm font-medium">
-                      <input
-                        type="checkbox"
-                        checked={form.feeExcluded}
+                    <datalist id="transaction-payees">
+                      {payeeSuggestions.map((payee) => (
+                        <option key={payee.id} value={payee.name} />
+                      ))}
+                    </datalist>
+                    <p className="text-xs text-muted-foreground">
+                      {t('transactions.payeeHint')}
+                    </p>
+                  </div>
+                )}
+
+                {(form.kind === 'expense' || form.kind === 'income') &&
+                  !form.splitLines && (
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="transaction-category"
+                        className="text-sm font-medium"
+                      >
+                        {t('transactions.category')}
+                      </label>
+                      <NativeSelect
+                        id="transaction-category"
+                        value={form.categoryId}
+                        disabled={busy}
+                        onChange={(event) => {
+                          autofillProtected.current.category = true
+                          setForm({
+                            ...form,
+                            categoryId: event.target.value,
+                          })
+                        }}
+                      >
+                        <option value="">{t('transactions.noCategory')}</option>
+                        {drawerCategories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.parentId
+                              ? `— ${category.name}`
+                              : category.name}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    </div>
+                  )}
+                {form.kind === 'transfer' && (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="transfer-fee"
+                        className="text-sm font-medium"
+                      >
+                        {t('transactions.fee')}
+                      </label>
+                      <AmountInput
+                        id="transfer-fee"
+                        value={form.feeAmount}
+                        currency={selectedAccount?.currency ?? 'HUF'}
+                        language={language}
+                        t={t}
+                        errorKey="transactions.error.amount"
+                        hintKey="transactions.amountHint"
+                        required={false}
+                        placeholder={t('transactions.optional')}
+                        disabled={busy}
+                        onChange={(feeAmount) =>
+                          setForm({ ...form, feeAmount })
+                        }
+                      />
+                      <label className="flex items-center gap-2 text-sm font-medium">
+                        <input
+                          type="checkbox"
+                          checked={form.feeExcluded}
+                          disabled={busy || !form.feeAmount}
+                          aria-describedby="transfer-fee-excluded-hint"
+                          onChange={(event) =>
+                            setForm({
+                              ...form,
+                              feeExcluded: event.target.checked,
+                            })
+                          }
+                          className="size-4 accent-primary"
+                        />
+                        {t('transactions.excluded')}
+                      </label>
+                      <p
+                        id="transfer-fee-excluded-hint"
+                        className="text-xs text-muted-foreground"
+                      >
+                        {t('transactions.excludedHint')}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="transfer-fee-category"
+                        className="text-sm font-medium"
+                      >
+                        {t('transactions.feeCategory')}
+                      </label>
+                      <NativeSelect
+                        id="transfer-fee-category"
+                        value={form.feeCategoryId}
                         disabled={busy || !form.feeAmount}
-                        aria-describedby="transfer-fee-excluded-hint"
                         onChange={(event) =>
                           setForm({
                             ...form,
-                            feeExcluded: event.target.checked,
+                            feeCategoryId: event.target.value,
                           })
+                        }
+                      >
+                        <option value="">{t('transactions.noCategory')}</option>
+                        {categoryOptions.expense.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.parentId
+                              ? `— ${category.name}`
+                              : category.name}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    </div>
+                  </div>
+                )}
+
+                {(form.kind === 'expense' || form.kind === 'income') &&
+                  !form.splitLines && (
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="transaction-tag"
+                        className="text-sm font-medium"
+                      >
+                        {t('tags.title')}
+                      </label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="transaction-tag"
+                          data-native-enter
+                          list="transaction-tags"
+                          value={form.pendingTagName}
+                          maxLength={100}
+                          disabled={busy}
+                          onChange={(event) => {
+                            autofillProtected.current.tags = true
+                            setForm({
+                              ...form,
+                              pendingTagName: event.target.value,
+                            })
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault()
+                              addTag()
+                            }
+                          }}
+                        />
+                        <Button
+                          disabled={busy || !form.pendingTagName.trim()}
+                          onClick={addTag}
+                        >
+                          {t('tags.add')}
+                        </Button>
+                      </div>
+                      <datalist id="transaction-tags">
+                        {tags.map((tag) => (
+                          <option key={tag.id} value={tag.name} />
+                        ))}
+                      </datalist>
+                      <p className="text-xs text-muted-foreground">
+                        {t('tags.hint')}
+                      </p>
+                      <ul className="flex flex-wrap gap-2">
+                        {form.tagNames.map((name, index) => (
+                          <li
+                            key={name}
+                            className="inline-flex items-center rounded-md bg-muted px-2 text-sm"
+                          >
+                            {name}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-7"
+                              disabled={busy}
+                              aria-label={`${t('tags.remove')}: ${name}`}
+                              onClick={() => {
+                                autofillProtected.current.tags = true
+                                setForm({
+                                  ...form,
+                                  tagNames: form.tagNames.filter(
+                                    (_, candidate) => candidate !== index,
+                                  ),
+                                })
+                              }}
+                            >
+                              <X aria-hidden="true" className="size-3" />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                {!form.splitLines && (
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="transaction-note"
+                      className="text-sm font-medium"
+                    >
+                      {t('transactions.note')}
+                    </label>
+                    <textarea
+                      id="transaction-note"
+                      className="min-h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      value={form.note}
+                      maxLength={1000}
+                      disabled={busy}
+                      onChange={(event) =>
+                        setForm({ ...form, note: event.target.value })
+                      }
+                    />
+                  </div>
+                )}
+                {(form.kind === 'expense' || form.kind === 'income') && (
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                      <input
+                        type="checkbox"
+                        checked={form.excluded}
+                        disabled={busy}
+                        aria-describedby="transaction-excluded-hint"
+                        onChange={(event) =>
+                          setForm({ ...form, excluded: event.target.checked })
                         }
                         className="size-4 accent-primary"
                       />
                       {t('transactions.excluded')}
                     </label>
                     <p
-                      id="transfer-fee-excluded-hint"
+                      id="transaction-excluded-hint"
                       className="text-xs text-muted-foreground"
                     >
                       {t('transactions.excludedHint')}
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="transfer-fee-category"
-                      className="text-sm font-medium"
-                    >
-                      {t('transactions.feeCategory')}
-                    </label>
-                    <NativeSelect
-                      id="transfer-fee-category"
-                      value={form.feeCategoryId}
-                      disabled={busy || !form.feeAmount}
-                      onChange={(event) =>
-                        setForm({
-                          ...form,
-                          feeCategoryId: event.target.value,
-                        })
-                      }
-                    >
-                      <option value="">{t('transactions.noCategory')}</option>
-                      {categoryOptions.expense.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.parentId
-                            ? `— ${category.name}`
-                            : category.name}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  </div>
-                </div>
-              )}
-
-              {(form.kind === 'expense' || form.kind === 'income') &&
-                !form.splitLines && (
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="transaction-tag"
-                      className="text-sm font-medium"
-                    >
-                      {t('tags.title')}
-                    </label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="transaction-tag"
-                        data-native-enter
-                        list="transaction-tags"
-                        value={form.pendingTagName}
-                        maxLength={100}
-                        disabled={busy}
-                        onChange={(event) => {
-                          autofillProtected.current.tags = true
-                          setForm({
-                            ...form,
-                            pendingTagName: event.target.value,
-                          })
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault()
-                            addTag()
-                          }
-                        }}
-                      />
-                      <Button
-                        disabled={busy || !form.pendingTagName.trim()}
-                        onClick={addTag}
-                      >
-                        {t('tags.add')}
-                      </Button>
-                    </div>
-                    <datalist id="transaction-tags">
-                      {tags.map((tag) => (
-                        <option key={tag.id} value={tag.name} />
-                      ))}
-                    </datalist>
-                    <p className="text-xs text-muted-foreground">
-                      {t('tags.hint')}
-                    </p>
-                    <ul className="flex flex-wrap gap-2">
-                      {form.tagNames.map((name, index) => (
-                        <li
-                          key={name}
-                          className="inline-flex items-center rounded-md bg-muted px-2 text-sm"
-                        >
-                          {name}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7"
-                            disabled={busy}
-                            aria-label={`${t('tags.remove')}: ${name}`}
-                            onClick={() => {
-                              autofillProtected.current.tags = true
-                              setForm({
-                                ...form,
-                                tagNames: form.tagNames.filter(
-                                  (_, candidate) => candidate !== index,
-                                ),
-                              })
-                            }}
-                          >
-                            <X aria-hidden="true" className="size-3" />
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
                 )}
-
-              {!form.splitLines && (
-                <div className="space-y-2">
-                  <label
-                    htmlFor="transaction-note"
-                    className="text-sm font-medium"
-                  >
-                    {t('transactions.note')}
-                  </label>
-                  <textarea
-                    id="transaction-note"
-                    className="min-h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                    value={form.note}
-                    maxLength={1000}
-                    disabled={busy}
-                    onChange={(event) =>
-                      setForm({ ...form, note: event.target.value })
-                    }
-                  />
-                </div>
-              )}
-              {(form.kind === 'expense' || form.kind === 'income') && (
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm font-medium">
-                    <input
-                      type="checkbox"
-                      checked={form.excluded}
-                      disabled={busy}
-                      aria-describedby="transaction-excluded-hint"
-                      onChange={(event) =>
-                        setForm({ ...form, excluded: event.target.checked })
-                      }
-                      className="size-4 accent-primary"
-                    />
-                    {t('transactions.excluded')}
-                  </label>
-                  <p
-                    id="transaction-excluded-hint"
-                    className="text-xs text-muted-foreground"
-                  >
-                    {t('transactions.excludedHint')}
+                {error && (
+                  <p role="alert" className="text-sm font-medium text-error">
+                    {t(error)}
                   </p>
-                </div>
-              )}
-              {error && (
-                <p role="alert" className="text-sm font-medium text-error">
-                  {t(error)}
-                </p>
-              )}
-              <div className="flex flex-wrap gap-2 pt-2">
-                <Button type="submit" disabled={busy}>
-                  {t(
-                    form.kind === 'adjustment'
-                      ? 'adjustments.save'
-                      : 'transactions.save',
-                  )}
-                </Button>
-                {form.kind !== 'adjustment' && (
-                  <Button
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() => {
-                      if (formRef.current?.reportValidity()) save(true)
-                    }}
-                  >
-                    {t('transactions.saveAndAddAnother')}
-                  </Button>
                 )}
-                <Button
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => setForm(null)}
-                >
-                  {t('transactions.cancel')}
-                </Button>
-              </div>
-            </form>
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <Button type="submit" disabled={busy}>
+                    {t(
+                      form.kind === 'adjustment'
+                        ? 'adjustments.save'
+                        : 'transactions.save',
+                    )}
+                  </Button>
+                  {form.kind !== 'adjustment' && (
+                    <Button
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() => {
+                        if (formRef.current?.reportValidity()) save(true)
+                      }}
+                    >
+                      {t('transactions.saveAndAddAnother')}
+                    </Button>
+                  )}
+                  <Button variant="ghost" disabled={busy} onClick={closeDrawer}>
+                    {t('transactions.cancel')}
+                  </Button>
+                </div>
+              </form>
+            )}
           </section>
         </div>
       )}

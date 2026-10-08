@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   Pencil,
+  Copy,
   Scale,
   Trash2,
 } from 'lucide-react'
@@ -29,6 +30,7 @@ interface Props {
   language: Language
   t(key: MessageKey): string
   busy: boolean
+  onDuplicate(transaction: Transaction): void
   onEdit(transaction: Transaction | Transfer | BalanceAdjustment): void
   onDelete(transaction: Transaction | Transfer | BalanceAdjustment): void
 }
@@ -73,6 +75,7 @@ export function TransactionTable({
   busy,
   onEdit,
   onDelete,
+  onDuplicate,
 }: Props) {
   const [scrollTop, setScrollTop] = useState(0)
   const [expandedSplits, setExpandedSplits] = useState<Set<string>>(new Set())
@@ -272,6 +275,7 @@ export function TransactionTable({
                       t={t}
                       onEdit={onEdit}
                       onDelete={onDelete}
+                      onDuplicate={onDuplicate}
                     />
                   </td>
                 </tr>
@@ -335,6 +339,7 @@ export function TransactionTable({
                       t={t}
                       onEdit={onEdit}
                       onDelete={onDelete}
+                      onDuplicate={onDuplicate}
                     />
                   </td>
                 </tr>
@@ -454,6 +459,7 @@ export function TransactionTable({
                       t={t}
                       onEdit={onEdit}
                       onDelete={onDelete}
+                      onDuplicate={onDuplicate}
                     />
                   )}
                 </td>
@@ -499,11 +505,25 @@ function RowActions({
   t,
   onEdit,
   onDelete,
-}: Pick<Props, 'busy' | 't' | 'onEdit' | 'onDelete'> & {
+  onDuplicate,
+}: Pick<Props, 'busy' | 't' | 'onEdit' | 'onDelete' | 'onDuplicate'> & {
   transaction: Transaction | Transfer | BalanceAdjustment
 }) {
   return (
     <div className="flex gap-1">
+      {(transaction.kind === 'expense' || transaction.kind === 'income') && (
+        <Button
+          className="size-7"
+          size="icon"
+          variant="ghost"
+          disabled={busy}
+          onClick={() => onDuplicate(transaction)}
+          aria-label={t('transactions.duplicate')}
+          title={t('transactions.duplicate')}
+        >
+          <Copy aria-hidden="true" className="size-3" />
+        </Button>
+      )}
       <Button
         className="size-7"
         size="icon"

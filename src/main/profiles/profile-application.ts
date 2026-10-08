@@ -87,8 +87,22 @@ import {
 import type { Tag, RenameTagInput } from '../../shared/tags'
 import { renameTagUndoableCommand, deleteTagUndoableCommand } from './tag-undo'
 import { listTags } from './profile-tags'
+import type {
+  CreateTemplateInput,
+  TransactionTemplate,
+  UpdateTemplateInput,
+  SaveTransactionAsTemplateInput,
+} from '../../shared/templates'
+import { listTemplates } from './profile-templates'
+import {
+  createTemplateUndoableCommand,
+  updateTemplateUndoableCommand,
+  deleteTemplateUndoableCommand,
+  saveTransactionAsTemplateUndoableCommand,
+} from './template-undo'
 import {
   createTransactionUndoableCommand,
+  duplicateTransactionUndoableCommand,
   deleteTransactionUndoableCommand,
   updateTransactionUndoableCommand,
 } from './transaction-undo'
@@ -189,6 +203,7 @@ export interface OpenProfileApplicationOptions {
 }
 
 export interface ProfileQueries {
+  listTemplates(): TransactionTemplate[]
   listCategorisationRules(): CategorisationRule[]
   getCategorisationAutofill(
     input: CategorisationRuleDraftInput,
@@ -212,6 +227,13 @@ export interface ProfileQueries {
 }
 
 export interface ProfileCommands {
+  updateTemplate(input: UpdateTemplateInput): TransactionTemplate
+  deleteTemplate(id: string): void
+  saveTransactionAsTemplate(
+    input: SaveTransactionAsTemplateInput,
+  ): TransactionTemplate
+  createTemplate(input: CreateTemplateInput): TransactionTemplate
+  duplicateTransaction(id: string): string
   createCategorisationRule(
     input: CreateCategorisationRuleInput,
   ): CategorisationRule
@@ -530,6 +552,28 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
   ),
   defineSqlMigration(
     14,
+    'transaction templates',
+    `
+    CREATE TABLE transaction_templates (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 100),
+      kind TEXT CHECK (kind IN ('expense', 'income')),
+      account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+      total_minor INTEGER CHECK (
+        total_minor IS NULL OR (typeof(total_minor) = 'integer' AND
+        total_minor BETWEEN 1 AND 9007199254740991)
+      ),
+      payee_name TEXT CHECK (payee_name IS NULL OR length(trim(payee_name)) BETWEEN 1 AND 100),
+      category_id TEXT REFERENCES categories(id) ON DELETE SET NULL,
+      tag_names TEXT NOT NULL CHECK (json_valid(tag_names) AND json_type(tag_names) = 'array'),
+      note TEXT CHECK (note IS NULL OR length(note) <= 1000),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `,
+  ),
+  defineSqlMigration(
+    15,
     'categorisation rules',
     `
     CREATE TABLE categorisation_rules (
@@ -715,6 +759,30 @@ class OpenProfileApplication implements ProfileApplication {
     this.#options = options
     this.#clock = options.clock ?? (() => new Date())
     this.commands = {
+      updateTemplate: (input) =>
+        this.#executeUndoableCommand(
+          updateTemplateUndoableCommand(this.#database, input, this.#clock),
+        ),
+      deleteTemplate: (id) =>
+        this.#executeUndoableCommand(
+          deleteTemplateUndoableCommand(this.#database, id),
+        ),
+      saveTransactionAsTemplate: (input) =>
+        this.#executeUndoableCommand(
+          saveTransactionAsTemplateUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+          ),
+        ),
+      createTemplate: (input) =>
+        this.#executeUndoableCommand(
+          createTemplateUndoableCommand(this.#database, input, this.#clock),
+        ),
+      duplicateTransaction: (id) =>
+        this.#executeUndoableCommand(
+          duplicateTransactionUndoableCommand(this.#database, id, this.#clock),
+        ),
       createCategorisationRule: (input) =>
         this.#executeUndoableCommand(
           createCategorisationRuleUndoableCommand(
@@ -852,6 +920,10 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      listTemplates: () => {
+        this.#assertAvailable()
+        return listTemplates(this.#database)
+      },
       listCategorisationRules: () => {
         this.#assertAvailable()
         return listCategorisationRules(this.#database)

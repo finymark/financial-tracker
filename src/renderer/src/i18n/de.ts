@@ -251,6 +251,30 @@ export const de = {
     'Wähle gültige Filter und einen geordneten Datumsbereich.',
   'transactions.error.totals':
     'Die gefilterte Summe ist zu groß für eine exakte Darstellung.',
+  'transactions.duplicate': 'Transaktion duplizieren',
+  'templates.title': 'Transaktionsvorlagen',
+  'templates.choose': 'Vorlage auswählen',
+  'templates.use': 'Vorlage verwenden',
+  'templates.create': 'Vorlage erstellen',
+  'templates.edit': 'Vorlage bearbeiten',
+  'templates.delete': 'Vorlage löschen',
+  'templates.save': 'Vorlage speichern',
+  'templates.name': 'Vorlagenname',
+  'templates.saveTransaction': 'Als Vorlage speichern',
+  'templates.savedTransactionHint':
+    'Verwendet die gespeicherte Transaktion, nicht ungespeicherte Änderungen im Formular.',
+  'templates.optionalHint':
+    'Nur der Name ist erforderlich. Andere Felder können leer bleiben und beim Verwenden ausgefüllt werden.',
+  'templates.tagsHint':
+    'Ein Tag-Name pro Zeile. Tags werden erst beim Erfassen einer Transaktion erstellt.',
+  'templates.deleteConfirmation': 'Diese Transaktionsvorlage löschen?',
+  'templates.amountRequired':
+    'Gib vor dem Speichern dieser Transaktion einen Betrag ein.',
+  'templates.error.name': 'Gib einen Vorlagennamen mit 1 bis 100 Zeichen ein.',
+  'templates.error.split':
+    'Aufgeteilte Transaktionen können nicht als Vorlagen gespeichert werden.',
+  'templates.error.notFound':
+    'Die Transaktionsvorlage wurde nicht gefunden. Aktualisiere die Liste.',
   'transactions.create': 'Transaktion erfassen',
   'transactions.edit': 'Transaktion bearbeiten',
   'transactions.delete': 'Löschen',

@@ -1,4 +1,5 @@
 import type { CategorisationAutofill } from '../../../shared/rules'
+import type { TransactionTemplate } from '../../../shared/templates'
 
 interface AutofillFields {
   categoryId: string
@@ -8,6 +9,16 @@ interface AutofillFields {
 interface ProtectedAutofillFields {
   category: boolean
   tags: boolean
+}
+
+export function templateAutofillProtection(
+  template: Pick<TransactionTemplate, 'categoryId' | 'tagNames'>,
+): ProtectedAutofillFields {
+  // Saved values are explicit choices, just like fields entered by the user.
+  return {
+    category: template.categoryId !== null,
+    tags: template.tagNames.length > 0,
+  }
 }
 
 export function mergeRuleAutofill<Current extends AutofillFields>(
