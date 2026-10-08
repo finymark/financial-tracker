@@ -18,6 +18,7 @@ import { registerPayeeIpc } from './profiles/payee-ipc'
 import { registerBalanceAdjustmentIpc } from './profiles/adjustment-ipc'
 import { ProfileRegistry } from './profiles/profile-registry'
 import { registerIpcHandler } from './ipc'
+import { registerCategorisationRuleIpc } from './profiles/rule-ipc'
 
 const APP_ID = 'com.finymark.financial-tracker'
 const APP_NAME = 'Financial Tracker'
@@ -98,6 +99,7 @@ void app.whenReady().then(() => {
   registerBalanceAdjustmentIpc(ipcMain, profiles)
   registerUndoIpc(ipcMain, profiles)
   registerTagIpc(ipcMain, profiles)
+  registerCategorisationRuleIpc(ipcMain, profiles)
   registerTemplateIpc(ipcMain, profiles)
 
   let shutdownPromise: Promise<void> | null = null

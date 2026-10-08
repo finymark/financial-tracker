@@ -175,5 +175,17 @@ export function deleteAccount(database: Database.Database, id: string): void {
   if (hasAccountTransactions(database, account.id)) {
     throw new Error('accounts.error.notEmpty')
   }
+  const rulesAvailable = Boolean(
+    database
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'categorisation_rules'",
+      )
+      .get(),
+  )
+  if (rulesAvailable) {
+    database
+      .prepare('DELETE FROM categorisation_rules WHERE account_id = ?')
+      .run(account.id)
+  }
   database.prepare('DELETE FROM accounts WHERE id = ?').run(account.id)
 }

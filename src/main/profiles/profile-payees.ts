@@ -137,6 +137,30 @@ export function resolvePayee(
   return id
 }
 
+export function findPayeeByName(
+  database: Database.Database,
+  name: string | null,
+): Payee | null {
+  if (name === null) return null
+  const alias = database
+    .prepare(
+      `SELECT payees.id, payees.name, payees.created_at AS createdAt
+       FROM payee_aliases
+       JOIN payees ON payees.id = payee_aliases.payee_id
+       WHERE payee_aliases.normalized_name = ?`,
+    )
+    .get(normalizePayeeAliasKey(name)) as Payee | undefined
+  if (alias) return alias
+  return (
+    (database
+      .prepare(
+        `SELECT id, name, created_at AS createdAt FROM payees
+         WHERE normalized_name = ?`,
+      )
+      .get(normalizePayeeKey(name)) as Payee | undefined) ?? null
+  )
+}
+
 export function addPayeeAlias(
   database: Database.Database,
   input: AddPayeeAliasInput,
@@ -196,6 +220,20 @@ export function mergePayees(
   database
     .prepare('UPDATE payee_aliases SET payee_id = ? WHERE payee_id = ?')
     .run(survivor.id, source.id)
+  const rulesAvailable = Boolean(
+    database
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'categorisation_rules'",
+      )
+      .get(),
+  )
+  if (rulesAvailable) {
+    database
+      .prepare(
+        'UPDATE categorisation_rules SET payee_id = ? WHERE payee_id = ?',
+      )
+      .run(survivor.id, source.id)
+  }
   database.prepare('DELETE FROM payees WHERE id = ?').run(source.id)
 
   if (normalizePayeeKey(source.name) !== normalizePayeeKey(survivor.name)) {

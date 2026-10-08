@@ -2,6 +2,17 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 
 const bridge: AppBridge = {
+  rules: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.rulesList),
+    autofill: (input) => ipcRenderer.invoke(IPC_CHANNELS.rulesAutofill, input),
+    create: (input) => ipcRenderer.invoke(IPC_CHANNELS.rulesCreate, input),
+    update: (input) => ipcRenderer.invoke(IPC_CHANNELS.rulesUpdate, input),
+    reorder: (input) => ipcRenderer.invoke(IPC_CHANNELS.rulesReorder, input),
+    delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.rulesDelete, input),
+    previewApplication: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.rulesPreviewApplication),
+    apply: () => ipcRenderer.invoke(IPC_CHANNELS.rulesApply),
+  },
   updates: {
     isReady: () => ipcRenderer.invoke(IPC_CHANNELS.updatesIsReady),
     onReady: (listener) => {

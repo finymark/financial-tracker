@@ -20,6 +20,7 @@ import { UpdateNotice } from './components/update-notice'
 import { BackupSettings } from './components/backup-settings'
 import { CategorySettings } from './components/category-settings'
 import { PayeeSettings } from './components/payee-settings'
+import { RuleSettings } from './components/rule-settings'
 import { AccountsPage } from './AccountsPage'
 import { TransactionsPage } from './TransactionsPage'
 import { Button } from './components/ui/button'
@@ -369,6 +370,7 @@ function Shell({
   const [backupBusy, setBackupBusy] = useState(false)
   const [categoryBusy, setCategoryBusy] = useState(false)
   const [payeeBusy, setPayeeBusy] = useState(false)
+  const [ruleBusy, setRuleBusy] = useState(false)
   const [categoryRevision, setCategoryRevision] = useState(0)
   const [undoRevision, setUndoRevision] = useState(0)
   const [undoOffered, setUndoOffered] = useState(false)
@@ -405,7 +407,15 @@ function Shell({
       // Do not open a second drawer or undo the ledger beneath a modal.
       if (action !== 'help' && document.querySelector('[role="dialog"]')) return
       if (action === 'newTransaction') {
-        if (savingSettings || backupBusy || categoryBusy || undoBusy) return
+        if (
+          savingSettings ||
+          backupBusy ||
+          categoryBusy ||
+          payeeBusy ||
+          ruleBusy ||
+          undoBusy
+        )
+          return
         event.preventDefault()
         setNewTransactionRequested(true)
         setPage('transactions')
@@ -413,7 +423,14 @@ function Shell({
         event.preventDefault()
         setShowShortcutHelp(true)
       } else if (action === 'undo') {
-        if (savingSettings || backupBusy || categoryBusy) return
+        if (
+          savingSettings ||
+          backupBusy ||
+          categoryBusy ||
+          payeeBusy ||
+          ruleBusy
+        )
+          return
         event.preventDefault()
         void undoLast()
       }
@@ -426,6 +443,8 @@ function Shell({
     savingSettings,
     backupBusy,
     categoryBusy,
+    payeeBusy,
+    ruleBusy,
     showShortcutHelp,
   ])
 
@@ -492,7 +511,7 @@ function Shell({
               aria-label={t(`navigation.${id}`)}
               aria-current={page === id ? 'page' : undefined}
               title={collapsed ? t(`navigation.${id}`) : undefined}
-              disabled={backupBusy || categoryBusy || payeeBusy}
+              disabled={backupBusy || categoryBusy || payeeBusy || ruleBusy}
               onClick={() => setPage(id)}
             >
               <Icon aria-hidden="true" />
@@ -511,7 +530,7 @@ function Shell({
           title={
             collapsed ? `${active.name} — ${t('profile.switch')}` : undefined
           }
-          disabled={backupBusy || categoryBusy || payeeBusy}
+          disabled={backupBusy || categoryBusy || payeeBusy || ruleBusy}
           onClick={onSwitchProfile}
         >
           <UsersRound className="size-5 shrink-0" aria-hidden="true" />
@@ -589,7 +608,8 @@ function Shell({
                         savingSettings ||
                         backupBusy ||
                         categoryBusy ||
-                        payeeBusy
+                        payeeBusy ||
+                        ruleBusy
                       }
                       onChange={(event) => {
                         const value = languages.find(
@@ -616,7 +636,8 @@ function Shell({
                         savingSettings ||
                         backupBusy ||
                         categoryBusy ||
-                        payeeBusy
+                        payeeBusy ||
+                        ruleBusy
                       }
                       onChange={(event) => {
                         const value = themeModes.find(
@@ -646,7 +667,8 @@ function Shell({
                         savingSettings ||
                         backupBusy ||
                         categoryBusy ||
-                        payeeBusy
+                        payeeBusy ||
+                        ruleBusy
                       }
                       onChange={(event) => {
                         const value = baseCurrencies.find(
@@ -707,8 +729,26 @@ function Shell({
             <PayeeSettings
               key={`${active.id}:${undoRevision}`}
               t={t}
-              disabled={savingSettings || backupBusy || categoryBusy}
+              disabled={
+                savingSettings || backupBusy || categoryBusy || ruleBusy
+              }
               onBusyChange={setPayeeBusy}
+              onChanged={() => {
+                setUndoError(false)
+                setUndoOffered(true)
+              }}
+            />
+          )}
+          {page === 'settings' && (
+            <RuleSettings
+              key={`${active.id}:${undoRevision}`}
+              language={language}
+              baseCurrency={baseCurrency}
+              t={t}
+              disabled={
+                savingSettings || backupBusy || categoryBusy || payeeBusy
+              }
+              onBusyChange={setRuleBusy}
               onChanged={() => {
                 setUndoError(false)
                 setUndoOffered(true)
@@ -719,7 +759,7 @@ function Shell({
             <CategorySettings
               key={`${active.id}:${categoryRevision}:${undoRevision}`}
               t={t}
-              disabled={savingSettings || backupBusy || payeeBusy}
+              disabled={savingSettings || backupBusy || payeeBusy || ruleBusy}
               onBusyChange={setCategoryBusy}
             />
           )}
@@ -733,7 +773,7 @@ function Shell({
                 setCategoryRevision((revision) => revision + 1)
               }}
               onBusyChange={setBackupBusy}
-              disabled={savingSettings || categoryBusy || payeeBusy}
+              disabled={savingSettings || categoryBusy || payeeBusy || ruleBusy}
             />
           )}
         </div>

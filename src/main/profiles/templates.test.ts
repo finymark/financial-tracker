@@ -328,7 +328,9 @@ test('the appended template migration preserves the previous ledger and persists
     clock: laterClock,
   })
   applications.push(upgraded)
-  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(14)
+  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(
+    CURRENT_MIGRATIONS.length,
+  )
   expect(upgraded.queries.listTransactions()).toEqual(ledger)
   expect(upgraded.queries.listTemplates()).toEqual([])
   const template = upgraded.commands.saveTransactionAsTemplate({
@@ -539,4 +541,297 @@ test('template prefill resolves aliases and template undo coexists with transact
   expect(application.commands.undoLast()).toBe(true)
   expect(application.queries.listPayeeAliases(source.payeeId!)).toEqual([])
   expect(application.queries.listTransactions().rows).toEqual([source])
+})
+
+test('duplicate preserves source category and tags despite a matching rule, and rule/template/ledger undo interleave', async () => {
+  const { application, input } = await setup()
+  const other = application.commands.createAccount({
+    name: 'Other',
+    currency: 'CHF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  const source = application.commands.createTransaction(input)
+  const template = application.commands.saveTransactionAsTemplate({
+    transactionId: source.id,
+    name: 'Source choices',
+  })
+  const suggestedCategory =
+    application.queries.listCategoryOptions('expense')[1].id
+  const rule = application.commands.createCategorisationRule({
+    enabled: true,
+    payeeId: source.payeeId,
+    textContains: null,
+    accountId: null,
+    minAmountMinor: null,
+    maxAmountMinor: null,
+    categoryId: suggestedCategory,
+    tagIds: [source.line.tags[0].id],
+  })
+  expect(
+    application.queries.getCategorisationAutofill({
+      accountId: input.accountId,
+      kind: input.kind,
+      totalMinor: input.totalMinor,
+      payeeName: input.payeeName,
+      note: input.note,
+    }),
+  ).toMatchObject({
+    source: 'rule',
+    ruleId: rule.id,
+    categoryId: suggestedCategory,
+  })
+  const copyId = application.commands.duplicateTransaction(source.id)
+  expect(
+    application.queries
+      .listTransactions()
+      .rows.find((row) => row.id === copyId),
+  ).toMatchObject({
+    line: { categoryId: source.line.categoryId, tags: source.line.tags },
+  })
+  const ledgerWithCopy = application.queries.listTransactions()
+  application.commands.createTransfer({
+    fromAccountId: input.accountId,
+    fromAmountMinor: 100,
+    toAccountId: other.id,
+    toAmountMinor: 100,
+    date: '2026-01-15',
+    note: '',
+    fee: null,
+  })
+  const ledgerWithTransfer = application.queries.listTransactions()
+  application.commands.createBalanceAdjustment({
+    accountId: other.id,
+    date: '2026-01-15',
+    observedMinor: 250,
+    note: '',
+  })
+  const ledgerWithAdjustment = application.queries.listTransactions()
+  application.commands.deleteTemplate(template.id)
+  expect(application.queries.listTemplates()).toEqual([])
+  expect(application.queries.listCategorisationRules()).toEqual([rule])
+  expect(application.queries.listTransactions()).toEqual(ledgerWithAdjustment)
+  application.commands.updateCategorisationRule({
+    ...rule,
+    enabled: false,
+    tagIds: rule.tags.map((tag) => tag.id),
+  })
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listCategorisationRules()).toEqual([rule])
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTemplates()).toEqual([template])
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions()).toEqual(ledgerWithTransfer)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions()).toEqual(ledgerWithCopy)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toEqual([source])
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listCategorisationRules()).toEqual([])
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTemplates()).toEqual([])
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toEqual([])
+  expect(application.commands.undoLast()).toBe(false)
+})
+
+test('tag deletion and rename keep rule references undoable while template tag names remain saved text', async () => {
+  const { application, input } = await setup()
+  const source = application.commands.createTransaction(input)
+  const tag = source.line.tags[0]
+  const template = application.commands.saveTransactionAsTemplate({
+    transactionId: source.id,
+    name: 'Saved text',
+  })
+  const draft = {
+    enabled: true,
+    payeeId: source.payeeId,
+    textContains: null,
+    accountId: null,
+    minAmountMinor: null,
+    maxAmountMinor: null,
+    categoryId: input.categoryId,
+    tagIds: [tag.id],
+  }
+  const categoryRule = application.commands.createCategorisationRule(draft)
+  const tagOnlyRule = application.commands.createCategorisationRule({
+    ...draft,
+    categoryId: null,
+  })
+  const before = application.queries.listTransactions()
+  application.commands.renameTag({ id: tag.id, name: 'Renamed' })
+  expect(
+    application.queries
+      .listCategorisationRules()
+      .every((rule) => rule.tags[0].name === 'Renamed'),
+  ).toBe(true)
+  expect(application.queries.listTemplates()).toEqual([template])
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listCategorisationRules()).toEqual([
+    categoryRule,
+    tagOnlyRule,
+  ])
+  application.commands.deleteTag(tag.id)
+  expect(application.queries.listCategorisationRules()).toEqual([
+    { ...categoryRule, tags: [] },
+  ])
+  expect(application.queries.listTemplates()).toEqual([template])
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listCategorisationRules()).toEqual([
+    categoryRule,
+    tagOnlyRule,
+  ])
+  expect(application.queries.listTransactions()).toEqual(before)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listCategorisationRules()).toEqual([categoryRule])
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listCategorisationRules()).toEqual([])
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTemplates()).toEqual([])
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toEqual([])
+})
+
+test('deleting shared account/category references preserves both template and rule deletion semantics', async () => {
+  const { application, input } = await setup()
+  const other = application.commands.createAccount({
+    name: 'Other',
+    currency: 'CHF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  const tagged = application.commands.createTransaction({
+    ...input,
+    accountId: other.id,
+  })
+  const category = application.commands.createCategory({
+    name: 'Shared category',
+    kind: 'expense',
+    parentId: null,
+  })
+  const template = application.commands.createTemplate({
+    name: 'Shared references',
+    accountId: input.accountId,
+    categoryId: category.id,
+    tagNames: ['Project'],
+  })
+  const draft = {
+    enabled: true,
+    payeeId: null,
+    textContains: 'Purchase',
+    accountId: null,
+    minAmountMinor: null,
+    maxAmountMinor: null,
+    categoryId: category.id,
+    tagIds: [],
+  }
+  application.commands.createCategorisationRule({
+    ...draft,
+    accountId: input.accountId,
+  })
+  application.commands.createCategorisationRule(draft)
+  const taggedRule = application.commands.createCategorisationRule({
+    ...draft,
+    tagIds: [tagged.line.tags[0].id],
+  })
+  application.commands.deleteAccount(input.accountId)
+  expect(application.queries.listCategorisationRules()).toHaveLength(2)
+  expect(
+    application.queries
+      .listCategorisationRules()
+      .every((rule) => rule.accountId === null),
+  ).toBe(true)
+  expect(application.queries.listTemplates()).toEqual([
+    { ...template, accountId: null },
+  ])
+  expect(application.commands.undoLast()).toBe(false)
+  application.commands.deleteCategory({ id: category.id })
+  expect(application.queries.listCategorisationRules()).toEqual([
+    { ...taggedRule, categoryId: null, categoryKind: null },
+  ])
+  expect(application.queries.listTemplates()).toEqual([
+    { ...template, accountId: null, categoryId: null },
+  ])
+  expect(application.queries.listTransactions().rows).toEqual([tagged])
+  expect(application.commands.undoLast()).toBe(false)
+})
+
+test('category replacement retargets rules and transactions while deleted template references become empty', async () => {
+  const { application, input } = await setup()
+  const category = application.commands.createCategory({
+    name: 'Replaceable',
+    kind: 'expense',
+    parentId: null,
+  })
+  input.categoryId = category.id
+  const source = application.commands.createTransaction(input)
+  const template = application.commands.saveTransactionAsTemplate({
+    transactionId: source.id,
+    name: 'Category reference',
+  })
+  const rule = application.commands.createCategorisationRule({
+    enabled: true,
+    payeeId: source.payeeId,
+    textContains: null,
+    accountId: null,
+    minAmountMinor: null,
+    maxAmountMinor: null,
+    categoryId: input.categoryId,
+    tagIds: [],
+  })
+  const replacement = application.queries
+    .listCategoryOptions('expense')
+    .find((category) => category.id !== input.categoryId)!
+  application.commands.deleteCategory({
+    id: input.categoryId,
+    replacementId: replacement.id,
+  })
+  expect(application.queries.listCategorisationRules()).toEqual([
+    { ...rule, categoryId: replacement.id },
+  ])
+  expect(application.queries.listTemplates()).toEqual([
+    { ...template, categoryId: null },
+  ])
+  expect(application.queries.listTransactions().rows[0]).toMatchObject({
+    line: { categoryId: replacement.id },
+  })
+  expect(application.commands.undoLast()).toBe(false)
+})
+
+test('rules migration 15 upgrades a version-14 template profile without changing templates or ledger', async () => {
+  const { application, input, profile, paths } = await setup(
+    CURRENT_MIGRATIONS.slice(0, 14),
+  )
+  const source = application.commands.createTransaction(input)
+  const template = application.commands.saveTransactionAsTemplate({
+    transactionId: source.id,
+    name: 'Before rules',
+  })
+  application.commands.duplicateTransaction(source.id)
+  const before = application.queries.listTransactions()
+  expect(application.queries.getProfileInfo().schemaVersion).toBe(14)
+  application.close()
+  const upgraded = await openProfileApplication({ profile, paths, clock })
+  applications.push(upgraded)
+  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(15)
+  expect(upgraded.queries.listTemplates()).toEqual([template])
+  expect(upgraded.queries.listTransactions()).toEqual(before)
+  expect(upgraded.queries.listCategorisationRules()).toEqual([])
+  const rule = upgraded.commands.createCategorisationRule({
+    enabled: true,
+    payeeId: source.payeeId,
+    textContains: null,
+    accountId: null,
+    minAmountMinor: null,
+    maxAmountMinor: null,
+    categoryId: input.categoryId,
+    tagIds: [source.line.tags[0].id],
+  })
+  upgraded.close()
+  const reopened = await openProfileApplication({ profile, paths, clock })
+  applications.push(reopened)
+  expect(reopened.queries.listTemplates()).toEqual([template])
+  expect(reopened.queries.listTransactions()).toEqual(before)
+  expect(reopened.queries.listCategorisationRules()).toEqual([rule])
+  expect(reopened.commands.undoLast()).toBe(false)
 })

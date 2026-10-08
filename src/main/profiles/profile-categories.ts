@@ -183,5 +183,36 @@ export function deleteCategory(
       )
       .run(input.replacementId, category.id)
   }
+  const rulesAvailable = Boolean(
+    database
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'categorisation_rules'",
+      )
+      .get(),
+  )
+  if (rulesAvailable) {
+    if (input.replacementId !== undefined) {
+      database
+        .prepare(
+          'UPDATE categorisation_rules SET category_id = ? WHERE category_id = ?',
+        )
+        .run(input.replacementId, category.id)
+    } else {
+      database
+        .prepare(
+          `DELETE FROM categorisation_rules
+           WHERE category_id = ? AND NOT EXISTS (
+             SELECT 1 FROM categorisation_rule_tags
+             WHERE categorisation_rule_tags.rule_id = categorisation_rules.id
+           )`,
+        )
+        .run(category.id)
+      database
+        .prepare(
+          'UPDATE categorisation_rules SET category_id = NULL WHERE category_id = ?',
+        )
+        .run(category.id)
+    }
+  }
   database.prepare('DELETE FROM categories WHERE id = ?').run(category.id)
 }
