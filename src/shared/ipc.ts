@@ -1,3 +1,4 @@
+import type { TransactionCsvInput } from './transaction-csv'
 import type {
   CreateTemplateInput,
   UpdateTemplateInput,
@@ -115,6 +116,7 @@ export const IPC_CHANNELS = {
   templatesSaveTransaction: 'templates:save-transaction',
   transactionsDuplicate: 'transactions:duplicate',
   transactionsList: 'transactions:list',
+  transactionsExportCsv: 'transactions:export-csv',
   transactionsCreate: 'transactions:create',
   transactionsUpdate: 'transactions:update',
   transactionsDelete: 'transactions:delete',
@@ -169,6 +171,8 @@ export interface AppBridge {
     ): Promise<TransactionTemplate>
   }
   transactions: {
+    // True after writing the file; false when the native save dialog is cancelled.
+    exportCsv(input?: TransactionCsvInput): Promise<boolean>
     duplicate(input: TransactionIdInput): Promise<string>
     list(input?: TransactionListInput): Promise<TransactionPage>
     create(input: CreateTransactionInput): Promise<Transaction>

@@ -1,3 +1,4 @@
+import { csvMessages } from '../../../shared/csv-translations'
 import { categoryNames } from '../../../shared/category-translations'
 import type { MessageCatalog } from './en'
 
@@ -19,6 +20,19 @@ export const de = {
     'Speichern und weitere hinzufügen (Datum, Konten und Typ behalten)',
   'shortcuts.newTransaction': 'Neue Transaktion (außerhalb von Eingabefeldern)',
   ...categoryNames.de,
+  ...csvMessages.de,
+  'csv.description':
+    'Alle Transaktionen mit den angewendeten Filtern exportieren, nicht nur diese Seite. Jeder Split-Teil erhält eine eigene Zeile. Umbuchungen und Saldoanpassungen werden nicht exportiert.',
+  'csv.decimalSeparator': 'Dezimaltrennzeichen',
+  'csv.profileDefault': 'Standard der Profilsprache',
+  'csv.dot': 'Punkt (123.45) · kommagetrennte Felder',
+  'csv.comma': 'Komma (123,45) · semikolongetrennte Felder',
+  'csv.saving': 'CSV wird gespeichert…',
+  'csv.saved': 'CSV gespeichert.',
+  'csv.error':
+    'Die CSV konnte nicht gespeichert werden. Bitte erneut versuchen.',
+  'csv.error.separator': 'Punkt oder Komma als Dezimaltrennzeichen wählen.',
+
   'rules.title': 'Kategorisierungsregeln',
   'rules.description':
     'Regeln werden der Reihe nach geprüft. Die erste passende Regel gewinnt und kann Zahlungspartner, Kategorie und Tags vor den zuletzt verwendeten Werten ausfüllen.',

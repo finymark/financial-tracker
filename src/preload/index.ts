@@ -30,6 +30,8 @@ const bridge: AppBridge = {
       ipcRenderer.invoke(IPC_CHANNELS.templatesSaveTransaction, input),
   },
   transactions: {
+    exportCsv: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.transactionsExportCsv, input),
     duplicate: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.transactionsDuplicate, input),
     list: (input) => ipcRenderer.invoke(IPC_CHANNELS.transactionsList, input),

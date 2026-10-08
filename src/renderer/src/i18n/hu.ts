@@ -1,3 +1,4 @@
+import { csvMessages } from '../../../shared/csv-translations'
 import { categoryNames } from '../../../shared/category-translations'
 import type { MessageCatalog } from './en'
 
@@ -17,6 +18,18 @@ export const hu = {
     'Mentés és újabb hozzáadása (dátum, számlák és típus megtartása)',
   'shortcuts.newTransaction': 'Új tranzakció (szövegbevitelen kívül)',
   ...categoryNames.hu,
+  ...csvMessages.hu,
+  'csv.description':
+    'Az alkalmazott szűrőknek megfelelő összes tranzakció exportálása, nem csak az aktuális oldalé. Minden felosztott rész külön sor. Az átvezetések és az egyenlegkorrekciók nem kerülnek az exportba.',
+  'csv.decimalSeparator': 'Tizedesjel',
+  'csv.profileDefault': 'A profil nyelvének alapértelmezése',
+  'csv.dot': 'Pont (123.45) · vesszővel elválasztott mezők',
+  'csv.comma': 'Vessző (123,45) · pontosvesszővel elválasztott mezők',
+  'csv.saving': 'CSV mentése…',
+  'csv.saved': 'CSV elmentve.',
+  'csv.error': 'A CSV mentése nem sikerült. Próbáld újra.',
+  'csv.error.separator': 'Válassz pontot vagy vesszőt tizedesjelként.',
+
   'rules.title': 'Kategorizálási szabályok',
   'rules.description':
     'A szabályokat sorrendben ellenőrizzük. Az első egyező szabály nyer, és a kedvezményezettet, a kategóriát, valamint a címkéket az utoljára használt értékek előtt töltheti ki.',

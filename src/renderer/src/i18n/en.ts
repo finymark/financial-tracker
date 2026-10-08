@@ -1,3 +1,4 @@
+import { csvMessages } from '../../../shared/csv-translations'
 import { categoryNames } from '../../../shared/category-translations'
 export const en = {
   'shortcuts.closeHelp': 'Close shortcut help',
@@ -15,6 +16,18 @@ export const en = {
     'Save and add another (keep date, accounts and type)',
   'shortcuts.newTransaction': 'New transaction (outside text editing controls)',
   ...categoryNames.en,
+  ...csvMessages.en,
+  'csv.description':
+    'Export all transactions matching the applied filters, not just this page. Each split part is a separate row. Transfers and balance adjustments are not exported.',
+  'csv.decimalSeparator': 'Decimal separator',
+  'csv.profileDefault': 'Profile language default',
+  'csv.dot': 'Dot (123.45) · comma-separated fields',
+  'csv.comma': 'Comma (123,45) · semicolon-separated fields',
+  'csv.saving': 'Saving CSV…',
+  'csv.saved': 'CSV saved.',
+  'csv.error': 'The CSV could not be saved. Try again.',
+  'csv.error.separator': 'Choose a dot or comma decimal separator.',
+
   'rules.title': 'Categorisation rules',
   'rules.description':
     'Rules are checked in order. The first matching rule wins and can prefill payee, category, and tags before last-used payee values.',
