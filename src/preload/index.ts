@@ -23,6 +23,16 @@ const bridge: AppBridge = {
     pause: (input) => ipcRenderer.invoke(IPC_CHANNELS.recurringPause, input),
     resume: (input) => ipcRenderer.invoke(IPC_CHANNELS.recurringResume, input),
     delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.recurringDelete, input),
+    pending: () => ipcRenderer.invoke(IPC_CHANNELS.pendingList),
+    dueCount: () => ipcRenderer.invoke(IPC_CHANNELS.pendingDueCount),
+    confirm: (input) => ipcRenderer.invoke(IPC_CHANNELS.pendingConfirm, input),
+    skip: (input) => ipcRenderer.invoke(IPC_CHANNELS.pendingSkip, input),
+    onPendingChanged: (listener) => {
+      const handler = () => listener()
+      ipcRenderer.on(IPC_CHANNELS.pendingChanged, handler)
+      return () =>
+        ipcRenderer.removeListener(IPC_CHANNELS.pendingChanged, handler)
+    },
   },
   reports: {
     cashFlow: (input) =>

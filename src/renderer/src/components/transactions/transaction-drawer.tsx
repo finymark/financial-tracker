@@ -31,6 +31,11 @@ import { shortcutTargetContext } from '../../lib/shortcut-context'
 import { useDialogFocus } from '../../lib/use-dialog-focus'
 import { templateAutofillProtection } from '../../lib/rule-autofill'
 import {
+  recurringPrefillFromTemplate,
+  recurringPrefillFromTransaction,
+  type RecurringPrefill,
+} from '../../lib/recurring-prefill'
+import {
   emptyForm,
   emptyTransferForm,
   type DrawerForm,
@@ -54,6 +59,7 @@ interface TransactionDrawerProps {
   run: RunCommand
   onClose(): void
   onRuleOffer(prefill: CreateCategorisationRuleInput): void
+  onCreateRecurring(prefill: RecurringPrefill): void
   createRef: RefObject<HTMLButtonElement | null>
 }
 function commonFields(form: DrawerForm) {
@@ -78,6 +84,7 @@ export function TransactionDrawer({
   run,
   onClose,
   onRuleOffer,
+  onCreateRecurring,
   createRef,
 }: TransactionDrawerProps) {
   const {
@@ -561,6 +568,20 @@ export function TransactionDrawer({
               t={t}
               applyTemplate={applyTemplate}
               run={run}
+              onCreateRecurring={(template) =>
+                onCreateRecurring(
+                  recurringPrefillFromTemplate(
+                    template,
+                    today(),
+                    tags,
+                    categories,
+                  ),
+                )
+              }
+              onCreateRecurringFromTransaction={(transaction) => {
+                const prefill = recurringPrefillFromTransaction(transaction)
+                if (prefill) onCreateRecurring(prefill)
+              }}
             />
             {templateEditor ? (
               <TemplateEditor

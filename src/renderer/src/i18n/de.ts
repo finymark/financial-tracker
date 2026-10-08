@@ -176,6 +176,21 @@ export const de = {
   'navigation.accounts': 'Konten',
   'navigation.settings': 'Einstellungen',
   'recurring.title': 'Wiederkehrende Transaktionen',
+  'recurring.definitions': 'Definitionen',
+  'recurring.sections': 'Bereiche für wiederkehrende Transaktionen',
+  'recurring.fromTransaction': 'Wiederkehrende Transaktion erstellen',
+  'recurring.fromTemplate': 'Wiederkehrende Transaktion aus Vorlage',
+  'recurring.fromSplitHint':
+    'Geteilte Transaktionen können nicht als wiederkehrende Transaktion verwendet werden.',
+  'pending.title': 'Ausstehend',
+  'pending.empty': 'Keine ausstehenden Transaktionen.',
+  'pending.confirm': 'Bestätigen',
+  'pending.editAndConfirm': 'Bearbeiten & bestätigen',
+  'pending.skip': 'Überspringen',
+  'pending.overdue': 'Überfällig',
+  'pending.dueCount': 'Fällige ausstehende Transaktionen',
+  'pending.error.accountArchived':
+    'Dieses Konto ist archiviert. Bearbeiten Sie die wiederkehrende Transaktion und wählen Sie vor der Bestätigung ein aktives Konto.',
   'recurring.description':
     'Regelmäßige Ausgaben und Einnahmen als Schätzung anlegen. Fällige Vorkommen bleiben ausstehend und wirken sich noch nicht auf die Finanzen aus.',
   'recurring.create': 'Wiederkehrende Transaktion erstellen',

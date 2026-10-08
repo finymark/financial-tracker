@@ -2,14 +2,22 @@ import { randomUUID } from 'node:crypto'
 import type Database from 'better-sqlite3'
 import {
   dueDates,
+  type ConfirmPendingTransactionInput,
   type CreateRecurringTransactionInput,
   type PendingTransaction,
   type RecurringSchedule,
   type RecurringTransaction,
   type UpdateRecurringTransactionInput,
 } from '../../shared/recurring'
+import type { Transaction } from '../../shared/transactions'
 import { today } from '../../shared/date'
 import { recurringFields, validateRecurringId } from './recurring-validation'
+import {
+  validateTransactionDate,
+  validateTransactionTotal,
+} from './transaction-validation'
+import { resolvePayee } from './profile-payees'
+import { getTransaction } from './profile-transactions'
 
 interface StoredRecurring {
   id: string
@@ -305,7 +313,9 @@ export function listPendingTransactions(
       `SELECT id, recurring_id AS recurringId,
     due_date AS dueDate, kind, account_id AS accountId, amount_minor AS amountMinor,
     payee_name AS payeeName, category_id AS categoryId, note,
-    created_at AS createdAt FROM pending_transactions ORDER BY due_date, created_at, id`,
+    status, confirmed_transaction_id AS confirmedTransactionId,
+    created_at AS createdAt FROM pending_transactions
+    WHERE status = 'pending' ORDER BY due_date, created_at, id`,
     )
     .all() as Omit<PendingTransaction, 'tagIds'>[]
   const tags = tagsByOwner(
@@ -315,6 +325,113 @@ export function listPendingTransactions(
     rows.map((row) => row.id),
   )
   return rows.map((row) => ({ ...row, tagIds: tags.get(row.id) ?? [] }))
+}
+
+export function getPendingTransaction(
+  database: Database.Database,
+  id: string,
+): PendingTransaction {
+  const validatedId = validateRecurringId(id)
+  const row = database
+    .prepare(
+      `SELECT id, recurring_id AS recurringId, due_date AS dueDate, kind,
+      account_id AS accountId, amount_minor AS amountMinor,
+      payee_name AS payeeName, category_id AS categoryId, note, status,
+      confirmed_transaction_id AS confirmedTransactionId,
+      created_at AS createdAt FROM pending_transactions WHERE id = ?`,
+    )
+    .get(validatedId) as Omit<PendingTransaction, 'tagIds'> | undefined
+  if (!row) throw new Error('pending.error.notFound')
+  const tags = tagsByOwner(database, 'pending_transaction_tags', 'pending_id', [
+    row.id,
+  ])
+  return { ...row, tagIds: tags.get(row.id) ?? [] }
+}
+
+export function getDuePendingTransactionCount(
+  database: Database.Database,
+  clock: () => Date,
+): number {
+  const row = database
+    .prepare(
+      `SELECT COUNT(*) AS count FROM pending_transactions
+       WHERE status = 'pending' AND due_date <= ?`,
+    )
+    .get(today(clock)) as { count: number }
+  return row.count
+}
+
+export function confirmPendingTransaction(
+  database: Database.Database,
+  input: ConfirmPendingTransactionInput,
+  clock: () => Date,
+): Transaction {
+  const pending = getPendingTransaction(database, input.id)
+  if (pending.status !== 'pending') throw new Error('pending.error.notPending')
+  const account = database
+    .prepare('SELECT archived FROM accounts WHERE id = ?')
+    .get(pending.accountId) as { archived: number } | undefined
+  if (!account || account.archived)
+    throw new Error('pending.error.accountArchived')
+  const amountMinor = validateTransactionTotal(
+    input.amountMinor ?? pending.amountMinor,
+  )
+  const date = validateTransactionDate(input.date ?? pending.dueDate, clock)
+  const timestamp = clock().toISOString()
+  const transactionId = randomUUID()
+  const lineId = randomUUID()
+  const payeeId = resolvePayee(database, pending.payeeName, timestamp)
+  database
+    .prepare(
+      `INSERT INTO transactions
+      (id, account_id, kind, date, total_minor, payee_id, note, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      transactionId,
+      pending.accountId,
+      pending.kind,
+      date,
+      amountMinor,
+      payeeId,
+      pending.note,
+      timestamp,
+      timestamp,
+    )
+  database
+    .prepare(
+      `INSERT INTO transaction_lines
+      (id, transaction_id, amount_minor, category_id, note)
+      VALUES (?, ?, ?, ?, ?)`,
+    )
+    .run(lineId, transactionId, amountMinor, pending.categoryId, pending.note)
+  const insertTag = database.prepare(
+    'INSERT INTO transaction_line_tags (line_id, tag_id) VALUES (?, ?)',
+  )
+  for (const tagId of pending.tagIds) insertTag.run(lineId, tagId)
+  const changed = database
+    .prepare(
+      `UPDATE pending_transactions SET status = 'confirmed',
+       confirmed_transaction_id = ? WHERE id = ? AND status = 'pending'`,
+    )
+    .run(transactionId, pending.id)
+  if (changed.changes !== 1) throw new Error('pending.error.notPending')
+  return getTransaction(database, transactionId)
+}
+
+export function skipPendingTransaction(
+  database: Database.Database,
+  id: string,
+): void {
+  const pending = getPendingTransaction(database, id)
+  if (pending.status !== 'pending') throw new Error('pending.error.notPending')
+  const changed = database
+    .prepare(
+      `UPDATE pending_transactions SET status = 'skipped',
+       confirmed_transaction_id = NULL WHERE id = ? AND status = 'pending'`,
+    )
+    .run(pending.id)
+  if (changed.changes !== 1) throw new Error('pending.error.notPending')
 }
 
 export function generateRecurringTransactions(
@@ -418,7 +535,8 @@ export function storePendingTransaction(
     .prepare(
       `INSERT INTO pending_transactions
     (id, recurring_id, due_date, kind, account_id, amount_minor, payee_name,
-     category_id, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     category_id, note, status, confirmed_transaction_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       item.id,
@@ -430,6 +548,8 @@ export function storePendingTransaction(
       item.payeeName,
       item.categoryId,
       item.note,
+      item.status,
+      item.confirmedTransactionId,
       item.createdAt,
     )
   const insert = database.prepare(
