@@ -357,6 +357,14 @@ not off-device copies or backups of the separate data folder.
 - Edit any listed transaction from the same drawer, or delete it after
   confirmation. Create, edit, delete, category reassignment, and balance updates
   run through the profile application command boundary in one SQLite transaction.
+- After a transaction is created, edited, or deleted, a toast offers **Undo**.
+  `Ctrl+Z` also undoes the latest transaction command unless focus is in a text
+  editing control. Undo restores the transaction header, all of its lines,
+  timestamps, identifiers, payee reference, and any payee created by that command
+  from before/after aggregate images captured in the original write transaction.
+  History is in memory for the open profile only and is cleared by profile
+  switching, restart, restore, or another profile write that has no declared undo
+  aggregate. Account and category commands are not undoable yet.
 - The dense table is newest first (date, creation timestamp, then UUID), grouped
   by day, with income/expense signs and icons. Each day shows totals for that
   whole filtered day, even when it continues onto another page. Only the visible
@@ -393,6 +401,11 @@ kinds, then edit the date, account, kind, amount, payee, category, and note. Del
 after first cancelling the confirmation. Archive an account and category and
 confirm neither appears in its drawer picker. Repeat in Hungarian, English, and
 German and check translated validation, keyboard focus, and light/dark themes.
+After create, edit, and delete, use both the toast action and `Ctrl+Z` and verify
+the exact previous transaction returns. While typing in amount, payee, note, or
+filter input, verify `Ctrl+Z` edits the field instead of undoing a transaction.
+Switch profiles after a change and verify the previous profile's command cannot
+be undone.
 Combine all filters and compare whole-set totals with known amounts in both
 currencies. Check custom endpoints, year/month rollover, main-category versus
 subcategory selection, archived-history filters, and case/diacritic-insensitive

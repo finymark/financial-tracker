@@ -60,13 +60,12 @@ import type {
   Transaction,
   UpdateTransactionInput,
 } from '../../shared/transactions'
+import { listPayees, listTransactions } from './profile-transactions'
 import {
-  createTransaction,
-  deleteTransaction,
-  listPayees,
-  listTransactions,
-  updateTransaction,
-} from './profile-transactions'
+  createTransactionUndoableCommand,
+  deleteTransactionUndoableCommand,
+  updateTransactionUndoableCommand,
+} from './transaction-undo'
 import {
   archiveAccount,
   changeAccountCurrency,
@@ -78,6 +77,7 @@ import {
   renameAccount,
 } from './profile-accounts'
 import { formatBackupTimestamp } from './backup-timestamp'
+import { UndoHistory, type UndoableCommand } from './undo-history'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -150,6 +150,7 @@ export interface ProfileCommands {
   createTransaction(input: CreateTransactionInput): Transaction
   updateTransaction(input: UpdateTransactionInput): Transaction
   deleteTransaction(id: string): void
+  undoLast(): boolean
   createCategory(input: CreateCategoryInput): Category
   renameCategory(input: RenameCategoryInput): Category
   archiveCategory(id: string): void
@@ -453,6 +454,7 @@ class OpenProfileApplication implements ProfileApplication {
   #restoring = false
   readonly #profile: ProfileSummary
   readonly #clock: () => Date
+  readonly #undoHistory = new UndoHistory()
 
   constructor(
     database: Database.Database,
@@ -464,15 +466,21 @@ class OpenProfileApplication implements ProfileApplication {
     this.#clock = options.clock ?? (() => new Date())
     this.commands = {
       createTransaction: (input) =>
-        this.#executeCommand(() =>
-          createTransaction(this.#database, input, this.#clock),
+        this.#executeUndoableCommand(
+          createTransactionUndoableCommand(this.#database, input, this.#clock),
         ),
       updateTransaction: (input) =>
-        this.#executeCommand(() =>
-          updateTransaction(this.#database, input, this.#clock),
+        this.#executeUndoableCommand(
+          updateTransactionUndoableCommand(this.#database, input, this.#clock),
         ),
       deleteTransaction: (id) =>
-        this.#executeCommand(() => deleteTransaction(this.#database, id)),
+        this.#executeUndoableCommand(
+          deleteTransactionUndoableCommand(this.#database, id),
+        ),
+      undoLast: () => {
+        this.#assertAvailable()
+        return this.#undoHistory.undoLast(this.#database)
+      },
       deleteCategory: (input) =>
         this.#executeCommand(() => deleteCategory(this.#database, input)),
       reorderCategory: (input) =>
@@ -616,6 +624,9 @@ class OpenProfileApplication implements ProfileApplication {
       (candidate) => candidate.id === input.backupId,
     )
     if (!backup) throw new Error('backups.error.notFound')
+    // File replacement bypasses the in-database command boundary, so even a
+    // later restore failure invalidates images tied to the previous connection.
+    this.#undoHistory.clear()
     const migrations = validateMigrations(
       this.#options.migrations ?? CURRENT_MIGRATIONS,
     )
@@ -687,12 +698,24 @@ class OpenProfileApplication implements ProfileApplication {
 
   close(): void {
     if (this.#restoring) throw new Error('Profile restore is in progress')
+    this.#undoHistory.clear()
     if (this.#database.open) this.#database.close()
   }
 
   #executeCommand<Result>(command: () => Result): Result {
     this.#assertAvailable()
-    return this.#database.transaction(command)()
+    const result = this.#database.transaction(command)()
+    // Commands without an aggregate declaration cannot safely be crossed by
+    // undo. New undoable command families should use UndoHistory.execute.
+    this.#undoHistory.clear()
+    return result
+  }
+
+  #executeUndoableCommand<BeforeImage, AfterImage, Result>(
+    command: UndoableCommand<BeforeImage, AfterImage, Result>,
+  ): Result {
+    this.#assertAvailable()
+    return this.#undoHistory.execute(this.#database, command)
   }
 
   #updateSettings(changes: ProfileSettingsChanges): ProfileSettings {

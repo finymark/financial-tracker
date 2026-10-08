@@ -181,6 +181,9 @@ export const de = {
     'Die Transaktion wurde nicht gefunden. Aktualisiere die Liste.',
   'transactions.error.lines':
     'Die Transaktionszeilen entsprechen nicht dem Gesamtbetrag.',
+  'undo.available': 'Transaktion geändert.',
+  'undo.action': 'Rückgängig',
+  'undo.error': 'Die Änderung konnte nicht rückgängig gemacht werden.',
   'accounts.title': 'Ein Platz für jedes Konto',
   'accounts.description':
     'Jeder Saldo kombiniert Eröffnungssaldo, Einnahmen und Ausgaben in der Kontowährung.',

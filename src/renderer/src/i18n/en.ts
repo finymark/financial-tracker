@@ -172,6 +172,9 @@ export const en = {
   'transactions.error.notFound':
     'The transaction could not be found. Refresh the list.',
   'transactions.error.lines': 'The transaction lines do not match its total.',
+  'undo.available': 'Transaction changed.',
+  'undo.action': 'Undo',
+  'undo.error': 'The change could not be undone.',
   'accounts.title': 'A place for each account',
   'accounts.description':
     'Each balance combines its opening balance with income and expenses in the account currency.',

@@ -45,6 +45,8 @@ function amountInput(minor: number): string {
 interface TransactionsPageProps {
   language: Language
   t(key: MessageKey): string
+  undoRevision: number
+  onTransactionChanged(): void
 }
 
 interface FormState {
@@ -71,7 +73,12 @@ function emptyForm(accountId = ''): FormState {
   }
 }
 
-export function TransactionsPage({ language, t }: TransactionsPageProps) {
+export function TransactionsPage({
+  language,
+  t,
+  undoRevision,
+  onTransactionChanged,
+}: TransactionsPageProps) {
   const [page, setPage] = useState<TransactionPage>({
     rows: [],
     totals: [],
@@ -152,7 +159,7 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
     return () => {
       ignore = true
     }
-  }, [request, revision, language])
+  }, [request, revision, language, undoRevision])
 
   function applyFilters(event: FormEvent) {
     event.preventDefault()
@@ -170,11 +177,12 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
     })
   }
 
-  async function run(action: () => Promise<unknown>) {
+  async function run(action: () => Promise<unknown>, offerUndo = false) {
     setBusy(true)
     setError(null)
     try {
       await action()
+      if (offerUndo) onTransactionChanged()
       setRequest((current) => ({ ...current, offset: 0 }))
       setRevision((current) => current + 1)
       setForm(null)
@@ -205,7 +213,7 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
       return form.id
         ? window.app.transactions.update({ id: form.id, ...input })
         : window.app.transactions.create(input)
-    })
+    }, true)
   }
 
   const selectedAccount = form
@@ -460,8 +468,9 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
             <Button
               disabled={busy || loading}
               onClick={() =>
-                void run(() =>
-                  window.app.transactions.delete({ id: deleting.id }),
+                void run(
+                  () => window.app.transactions.delete({ id: deleting.id }),
+                  true,
                 )
               }
             >
