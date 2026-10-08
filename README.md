@@ -341,6 +341,32 @@ not off-device copies or backups of the separate data folder.
   lines and subcategories, then open Transactions with that category and the
   inclusive report range applied.
 
+- **Monthly trend** shows expenses and incomes as bars with a net line and a
+  month-by-month table, in base currency, for the same report date range. Empty
+  months stay visible as zero. Partial first/last months count only in-range days
+  and show their covered dates. Each month's expense, income, and net totals keep
+  their own explicit unconverted currency amounts and provisional-rate markers.
+  Net is converted and rounded independently from exact income minus expense
+  lines, not calculated by subtracting rounded display totals.
+
+### Manual Reports chart check
+
+Run `npm run dev` with synthetic HUF/CHF expenses and income over several months,
+including an empty month, split categories, uncategorized lines, excluded
+transactions, transfers with included/excluded fees, and balance adjustments.
+In **Reports**, check both category charts and their drill-down, then switch to
+**Monthly trend**. Verify expense/income bars, the positive/negative net line,
+legend, tooltips, and table agree with the known amounts. Try every preset and a
+custom range starting/ending mid-month, a single day, year rollover, and leap
+February; only in-range days count and partial labels show the covered dates.
+Check zeros in empty months, separate missing-rate amounts in each month's
+expense/income/net cells (not plotted as converted values), and provisional-rate
+markers when using stale cached rates. Switch base currency and repeat in HU/EN/DE
+and light/dark themes; confirm localized month/money labels, themed axes/series/
+tooltips, horizontal scrolling for long ranges, keyboard range/tab controls, and
+loading/error states. Chart rendering remains a manual check; application-API
+SQLite tests cover the aggregation and translation completeness is automated.
+
 ## Accounts
 
 - Create an account with a name, HUF or CHF currency, an opening balance, and a

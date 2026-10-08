@@ -44,3 +44,20 @@ export interface CategoryBreakdownReport {
   total: BaseCurrencyConversion
   categories: CategoryBreakdownCategory[]
 }
+
+export interface MonthlyTrendMonth {
+  /** ISO calendar month (YYYY-MM), in chronological order. */
+  month: string
+  /** Only the inclusive days covered by the requested range. */
+  range: ReportDateRange
+  partial: boolean
+  expenses: BaseCurrencyConversion
+  incomes: BaseCurrencyConversion
+  /** Exact incomes minus expenses, rounded independently once. */
+  net: BaseCurrencyConversion
+}
+
+export interface MonthlyTrendReport {
+  range: ReportDateRange
+  months: MonthlyTrendMonth[]
+}
