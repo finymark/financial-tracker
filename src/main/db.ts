@@ -1,13 +1,25 @@
 import Database from 'better-sqlite3'
-import type { DatabasePing } from '../shared/ipc'
 
-export function openDatabase(path: string): Database.Database {
-  return new Database(path)
+export function normalizePayeeKey(value: string): string {
+  return value.normalize('NFC').toLocaleLowerCase('und').normalize('NFC')
 }
 
-export function pingDatabase(database: Database.Database): DatabasePing {
-  const row = database.prepare("SELECT 'ok' AS result").get() as {
-    result: DatabasePing
-  }
-  return row.result
+function foldText(value: unknown): string {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLocaleLowerCase('und')
+}
+
+export function openDatabase(
+  path: string,
+  options?: Database.Options,
+): Database.Database {
+  const database = new Database(path, options)
+  database.pragma('foreign_keys = ON')
+  database.function('fold_text', { deterministic: true }, foldText)
+  database.function('payee_key', { deterministic: true }, (value: unknown) =>
+    normalizePayeeKey(String(value ?? '')),
+  )
+  return database
 }

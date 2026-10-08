@@ -16,6 +16,7 @@ export const de = {
   'categories.create': 'Kategorie erstellen',
   'categories.rename': 'Umbenennen',
   'categories.archive': 'Archivieren',
+  'categories.unarchive': 'Dearchivieren',
   'categories.archived': 'Archiviert — in Kategorieauswahllisten ausgeblendet',
   'categories.delete': 'Löschen',
   'categories.deleteConfirmation': 'Diese Kategorie endgültig löschen?',
@@ -83,6 +84,22 @@ export const de = {
   'profile.cancel': 'Zurück zum Profil',
   'profile.switch': 'Profil wechseln',
   'profile.error': 'Der Profilvorgang konnte nicht abgeschlossen werden.',
+  'profiles.error.name': 'Gib einen Profilnamen mit 1 bis 100 Zeichen ein.',
+  'profiles.error.notFound':
+    'Das Profil wurde nicht gefunden. Aktualisiere die Liste.',
+  'profiles.error.confirmation':
+    'Gib den Profilnamen zur Löschbestätigung exakt ein.',
+  'profiles.error.registryRead': 'Die Profilliste konnte nicht gelesen werden.',
+  'profiles.error.registryWrite':
+    'Die Profilliste konnte nicht gespeichert werden.',
+  'profiles.error.delete':
+    'Das Profil konnte nicht sicher gelöscht werden und bleibt verfügbar.',
+  'profiles.error.newerSchema':
+    'Dieses Profil wurde mit einer neueren App-Version geöffnet und kann nicht sicher geöffnet werden.',
+  'profiles.error.migration':
+    'Das Profil-Upgrade ist fehlgeschlagen. Die vorherige Datenbank wurde erhalten.',
+  'profiles.error.identity':
+    'Die Profildatenbank stimmt nicht mit dem ausgewählten Profil überein.',
   'overview.title': 'Deine Finanzen im Überblick',
   'overview.description':
     'Eine zusammengefasste Finanzübersicht wird später hier verfügbar sein.',
@@ -206,6 +223,7 @@ export const de = {
   'settings.description':
     'Sprache, Darstellung und Basiswährung werden für dieses Profil gespeichert und sofort übernommen.',
   'settings.baseCurrency': 'Basiswährung',
+  'settings.version': 'App-Version',
   'settings.error':
     'Die Einstellungen konnten nicht gespeichert werden. Bitte versuche es erneut.',
   'backups.title': 'Sicherungen',
@@ -223,6 +241,22 @@ export const de = {
     'Der Sicherungsvorgang ist fehlgeschlagen. Falls auch die Wiederherstellung fehlgeschlagen ist, starten Sie die App vor dem Fortfahren neu.',
   'backups.restored':
     'Sicherung wiederhergestellt. Die Profildatenbank wurde erneut geöffnet.',
+  'backups.error.confirmation':
+    'Bestätige die Wiederherstellung, bevor du fortfährst.',
+  'backups.error.notFound':
+    'Diese Sicherung ist nicht mehr verfügbar. Aktualisiere die Liste.',
+  'backups.error.restore':
+    'Die Sicherung konnte nicht wiederhergestellt werden; die vorherige Datenbank wurde erneut geöffnet.',
+  'backups.error.recovery':
+    'Die Wiederherstellung ist fehlgeschlagen. Starte die App neu.',
+  'backups.error.create':
+    'Die Startsicherung konnte nicht erstellt und geprüft werden.',
+  'backups.error.invalid':
+    'Die ausgewählte Sicherung ist beschädigt oder ungültig.',
+  'backups.error.foreign':
+    'Die ausgewählte Sicherung gehört zu einem anderen Profil.',
+  'backups.error.newerSchema':
+    'Die ausgewählte Sicherung benötigt eine neuere App-Version.',
   'settings.language': 'Sprache',
   'settings.theme': 'Darstellung',
   'language.hu': 'Ungarisch',

@@ -16,6 +16,7 @@ export const hu = {
   'categories.create': 'Kategória létrehozása',
   'categories.rename': 'Átnevezés',
   'categories.archive': 'Archiválás',
+  'categories.unarchive': 'Visszaállítás',
   'categories.archived': 'Archivált — nem jelenik meg a kategóriaválasztókban',
   'categories.delete': 'Törlés',
   'categories.deleteConfirmation': 'Végleg törlöd ezt a kategóriát?',
@@ -79,6 +80,20 @@ export const hu = {
   'profile.cancel': 'Vissza a profilhoz',
   'profile.switch': 'Profilváltás',
   'profile.error': 'A profilműveletet nem sikerült végrehajtani.',
+  'profiles.error.name': 'Adj meg egy 1–100 karakter hosszú profilnevet.',
+  'profiles.error.notFound': 'A profil nem található. Frissítsd a listát.',
+  'profiles.error.confirmation':
+    'A törlés megerősítéséhez pontosan írd be a profil nevét.',
+  'profiles.error.registryRead': 'A profillista nem olvasható.',
+  'profiles.error.registryWrite': 'A profillista nem menthető.',
+  'profiles.error.delete':
+    'A profil biztonságos törlése nem sikerült; továbbra is elérhető.',
+  'profiles.error.newerSchema':
+    'Ezt a profilt újabb alkalmazásverzió nyitotta meg, ezért nem nyitható meg biztonságosan.',
+  'profiles.error.migration':
+    'A profil frissítése nem sikerült. A frissítés előtti adatbázis megmaradt.',
+  'profiles.error.identity':
+    'A profiladatbázis nem egyezik a kiválasztott profillal.',
   'overview.title': 'Pénzügyeid átláthatóan',
   'overview.description':
     'A pénzügyek összesített áttekintése később lesz itt elérhető.',
@@ -201,6 +216,7 @@ export const hu = {
   'settings.description':
     'A nyelv, a megjelenés és az alap pénznem a profilhoz mentődik, és azonnal érvényesül.',
   'settings.baseCurrency': 'Alap pénznem',
+  'settings.version': 'Alkalmazásverzió',
   'settings.error': 'A beállításokat nem sikerült menteni. Próbáld újra.',
   'backups.title': 'Biztonsági mentések',
   'backups.description':
@@ -217,6 +233,20 @@ export const hu = {
     'A mentési művelet nem sikerült. Ha a helyreállítás is sikertelen volt, folytatás előtt indítsa újra az alkalmazást.',
   'backups.restored':
     'A mentés visszaállítva. A profil adatbázisa újra megnyílt.',
+  'backups.error.confirmation':
+    'A folytatás előtt erősítsd meg a visszaállítást.',
+  'backups.error.notFound':
+    'Ez a mentés már nem érhető el. Frissítsd a listát.',
+  'backups.error.restore':
+    'A mentés nem állítható vissza; az előző adatbázis újra megnyílt.',
+  'backups.error.recovery':
+    'A helyreállítás nem sikerült. Folytatás előtt indítsd újra az alkalmazást.',
+  'backups.error.create':
+    'Az indítási mentés nem hozható létre és nem ellenőrizhető.',
+  'backups.error.invalid': 'A kiválasztott mentés sérült vagy érvénytelen.',
+  'backups.error.foreign': 'A kiválasztott mentés másik profilhoz tartozik.',
+  'backups.error.newerSchema':
+    'A kiválasztott mentéshez újabb alkalmazásverzió szükséges.',
   'settings.language': 'Nyelv',
   'settings.theme': 'Megjelenés',
   'language.hu': 'Magyar',

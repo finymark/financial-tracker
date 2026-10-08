@@ -10,13 +10,7 @@ import type {
 } from '../../shared/profiles'
 import type { ProfileController } from './profile-controller'
 import { parseSettingsChanges } from './profile-settings'
-
-function inputRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new TypeError('IPC input must be an object')
-  }
-  return value as Record<string, unknown>
-}
+import { inputRecord, registerIpcHandler } from '../ipc'
 
 function stringProperty(
   input: Record<string, unknown>,
@@ -76,12 +70,14 @@ export function registerProfileIpc(
   ipcMain: IpcMain,
   controller: ProfileController,
 ): void {
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.backupsList,
     (): Awaited<ReturnType<AppBridge['backups']['list']>> =>
       controller.listBackups(),
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.backupsRestore,
     async (
       _event,
@@ -89,11 +85,13 @@ export function registerProfileIpc(
     ): Promise<Awaited<ReturnType<AppBridge['backups']['restore']>>> =>
       controller.restoreBackup(parseRestoreBackupInput(value)),
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.profilesList,
     (): Awaited<ReturnType<AppBridge['profiles']['list']>> => controller.list(),
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.profilesCreate,
     async (
       _event,
@@ -103,7 +101,8 @@ export function registerProfileIpc(
       return controller.create(input.name)
     },
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.profilesRename,
     (
       _event,
@@ -113,17 +112,16 @@ export function registerProfileIpc(
       return controller.rename(input.id, input.name)
     },
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.profilesDelete,
-    (
-      _event,
-      value: unknown,
-    ): Awaited<ReturnType<AppBridge['profiles']['delete']>> => {
+    async (_event, value: unknown): Promise<void> => {
       const input = parseDeleteProfileInput(value)
-      controller.delete(input.id, input.confirmation)
+      await controller.delete(input.id, input.confirmation)
     },
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.profilesOpen,
     async (
       _event,
@@ -133,12 +131,14 @@ export function registerProfileIpc(
       return controller.open(input.id)
     },
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.profilesGetActive,
     (): Awaited<ReturnType<AppBridge['profiles']['getActive']>> =>
       controller.getActive(),
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.profilesUpdateSettings,
     (
       _event,
@@ -146,10 +146,8 @@ export function registerProfileIpc(
     ): Awaited<ReturnType<AppBridge['profiles']['updateSettings']>> =>
       controller.updateSettings(parseUpdateSettingsInput(value)),
   )
-  ipcMain.handle(
-    IPC_CHANNELS.profilesClose,
-    (): Awaited<ReturnType<AppBridge['profiles']['close']>> => {
-      controller.close()
-    },
-  )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.profilesClose, (): Promise<void> => {
+    controller.close()
+    return Promise.resolve()
+  })
 }

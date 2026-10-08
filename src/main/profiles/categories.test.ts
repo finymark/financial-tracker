@@ -203,6 +203,23 @@ test('only active two-level categories of the same kind can appear in expense or
   ).toThrow('categories.error.parent')
 })
 
+test('omitted parent creates a main category and archived categories can be unarchived', async () => {
+  const { application } = await setup()
+  const category = application.commands.createCategory({
+    name: 'Main without parent',
+    kind: 'expense',
+  })
+  expect(category.parentId).toBeNull()
+  application.commands.archiveCategory(category.id)
+  expect(
+    application.queries.listCategoryOptions('expense').map(({ id }) => id),
+  ).not.toContain(category.id)
+  application.commands.unarchiveCategory(category.id)
+  expect(
+    application.queries.listCategoryOptions('expense').map(({ id }) => id),
+  ).toContain(category.id)
+})
+
 test('reordering changes only sibling positions and persists across reopen', async () => {
   const { application, profile, paths } = await setup()
   const food = application.queries

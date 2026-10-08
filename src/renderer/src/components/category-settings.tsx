@@ -226,7 +226,7 @@ export function CategorySettings({
                             >
                               {t('categories.rename')}
                             </Button>
-                            {!category.archived && (
+                            {!category.archived ? (
                               <Button
                                 variant="ghost"
                                 disabled={locked}
@@ -239,6 +239,20 @@ export function CategorySettings({
                                 }
                               >
                                 {t('categories.archive')}
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                disabled={locked}
+                                onClick={() =>
+                                  void run(() =>
+                                    window.app.categories.unarchive({
+                                      id: category.id,
+                                    }),
+                                  )
+                                }
+                              >
+                                {t('categories.unarchive')}
                               </Button>
                             )}
                             <Button

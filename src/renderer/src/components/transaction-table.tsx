@@ -196,7 +196,7 @@ export function TransactionTable({
                     {transaction.kind === 'expense' ? '−' : '+'}
                     {account
                       ? format.money(transaction.totalMinor, account.currency)
-                      : transaction.totalMinor / 100}
+                      : format.money(transaction.totalMinor, 'HUF')}
                   </span>
                 </td>
                 <td className="px-1">

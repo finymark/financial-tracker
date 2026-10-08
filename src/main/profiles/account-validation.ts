@@ -1,7 +1,5 @@
 import { currencies, type Currency } from '../../shared/accounts'
-
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+import { UUID_PATTERN } from '../../shared/validation'
 
 export function validateAccountId(value: unknown): string {
   if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {

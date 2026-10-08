@@ -1,3 +1,26 @@
+export const categoryTranslationKeys = [
+  'categories.default.food',
+  'categories.default.shop',
+  'categories.default.restaurant',
+  'categories.default.housing',
+  'categories.default.rent',
+  'categories.default.utilities',
+  'categories.default.transport',
+  'categories.default.publicTransport',
+  'categories.default.car',
+  'categories.default.health',
+  'categories.default.entertainment',
+  'categories.default.clothing',
+  'categories.default.subscriptions',
+  'categories.default.otherExpense',
+  'categories.default.fees',
+  'categories.default.salary',
+  'categories.default.otherIncome',
+] as const
+
+export type CategoryTranslationKey = (typeof categoryTranslationKeys)[number]
+type CategoryCatalog = Record<CategoryTranslationKey, string>
+
 export const categoryNames = {
   en: {
     'categories.default.food': 'Food',
@@ -17,7 +40,7 @@ export const categoryNames = {
     'categories.default.fees': 'Fees',
     'categories.default.salary': 'Salary',
     'categories.default.otherIncome': 'Other income',
-  },
+  } satisfies CategoryCatalog,
   hu: {
     'categories.default.food': 'Élelmiszer',
     'categories.default.shop': 'Bolt',
@@ -36,7 +59,7 @@ export const categoryNames = {
     'categories.default.fees': 'Díjak',
     'categories.default.salary': 'Fizetés',
     'categories.default.otherIncome': 'Egyéb bevétel',
-  },
+  } satisfies CategoryCatalog,
   de: {
     'categories.default.food': 'Lebensmittel',
     'categories.default.shop': 'Einkäufe',
@@ -55,8 +78,5 @@ export const categoryNames = {
     'categories.default.fees': 'Gebühren',
     'categories.default.salary': 'Gehalt',
     'categories.default.otherIncome': 'Sonstige Einnahmen',
-  },
+  } satisfies CategoryCatalog,
 }
-
-// The English keys are the shared category translation vocabulary.
-export type CategoryTranslationKey = keyof typeof categoryNames.en

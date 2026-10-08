@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
-import { openDatabase, pingDatabase } from './db'
+import { openDatabase } from './db'
 
 test('writes and reads SQLite data from a temporary file', () => {
   const directory = mkdtempSync(join(tmpdir(), 'financial-tracker-test-'))
@@ -10,7 +10,10 @@ test('writes and reads SQLite data from a temporary file', () => {
   const database = openDatabase(path)
 
   try {
-    expect(pingDatabase(database)).toBe('ok')
+    expect(database.pragma('foreign_keys', { simple: true })).toBe(1)
+    expect(
+      database.prepare("SELECT fold_text('ÁRVÍZ') AS value").get(),
+    ).toEqual({ value: 'arviz' })
     database.exec('CREATE TABLE example (value TEXT NOT NULL)')
     database.prepare('INSERT INTO example (value) VALUES (?)').run('round-trip')
     database.close()

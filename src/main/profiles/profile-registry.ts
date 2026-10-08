@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   renameSync,
   rmSync,
   writeFileSync,
@@ -12,12 +13,11 @@ import type {
   ProfileRegistrySnapshot,
   ProfileSummary,
 } from '../../shared/profiles'
+import { UUID_PATTERN } from '../../shared/validation'
 
 const REGISTRY_VERSION = 1
 const RENAME_RETRY_DELAYS = [10, 20, 40, 80, 160]
 const RETRYABLE_RENAME_CODES = new Set(['EPERM', 'EACCES', 'EBUSY'])
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 interface StoredRegistry extends ProfileRegistrySnapshot {
   version: typeof REGISTRY_VERSION
@@ -36,13 +36,15 @@ export interface ProfileRegistryOptions {
   clock?: () => Date
   createId?: () => string
   rename?: typeof renameSync
+  renameProfileDirectory?: typeof renameSync
+  remove?: typeof rmSync
   wait?: (milliseconds: number) => void
 }
 
 function validateName(name: string): string {
   const normalized = name.trim()
   if (normalized.length === 0 || normalized.length > 100) {
-    throw new Error('Profile name must contain between 1 and 100 characters')
+    throw new Error('profiles.error.name')
   }
   return normalized
 }
@@ -99,6 +101,8 @@ export class ProfileRegistry {
   readonly #clock: () => Date
   readonly #createId: () => string
   readonly #rename: typeof renameSync
+  readonly #renameProfileDirectory: typeof renameSync
+  readonly #remove: typeof rmSync
   readonly #wait: (milliseconds: number) => void
 
   constructor(options: ProfileRegistryOptions) {
@@ -107,6 +111,8 @@ export class ProfileRegistry {
     this.#clock = options.clock ?? (() => new Date())
     this.#createId = options.createId ?? randomUUID
     this.#rename = options.rename ?? renameSync
+    this.#renameProfileDirectory = options.renameProfileDirectory ?? renameSync
+    this.#remove = options.remove ?? rmSync
     this.#wait =
       options.wait ??
       ((milliseconds) => {
@@ -118,6 +124,7 @@ export class ProfileRegistry {
         )
       })
     mkdirSync(this.#profilesDirectory, { recursive: true })
+    this.#removeStaleTombstones()
     if (!existsSync(this.#registryPath)) this.#write(this.#emptyRegistry())
     this.#read()
   }
@@ -134,7 +141,7 @@ export class ProfileRegistry {
     const profile = this.#read().profiles.find(
       (candidate) => candidate.id === id,
     )
-    if (!profile) throw new Error('Profile not found')
+    if (!profile) throw new Error('profiles.error.notFound')
     return { ...profile }
   }
 
@@ -172,7 +179,7 @@ export class ProfileRegistry {
   renameProfile(id: string, name: string): ProfileSummary {
     const registry = this.#read()
     const index = registry.profiles.findIndex((profile) => profile.id === id)
-    if (index === -1) throw new Error('Profile not found')
+    if (index === -1) throw new Error('profiles.error.notFound')
     const renamed = { ...registry.profiles[index], name: validateName(name) }
     const profiles = [...registry.profiles]
     profiles[index] = renamed
@@ -183,34 +190,52 @@ export class ProfileRegistry {
   deleteProfile(id: string, confirmation: string): void {
     const registry = this.#read()
     const profile = registry.profiles.find((candidate) => candidate.id === id)
-    if (!profile) throw new Error('Profile not found')
+    if (!profile) throw new Error('profiles.error.notFound')
     if (confirmation !== profile.name) {
-      throw new Error('Profile deletion confirmation does not match')
+      throw new Error('profiles.error.confirmation')
+    }
+    const paths = this.getProfilePaths(id)
+    const tombstone = join(
+      this.#profilesDirectory,
+      `.deleted-${id}-${this.#createId()}`,
+    )
+    try {
+      this.#renameProfileDirectory(paths.profileDirectory, tombstone)
+    } catch (error) {
+      throw new Error('profiles.error.delete', { cause: error })
     }
     const profiles = registry.profiles.filter(
       (candidate) => candidate.id !== id,
     )
-    this.#write({
-      ...registry,
-      profiles,
-      lastUsedProfileId:
-        registry.lastUsedProfileId === id ? null : registry.lastUsedProfileId,
-    })
     try {
-      rmSync(this.getProfilePaths(id).profileDirectory, {
-        recursive: true,
-        force: true,
+      this.#write({
+        ...registry,
+        profiles,
+        lastUsedProfileId:
+          registry.lastUsedProfileId === id ? null : registry.lastUsedProfileId,
       })
     } catch (error) {
-      this.#write(registry)
-      throw error
+      try {
+        this.#renameProfileDirectory(tombstone, paths.profileDirectory)
+      } catch (rollbackError) {
+        throw new AggregateError(
+          [error, rollbackError],
+          'profiles.error.delete',
+        )
+      }
+      throw new Error('profiles.error.delete', { cause: error })
+    }
+    try {
+      this.#remove(tombstone, { recursive: true, force: true })
+    } catch {
+      // Registry no longer references the tombstone; startup retries cleanup.
     }
   }
 
   rememberLastUsed(id: string): void {
     const registry = this.#read()
     if (!registry.profiles.some((profile) => profile.id === id)) {
-      throw new Error('Profile not found')
+      throw new Error('profiles.error.notFound')
     }
     this.#write({ ...registry, lastUsedProfileId: id })
   }
@@ -239,7 +264,7 @@ export class ProfileRegistry {
     try {
       return parseRegistry(readFileSync(this.#registryPath, 'utf8'))
     } catch (error) {
-      throw new Error('Could not read the profile registry', { cause: error })
+      throw new Error('profiles.error.registryRead', { cause: error })
     }
   }
 
@@ -252,17 +277,43 @@ export class ProfileRegistry {
     })
     // Windows indexers/antivirus can briefly lock the destination. Keep the
     // original intact and retry only the atomic replace, for at most 310 ms.
-    for (let attempt = 0; ; attempt += 1) {
-      try {
-        this.#rename(temporaryPath, this.#registryPath)
-        return
-      } catch (error) {
-        const code = (error as NodeJS.ErrnoException | null)?.code
-        const delay = RENAME_RETRY_DELAYS[attempt]
-        if (delay === undefined || !RETRYABLE_RENAME_CODES.has(code ?? '')) {
-          throw error
+    try {
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          this.#rename(temporaryPath, this.#registryPath)
+          return
+        } catch (error) {
+          const code = (error as NodeJS.ErrnoException | null)?.code
+          const delay = RENAME_RETRY_DELAYS[attempt]
+          if (delay === undefined || !RETRYABLE_RENAME_CODES.has(code ?? '')) {
+            throw error
+          }
+          this.#wait(delay)
         }
-        this.#wait(delay)
+      }
+    } catch (error) {
+      throw new Error('profiles.error.registryWrite', { cause: error })
+    } finally {
+      try {
+        rmSync(temporaryPath, { force: true })
+      } catch {
+        // Preserve the registry error; startup does not consume temporary files.
+      }
+    }
+  }
+
+  #removeStaleTombstones(): void {
+    for (const entry of readdirSync(this.#profilesDirectory, {
+      withFileTypes: true,
+    })) {
+      if (!entry.isDirectory() || !entry.name.startsWith('.deleted-')) continue
+      try {
+        this.#remove(join(this.#profilesDirectory, entry.name), {
+          recursive: true,
+          force: true,
+        })
+      } catch {
+        // Best effort: a later startup can retry locked tombstones.
       }
     }
   }

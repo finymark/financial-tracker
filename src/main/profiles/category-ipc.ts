@@ -8,24 +8,20 @@ import {
   validateCategorySortOrder,
 } from './category-validation'
 import type { ProfileController } from './profile-controller'
-
-function inputRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new TypeError('IPC input must be an object')
-  }
-  return value as Record<string, unknown>
-}
+import { inputRecord, registerIpcHandler } from '../ipc'
 
 export function registerCategoryIpc(
   ipcMain: IpcMain,
   controller: ProfileController,
 ): void {
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.categoriesList,
     (): Awaited<ReturnType<AppBridge['categories']['list']>> =>
       controller.getActiveApplication().queries.listCategories(),
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.categoriesListOptions,
     (
       _event,
@@ -37,7 +33,8 @@ export function registerCategoryIpc(
         .queries.listCategoryOptions(validateCategoryKind(input.kind))
     },
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.categoriesCreate,
     (
       _event,
@@ -51,7 +48,8 @@ export function registerCategoryIpc(
       })
     },
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.categoriesRename,
     (
       _event,
@@ -64,7 +62,8 @@ export function registerCategoryIpc(
       })
     },
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.categoriesReorder,
     (
       _event,
@@ -77,7 +76,8 @@ export function registerCategoryIpc(
       })
     },
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.categoriesArchive,
     (
       _event,
@@ -88,7 +88,20 @@ export function registerCategoryIpc(
         .commands.archiveCategory(validateCategoryId(inputRecord(value).id))
     },
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
+    IPC_CHANNELS.categoriesUnarchive,
+    (
+      _event,
+      value: unknown,
+    ): Awaited<ReturnType<AppBridge['categories']['unarchive']>> => {
+      controller
+        .getActiveApplication()
+        .commands.unarchiveCategory(validateCategoryId(inputRecord(value).id))
+    },
+  )
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.categoriesDelete,
     (
       _event,

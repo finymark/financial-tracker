@@ -12,7 +12,6 @@ import type {
 import { getCategory } from './profile-categories'
 import {
   parseTransactionListInput,
-  today,
   validateTransactionAccountId,
   validateTransactionCategoryId,
   validateTransactionDate,
@@ -22,6 +21,8 @@ import {
   validateTransactionTotal,
   validateTransactionId,
 } from './transaction-validation'
+import { today } from '../../shared/date'
+import { normalizePayeeKey } from '../db'
 
 interface StoredTransaction {
   id: string
@@ -110,14 +111,31 @@ function resolvePayee(
   timestamp: string,
 ): string | null {
   if (name === null) return null
-  const existing = database
-    .prepare('SELECT id FROM payees WHERE name = ? COLLATE NOCASE')
-    .get(name) as { id: string } | undefined
+  const hasNormalizedName = (
+    database.pragma('table_info(payees)') as { name: string }[]
+  ).some((column) => column.name === 'normalized_name')
+  const existing = (
+    hasNormalizedName
+      ? database
+          .prepare('SELECT id FROM payees WHERE normalized_name = ?')
+          .get(normalizePayeeKey(name))
+      : database
+          .prepare('SELECT id FROM payees WHERE name = ? COLLATE NOCASE')
+          .get(name)
+  ) as { id: string } | undefined
   if (existing) return existing.id
   const id = randomUUID()
-  database
-    .prepare('INSERT INTO payees (id, name, created_at) VALUES (?, ?, ?)')
-    .run(id, name, timestamp)
+  if (hasNormalizedName) {
+    database
+      .prepare(
+        'INSERT INTO payees (id, name, normalized_name, created_at) VALUES (?, ?, ?, ?)',
+      )
+      .run(id, name, normalizePayeeKey(name), timestamp)
+  } else {
+    database
+      .prepare('INSERT INTO payees (id, name, created_at) VALUES (?, ?, ?)')
+      .run(id, name, timestamp)
+  }
   return id
 }
 
@@ -126,11 +144,12 @@ function validateReferences(
   accountId: string,
   kind: 'expense' | 'income',
   categoryId: string | null,
+  current?: Pick<Transaction, 'accountId' | 'kind' | 'line'>,
 ): void {
   const account = database
     .prepare('SELECT archived FROM accounts WHERE id = ?')
     .get(accountId) as { archived: number } | undefined
-  if (!account || account.archived)
+  if (!account || (account.archived && accountId !== current?.accountId))
     throw new Error('transactions.error.account')
   if (categoryId === null) return
   let category: ReturnType<typeof getCategory>
@@ -143,7 +162,11 @@ function validateReferences(
   } catch {
     throw new Error('transactions.error.category')
   }
-  if (category.kind !== kind || category.archived || parentArchived) {
+  if (
+    category.kind !== kind ||
+    ((category.archived || parentArchived) &&
+      categoryId !== current?.line.categoryId)
+  ) {
     throw new Error('transactions.error.category')
   }
 }
@@ -203,7 +226,7 @@ export function updateTransaction(
   const payeeName = validateTransactionPayeeName(input.payeeName)
   const categoryId = validateTransactionCategoryId(input.categoryId)
   const note = validateTransactionNote(input.note)
-  validateReferences(database, accountId, kind, categoryId)
+  validateReferences(database, accountId, kind, categoryId, current)
   const timestamp = clock().toISOString()
   const payeeId = resolvePayee(database, payeeName, timestamp)
   database
@@ -293,9 +316,6 @@ export function listTransactions(
       input.categoryId,
     )
   if (input.search) {
-    database.function('fold_text', { deterministic: true }, (text: unknown) =>
-      foldText(String(text ?? '')),
-    )
     add(
       '(instr(fold_text(payees.name), ?) > 0 OR instr(fold_text(transactions.note), ?) > 0)',
       foldText(input.search),
@@ -319,13 +339,29 @@ export function listTransactions(
         )
         .all(...parameters, input.limit!, input.offset!) as StoredTransaction[]
     ).map(transactionView)
+    const totalCount = Number(
+      (
+        database
+          .prepare(`SELECT COUNT(*) AS count ${filtered}`)
+          .safeIntegers()
+          .get(...parameters) as { count: bigint }
+      ).count,
+    )
+    if (!Number.isSafeInteger(totalCount))
+      throw new Error('transactions.error.totals')
     const aggregates = database
       .prepare(
-        `SELECT transactions.date, accounts.currency,
-      SUM(CASE transactions.kind WHEN 'expense' THEN transactions.total_minor ELSE 0 END) AS expenseMinor,
-      SUM(CASE transactions.kind WHEN 'income' THEN transactions.total_minor ELSE 0 END) AS incomeMinor,
-      COUNT(*) AS count ${filtered}
-      GROUP BY transactions.date, accounts.currency ORDER BY transactions.date DESC, accounts.currency`,
+        `SELECT filtered_transactions.date, filtered_transactions.currency,
+      SUM(CASE filtered_transactions.kind WHEN 'expense' THEN aggregate_lines.amount_minor ELSE 0 END) AS expenseMinor,
+      SUM(CASE filtered_transactions.kind WHEN 'income' THEN aggregate_lines.amount_minor ELSE 0 END) AS incomeMinor
+      FROM (
+        SELECT transactions.id, transactions.date, transactions.kind, accounts.currency
+        ${filtered}
+      ) AS filtered_transactions
+      JOIN transaction_lines AS aggregate_lines
+        ON aggregate_lines.transaction_id = filtered_transactions.id
+      GROUP BY filtered_transactions.date, filtered_transactions.currency
+      ORDER BY filtered_transactions.date DESC, filtered_transactions.currency`,
       )
       .safeIntegers()
       .all(...parameters) as {
@@ -333,11 +369,9 @@ export function listTransactions(
       currency: TransactionTotals['currency']
       expenseMinor: bigint
       incomeMinor: bigint
-      count: bigint
     }[]
     const totals = new Map<TransactionTotals['currency'], TransactionTotals>()
     const days: TransactionPage['days'] = []
-    let totalCount = 0
     const safe = (value: bigint): number => {
       const number = Number(value)
       if (!Number.isSafeInteger(number))
@@ -361,7 +395,6 @@ export function listTransactions(
       total.expenseMinor = safe(BigInt(total.expenseMinor) + row.expenseMinor)
       total.incomeMinor = safe(BigInt(total.incomeMinor) + row.incomeMinor)
       totals.set(row.currency, total)
-      totalCount += safe(row.count)
     }
     return {
       rows,

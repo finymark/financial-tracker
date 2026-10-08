@@ -5,27 +5,21 @@ import {
   parseTransactionListInput,
   validateTransactionAccountId,
   validateTransactionCategoryId,
-  validateTransactionDate,
+  validateTransactionDateShape,
   validateTransactionId,
   validateTransactionKind,
   validateTransactionNote,
   validateTransactionPayeeName,
   validateTransactionTotal,
 } from './transaction-validation'
-
-function inputRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new TypeError('IPC input must be an object')
-  }
-  return value as Record<string, unknown>
-}
+import { inputRecord, registerIpcHandler } from '../ipc'
 
 function transactionFields(value: unknown) {
   const input = inputRecord(value)
   return {
     accountId: validateTransactionAccountId(input.accountId),
     kind: validateTransactionKind(input.kind),
-    date: validateTransactionDate(input.date, () => new Date()),
+    date: validateTransactionDateShape(input.date),
     totalMinor: validateTransactionTotal(input.totalMinor),
     payeeName: validateTransactionPayeeName(input.payeeName),
     categoryId: validateTransactionCategoryId(input.categoryId),
@@ -37,7 +31,8 @@ export function registerTransactionIpc(
   ipcMain: IpcMain,
   controller: ProfileController,
 ): void {
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.transactionsList,
     (
       _event,
@@ -47,12 +42,14 @@ export function registerTransactionIpc(
         .getActiveApplication()
         .queries.listTransactions(parseTransactionListInput(value)),
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.payeesList,
     (): Awaited<ReturnType<AppBridge['payees']['list']>> =>
       controller.getActiveApplication().queries.listPayees(),
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.transactionsCreate,
     (
       _event,
@@ -62,7 +59,8 @@ export function registerTransactionIpc(
         .getActiveApplication()
         .commands.createTransaction(transactionFields(value)),
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.transactionsUpdate,
     (
       _event,
@@ -75,7 +73,8 @@ export function registerTransactionIpc(
       })
     },
   )
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.transactionsDelete,
     (
       _event,

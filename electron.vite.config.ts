@@ -2,7 +2,7 @@ import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   main: {},
   preload: {
     build: {
@@ -15,6 +15,18 @@ export default defineConfig({
     },
   },
   renderer: {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      {
+        name: 'environment-csp',
+        transformIndexHtml(html) {
+          return html.replace(
+            '%CSP_DEV_CONNECT%',
+            command === 'serve' ? 'ws://localhost:* ws://127.0.0.1:*' : '',
+          )
+        },
+      },
+      react(),
+      tailwindcss(),
+    ],
   },
-})
+}))

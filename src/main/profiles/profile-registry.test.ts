@@ -1,5 +1,7 @@
 import {
   existsSync,
+  mkdirSync,
+  readdirSync,
   mkdtempSync,
   readFileSync,
   renameSync,
@@ -116,7 +118,9 @@ describe('profile registry', () => {
         throw lock
       })
 
-      expect(() => registry.createProfile('Failed profile')).toThrow(lock)
+      expect(() => registry.createProfile('Failed profile')).toThrow(
+        'profiles.error.registryWrite',
+      )
 
       expect(rename).toHaveBeenCalledTimes(6)
       expect(wait.mock.calls).toEqual([[10], [20], [40], [80], [160]])
@@ -125,6 +129,7 @@ describe('profile registry', () => {
       expect(existsSync(registry.getProfilePaths(id).profileDirectory)).toBe(
         false,
       )
+      expect(existsSync(`${registryPath}.tmp`)).toBe(false)
     },
   )
 
@@ -147,11 +152,14 @@ describe('profile registry', () => {
         throw failure
       })
 
-      expect(() => registry.createProfile('Failed profile')).toThrow(failure)
+      expect(() => registry.createProfile('Failed profile')).toThrow(
+        'profiles.error.registryWrite',
+      )
 
       expect(rename).toHaveBeenCalledTimes(1)
       expect(wait).not.toHaveBeenCalled()
       expect(readFileSync(registryPath, 'utf8')).toBe(original)
+      expect(existsSync(`${registryPath}.tmp`)).toBe(false)
     },
   )
 
@@ -191,5 +199,82 @@ describe('profile registry', () => {
 
     expect(registry.listProfiles()).toEqual([])
     expect(existsSync(paths.profileDirectory)).toBe(false)
+  })
+
+  test('keeps the registry and profile directory when tombstoning fails', () => {
+    const userData = temporaryUserData()
+    const failure = new Error('Synthetic directory lock')
+    const renameProfileDirectory = vi.fn(() => {
+      throw failure
+    })
+    const registry = new ProfileRegistry({
+      userDataDirectory: userData,
+      renameProfileDirectory,
+    })
+    const profile = registry.createProfile('Kept profile')
+
+    expect(() => registry.deleteProfile(profile.id, profile.name)).toThrow(
+      'profiles.error.delete',
+    )
+    expect(registry.listProfiles()).toEqual([profile])
+    expect(
+      existsSync(registry.getProfilePaths(profile.id).profileDirectory),
+    ).toBe(true)
+  })
+
+  test('restores the profile directory when removing it from the registry fails', () => {
+    const userData = temporaryUserData()
+    const rename = vi.fn(renameSync)
+    const registry = new ProfileRegistry({
+      userDataDirectory: userData,
+      rename,
+    })
+    const profile = registry.createProfile('Rollback profile')
+    const paths = registry.getProfilePaths(profile.id)
+    rename.mockImplementation(() => {
+      throw Object.assign(new Error('Synthetic registry lock'), { code: 'EIO' })
+    })
+
+    expect(() => registry.deleteProfile(profile.id, profile.name)).toThrow(
+      'profiles.error.delete',
+    )
+    expect(registry.listProfiles()).toEqual([profile])
+    expect(existsSync(paths.profileDirectory)).toBe(true)
+  })
+
+  test('commits deletion before best-effort tombstone cleanup and removes stale tombstones on startup', () => {
+    const userData = temporaryUserData()
+    const remove = vi.fn<typeof rmSync>(() => {
+      throw new Error('Synthetic cleanup lock')
+    })
+    const registry = new ProfileRegistry({
+      userDataDirectory: userData,
+      remove,
+    })
+    const profile = registry.createProfile('Deleted profile')
+    registry.deleteProfile(profile.id, profile.name)
+    expect(registry.listProfiles()).toEqual([])
+    expect(
+      existsSync(registry.getProfilePaths(profile.id).profileDirectory),
+    ).toBe(false)
+    const profilesDirectory = join(userData, 'profiles')
+    expect(readFileSync(join(userData, 'profiles.json'), 'utf8')).not.toContain(
+      profile.id,
+    )
+    // A normal startup retries any tombstone left by the failed best-effort remove.
+    new ProfileRegistry({ userDataDirectory: userData })
+    expect(
+      readdirSync(profilesDirectory).some((name) =>
+        name.startsWith('.deleted-'),
+      ),
+    ).toBe(false)
+  })
+
+  test('cleans a stale tombstone directory on startup', () => {
+    const userData = temporaryUserData()
+    const tombstone = join(userData, 'profiles', '.deleted-stale')
+    mkdirSync(tombstone, { recursive: true })
+    new ProfileRegistry({ userDataDirectory: userData })
+    expect(existsSync(tombstone)).toBe(false)
   })
 })

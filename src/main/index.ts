@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { registerUpdates } from './updates'
-import { openDatabase, pingDatabase } from './db'
+import { openDatabase } from './db'
 import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 import { ProfileController } from './profiles/profile-controller'
 import { registerCategoryIpc } from './profiles/category-ipc'
@@ -11,6 +11,7 @@ import { registerAccountIpc } from './profiles/account-ipc'
 import { registerProfileIpc } from './profiles/profile-ipc'
 import { registerTransactionIpc } from './profiles/transaction-ipc'
 import { ProfileRegistry } from './profiles/profile-registry'
+import { registerIpcHandler } from './ipc'
 
 const APP_ID = 'com.finymark.financial-tracker'
 const APP_NAME = 'Financial Tracker'
@@ -45,7 +46,10 @@ function smokeTest(): void {
   try {
     const database = openDatabase(join(directory, 'smoke.sqlite'))
     try {
-      if (pingDatabase(database) !== 'ok') throw new Error('SQLite ping failed')
+      const result = database.prepare("SELECT 'ok' AS result").get() as {
+        result: string
+      }
+      if (result.result !== 'ok') throw new Error('SQLite query failed')
       console.log('SQLite smoke test OK')
       exitCode = 0
     } finally {
@@ -69,18 +73,15 @@ void app.whenReady().then(() => {
     smokeTest()
     return
   }
-  const database = openDatabase(':memory:')
   const profiles = new ProfileController(
     new ProfileRegistry({ userDataDirectory: app.getPath('userData') }),
+    app.getLocale(),
   )
 
-  ipcMain.handle(
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.getVersion,
     (): Awaited<ReturnType<AppBridge['getVersion']>> => app.getVersion(),
-  )
-  ipcMain.handle(
-    IPC_CHANNELS.dbPing,
-    (): Awaited<ReturnType<AppBridge['dbPing']>> => pingDatabase(database),
   )
   registerProfileIpc(ipcMain, profiles)
   registerAccountIpc(ipcMain, profiles)
@@ -91,7 +92,6 @@ void app.whenReady().then(() => {
   let shutdownComplete = false
   function shutdown(): Promise<void> {
     shutdownPromise ??= profiles.shutdown().then(() => {
-      database.close()
       shutdownComplete = true
     })
     return shutdownPromise
@@ -102,7 +102,11 @@ void app.whenReady().then(() => {
     void shutdown().then(() => app.quit())
   })
   const window = createWindow()
-  registerUpdates(ipcMain, window, app.isPackaged, shutdown)
+  registerUpdates(ipcMain, window, app.isPackaged, shutdown, async () => {
+    shutdownPromise = null
+    shutdownComplete = false
+    await profiles.recoverFromFailedShutdown()
+  })
 })
 
 app.on('window-all-closed', () => app.quit())

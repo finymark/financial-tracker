@@ -29,6 +29,7 @@ import {
   createCategory,
   renameCategory,
   archiveCategory,
+  unarchiveCategory,
   reorderCategory,
   deleteCategory,
   hasCategoryTransactions,
@@ -49,13 +50,6 @@ import type {
   ProfileSettings,
   ProfileSettingsChanges,
 } from '../../shared/settings'
-import {
-  validateAccountId,
-  validateAccountName,
-  validateAccountCurrency,
-  validateOpeningBalance,
-  validateOpeningDate,
-} from './account-validation'
 import type { ProfilePaths } from './profile-registry'
 import { parseSettingsChanges } from './profile-settings'
 import type {
@@ -73,6 +67,17 @@ import {
   listTransactions,
   updateTransaction,
 } from './profile-transactions'
+import {
+  archiveAccount,
+  changeAccountCurrency,
+  createAccount,
+  deleteAccount,
+  getAccountBalance,
+  hasAccountTransactions,
+  listAccounts,
+  renameAccount,
+} from './profile-accounts'
+import { formatBackupTimestamp } from './backup-timestamp'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -105,15 +110,6 @@ const ACCOUNTS_SCHEMA_SQL = `
   )
 `
 
-interface StoredAccount extends CreateAccountInput {
-  id: string
-  createdAt: string
-  archived: number
-}
-
-const ACCOUNT_COLUMNS = `id, name, currency, opening_balance AS openingBalance,
-  opening_date AS openingDate, created_at AS createdAt, archived`
-
 export interface SchemaMigration {
   readonly version: number
   readonly name: string
@@ -132,6 +128,7 @@ export interface OpenProfileApplicationOptions {
   paths: ProfilePaths
   migrations?: readonly SchemaMigration[]
   clock?: () => Date
+  createStartupBackup?: boolean
 }
 
 export interface ProfileQueries {
@@ -156,6 +153,7 @@ export interface ProfileCommands {
   createCategory(input: CreateCategoryInput): Category
   renameCategory(input: RenameCategoryInput): Category
   archiveCategory(id: string): void
+  unarchiveCategory(id: string): void
   reorderCategory(input: ReorderCategoryInput): void
   deleteCategory(input: DeleteCategoryInput): void
   restoreBackup(input: RestoreBackupInput): Promise<void>
@@ -175,27 +173,32 @@ export interface ProfileApplication {
 }
 
 export class NewerSchemaError extends Error {
+  readonly actualVersion: number
+  readonly supportedVersion: number
+
   constructor(actualVersion: number, supportedVersion: number) {
-    super(
-      `Profile schema version ${actualVersion} is newer than supported version ${supportedVersion}`,
-    )
+    super('profiles.error.newerSchema')
     this.name = 'NewerSchemaError'
+    this.actualVersion = actualVersion
+    this.supportedVersion = supportedVersion
   }
 }
 
 export class MigrationError extends Error {
   readonly backupPath: string | null
+  readonly migrationVersion: number
+  readonly migrationName: string
 
   constructor(
     migration: SchemaMigration,
     backupPath: string | null,
     cause: unknown,
   ) {
-    super(`Migration ${migration.version} (${migration.name}) failed`, {
-      cause,
-    })
+    super('profiles.error.migration', { cause })
     this.name = 'MigrationError'
     this.backupPath = backupPath
+    this.migrationVersion = migration.version
+    this.migrationName = migration.name
   }
 }
 
@@ -283,6 +286,44 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
     CREATE INDEX categories_parent_id ON categories(parent_id);
   `,
   ),
+  defineSqlMigration(
+    7,
+    'Unicode-normalized payee keys',
+    `
+    ALTER TABLE payees ADD COLUMN normalized_name TEXT;
+    UPDATE payees SET normalized_name = payee_key(name);
+    UPDATE transactions
+    SET payee_id = (
+      SELECT canonical.id
+      FROM payees AS canonical
+      WHERE canonical.normalized_name = (
+        SELECT duplicate.normalized_name FROM payees AS duplicate
+        WHERE duplicate.id = transactions.payee_id
+      )
+      ORDER BY canonical.created_at, canonical.rowid
+      LIMIT 1
+    )
+    WHERE payee_id IS NOT NULL;
+    DELETE FROM payees
+    WHERE id NOT IN (
+      SELECT canonical.id
+      FROM payees AS canonical
+      WHERE canonical.rowid = (
+        SELECT candidate.rowid FROM payees AS candidate
+        WHERE candidate.normalized_name = canonical.normalized_name
+        ORDER BY candidate.created_at, candidate.rowid
+        LIMIT 1
+      )
+    );
+    CREATE UNIQUE INDEX payees_normalized_name ON payees(normalized_name);
+    CREATE TRIGGER payees_normalized_name_insert BEFORE INSERT ON payees
+    WHEN NEW.normalized_name IS NULL OR NEW.normalized_name <> payee_key(NEW.name)
+      BEGIN SELECT RAISE(ABORT, 'Invalid normalized payee name'); END;
+    CREATE TRIGGER payees_normalized_name_update BEFORE UPDATE OF name, normalized_name ON payees
+    WHEN NEW.normalized_name IS NULL OR NEW.normalized_name <> payee_key(NEW.name)
+      BEGIN SELECT RAISE(ABORT, 'Invalid normalized payee name'); END;
+  `,
+  ),
 ]
 
 function validateMigrations(
@@ -346,10 +387,6 @@ function validateAppliedMigrations(
   return currentVersion
 }
 
-function safeTimestamp(date: Date): string {
-  return date.toISOString().replaceAll(':', '-').replaceAll('.', '-')
-}
-
 async function createVerifiedBackup(
   database: Database.Database,
   paths: ProfilePaths,
@@ -359,20 +396,20 @@ async function createVerifiedBackup(
   mkdirSync(paths.preMigrationBackupDirectory, { recursive: true })
   let backupPath = join(
     paths.preMigrationBackupDirectory,
-    `${safeTimestamp(clock())}-v${currentVersion}.sqlite`,
+    `${formatBackupTimestamp(clock())}-v${currentVersion}.sqlite`,
   )
   let suffix = 1
   while (existsSync(backupPath)) {
     backupPath = join(
       paths.preMigrationBackupDirectory,
-      `${safeTimestamp(clock())}-v${currentVersion}-${suffix}.sqlite`,
+      `${formatBackupTimestamp(clock())}-v${currentVersion}-${suffix}.sqlite`,
     )
     suffix += 1
   }
 
   try {
     await database.backup(backupPath)
-    const backup = new Database(backupPath, {
+    const backup = openDatabase(backupPath, {
       readonly: true,
       fileMustExist: true,
     })
@@ -442,6 +479,8 @@ class OpenProfileApplication implements ProfileApplication {
         this.#executeCommand(() => reorderCategory(this.#database, input)),
       archiveCategory: (id) =>
         this.#executeCommand(() => archiveCategory(this.#database, id)),
+      unarchiveCategory: (id) =>
+        this.#executeCommand(() => unarchiveCategory(this.#database, id)),
       createCategory: (input) =>
         this.#executeCommand(() => {
           const id = createCategory(this.#database, input)
@@ -458,11 +497,20 @@ class OpenProfileApplication implements ProfileApplication {
         }),
       restoreBackup: (input) => this.#restoreBackup(input),
       ensureProfileIdentity: () => this.#ensureProfileIdentity(),
-      createAccount: (input) => this.#createAccount(input),
-      renameAccount: (input) => this.#renameAccount(input),
-      changeAccountCurrency: (input) => this.#changeAccountCurrency(input),
-      archiveAccount: (id) => this.#archiveAccount(id),
-      deleteAccount: (id) => this.#deleteAccount(id),
+      createAccount: (input) =>
+        this.#executeCommand(() =>
+          createAccount(this.#database, input, this.#clock),
+        ),
+      renameAccount: (input) =>
+        this.#executeCommand(() => renameAccount(this.#database, input)),
+      changeAccountCurrency: (input) =>
+        this.#executeCommand(() =>
+          changeAccountCurrency(this.#database, input),
+        ),
+      archiveAccount: (id) =>
+        this.#executeCommand(() => archiveAccount(this.#database, id)),
+      deleteAccount: (id) =>
+        this.#executeCommand(() => deleteAccount(this.#database, id)),
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
@@ -502,137 +550,23 @@ class OpenProfileApplication implements ProfileApplication {
       },
       getProfileInfo: () => this.#getProfileInfo(),
       getSettings: () => this.#getSettings(),
-      listAccounts: () => this.#listAccounts(),
-      listAccountOptions: () => this.#listAccounts(true),
-      getAccountBalance: (id) => this.#getAccountBalance(id),
-      hasAccountTransactions: (id) => this.#hasAccountTransactions(id),
+      listAccounts: () => {
+        this.#assertAvailable()
+        return listAccounts(this.#database)
+      },
+      listAccountOptions: () => {
+        this.#assertAvailable()
+        return listAccounts(this.#database, true)
+      },
+      getAccountBalance: (id) => {
+        this.#assertAvailable()
+        return getAccountBalance(this.#database, id)
+      },
+      hasAccountTransactions: (id) => {
+        this.#assertAvailable()
+        return hasAccountTransactions(this.#database, id)
+      },
     }
-  }
-
-  #createAccount(input: CreateAccountInput): Account {
-    return this.#executeCommand(() => {
-      const name = validateAccountName(input.name)
-      const currency = validateAccountCurrency(input.currency)
-      const openingBalance = validateOpeningBalance(input.openingBalance)
-      const openingDate = validateOpeningDate(input.openingDate)
-      const id = randomUUID()
-      this.#database
-        .prepare(
-          `INSERT INTO accounts
-        (id, name, currency, opening_balance, opening_date, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)`,
-        )
-        .run(
-          id,
-          name,
-          currency,
-          openingBalance,
-          openingDate,
-          this.#clock().toISOString(),
-        )
-      return this.#accountView(this.#getAccount(id))
-    })
-  }
-
-  #renameAccount(input: RenameAccountInput): Account {
-    return this.#executeCommand(() => {
-      const account = this.#getAccount(input.id)
-      const name = validateAccountName(input.name)
-      this.#database
-        .prepare('UPDATE accounts SET name = ? WHERE id = ?')
-        .run(name, account.id)
-      return this.#accountView(this.#getAccount(account.id))
-    })
-  }
-
-  #changeAccountCurrency(input: ChangeAccountCurrencyInput): Account {
-    return this.#executeCommand(() => {
-      const account = this.#getAccount(input.id)
-      const currency = validateAccountCurrency(input.currency)
-      if (
-        currency !== account.currency &&
-        this.#hasAccountTransactions(account.id)
-      ) {
-        throw new Error('accounts.error.currencyLocked')
-      }
-      this.#database
-        .prepare('UPDATE accounts SET currency = ? WHERE id = ?')
-        .run(currency, account.id)
-      return this.#accountView(this.#getAccount(account.id))
-    })
-  }
-
-  #archiveAccount(id: string): void {
-    this.#executeCommand(() => {
-      const account = this.#getAccount(id)
-      this.#database
-        .prepare('UPDATE accounts SET archived = 1 WHERE id = ?')
-        .run(account.id)
-    })
-  }
-
-  #deleteAccount(id: string): void {
-    this.#executeCommand(() => {
-      const account = this.#getAccount(id)
-      if (this.#hasAccountTransactions(account.id)) {
-        throw new Error('accounts.error.notEmpty')
-      }
-      this.#database
-        .prepare('DELETE FROM accounts WHERE id = ?')
-        .run(account.id)
-    })
-  }
-
-  #getAccount(id: string): StoredAccount {
-    this.#assertAvailable()
-    const account = this.#database
-      .prepare(`SELECT ${ACCOUNT_COLUMNS} FROM accounts WHERE id = ?`)
-      .get(validateAccountId(id)) as StoredAccount | undefined
-    if (!account) throw new Error('accounts.error.notFound')
-    return account
-  }
-
-  #listAccounts(activeOnly = false): Account[] {
-    this.#assertAvailable()
-    const accounts = this.#database
-      .prepare(
-        `SELECT ${ACCOUNT_COLUMNS} FROM accounts ${activeOnly ? 'WHERE archived = 0' : ''} ORDER BY created_at, rowid`,
-      )
-      .all() as StoredAccount[]
-    return accounts.map((account) => this.#accountView(account))
-  }
-
-  #accountView(account: StoredAccount): Account {
-    return {
-      ...account,
-      archived: Boolean(account.archived),
-      balance: this.#getAccountBalance(account.id),
-      hasTransactions: this.#hasAccountTransactions(account.id),
-    }
-  }
-
-  #getAccountBalance(id: string): number {
-    const account = this.#getAccount(id)
-    const totals = this.#database
-      .prepare(
-        `SELECT COALESCE(SUM(
-          CASE kind WHEN 'income' THEN total_minor ELSE -total_minor END
-        ), 0) AS total FROM transactions WHERE account_id = ?`,
-      )
-      .get(account.id) as { total: number }
-    const balance = account.openingBalance + totals.total
-    if (!Number.isSafeInteger(balance))
-      throw new Error('accounts.error.balance')
-    return balance
-  }
-
-  #hasAccountTransactions(id: string): boolean {
-    const account = this.#getAccount(id)
-    return Boolean(
-      this.#database
-        .prepare('SELECT 1 FROM transactions WHERE account_id = ? LIMIT 1')
-        .get(account.id),
-    )
   }
 
   #ensureProfileIdentity(): void {
@@ -652,7 +586,7 @@ class OpenProfileApplication implements ProfileApplication {
         identity.id !== this.#profile.id ||
         identity.createdAt !== this.#profile.createdAt
       ) {
-        throw new Error('Profile database identity does not match the registry')
+        throw new Error('profiles.error.identity')
       }
     })
   }
@@ -665,7 +599,7 @@ class OpenProfileApplication implements ProfileApplication {
       identity?.id !== this.#profile.id ||
       identity.createdAt !== this.#profile.createdAt
     ) {
-      throw new Error('Backup does not belong to this profile')
+      throw new Error('backups.error.foreign')
     }
   }
 
@@ -676,13 +610,12 @@ class OpenProfileApplication implements ProfileApplication {
 
   async #restoreBackup(input: RestoreBackupInput): Promise<void> {
     this.#assertAvailable()
-    if (input.confirmed !== true)
-      throw new Error('Backup restore requires confirmation')
+    if (input.confirmed !== true) throw new Error('backups.error.confirmation')
     const { paths } = this.#options
     const backup = listBackupFiles(paths.backupDirectory).find(
       (candidate) => candidate.id === input.backupId,
     )
-    if (!backup) throw new Error('Backup not found in this profile')
+    if (!backup) throw new Error('backups.error.notFound')
     const migrations = validateMigrations(
       this.#options.migrations ?? CURRENT_MIGRATIONS,
     )
@@ -697,11 +630,24 @@ class OpenProfileApplication implements ProfileApplication {
     this.#restoring = true
     let recoveryNeeded = false
     try {
-      copyFileSync(join(paths.backupDirectory, backup.filename), stagedPath)
-      verifySqliteBackup(stagedPath, (database) => {
-        validateAppliedMigrations(readAppliedMigrations(database), migrations)
-        this.#validateIdentity(database)
-      })
+      try {
+        copyFileSync(join(paths.backupDirectory, backup.filename), stagedPath)
+        verifySqliteBackup(stagedPath, (database) => {
+          validateAppliedMigrations(readAppliedMigrations(database), migrations)
+          this.#validateIdentity(database)
+        })
+      } catch (error) {
+        if (error instanceof NewerSchemaError) {
+          throw new Error('backups.error.newerSchema', { cause: error })
+        }
+        if (
+          error instanceof Error &&
+          error.message === 'backups.error.foreign'
+        ) {
+          throw error
+        }
+        throw new Error('backups.error.invalid', { cause: error })
+      }
       // Restore is a file lifecycle operation, not an in-database write transaction.
       // Keep an online recovery snapshot until the replacement has reopened successfully.
       await this.#database.backup(recoveryPath)
@@ -727,13 +673,10 @@ class OpenProfileApplication implements ProfileApplication {
         } catch (recoveryError) {
           throw new AggregateError(
             [error, recoveryError],
-            `Restore recovery failed; the previous database is preserved at ${recoveryPath}`,
+            'backups.error.recovery',
           )
         }
-        throw new Error(
-          'Could not restore backup; the previous database was reopened',
-          { cause: error },
-        )
+        throw new Error('backups.error.restore', { cause: error })
       }
     } finally {
       this.#restoring = false
@@ -860,11 +803,13 @@ export async function openProfileApplication(
   const application = new OpenProfileApplication(database, options)
   try {
     application.commands.ensureProfileIdentity()
-    await createStartupBackup(
-      database,
-      options.paths.backupDirectory,
-      options.clock ?? (() => new Date()),
-    )
+    if (options.createStartupBackup !== false) {
+      await createStartupBackup(
+        database,
+        options.paths.backupDirectory,
+        options.clock ?? (() => new Date()),
+      )
+    }
     return application
   } catch (error) {
     application.close()

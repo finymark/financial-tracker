@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdtempSync,
   readdirSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
@@ -52,6 +53,58 @@ describe('profile application API', () => {
     } finally {
       application.close()
     }
+  })
+
+  test.each([
+    ['hu-HU', 'hu'],
+    ['de-DE', 'de'],
+    ['fr-FR', 'en'],
+  ] as const)(
+    'new profiles use the %s system locale and take one backup on their first real open',
+    async (locale, language) => {
+      const { registry } = setup()
+      const controller = new ProfileController(registry, locale)
+      const profile = await controller.create(`Locale ${locale}`)
+      const paths = registry.getProfilePaths(profile.id)
+      expect(
+        readdirSync(paths.backupDirectory).filter((name) =>
+          name.endsWith('.sqlite'),
+        ),
+      ).toEqual([])
+      const active = await controller.open(profile.id)
+      expect(active.settings).toEqual({
+        language,
+        theme: 'system',
+        baseCurrency: 'HUF',
+      })
+      expect(controller.listBackups()).toHaveLength(1)
+      controller.close()
+    },
+  )
+
+  test('failed active-profile deletion reopens the profile instead of stranding the app', async () => {
+    const userDataDirectory = mkdtempSync(
+      join(tmpdir(), 'financial-tracker-delete-recovery-'),
+    )
+    temporaryDirectories.push(userDataDirectory)
+    let blockDeletion = false
+    const registry = new ProfileRegistry({
+      userDataDirectory,
+      renameProfileDirectory(source, destination) {
+        if (blockDeletion) throw new Error('Synthetic directory lock')
+        renameSync(source, destination)
+      },
+    })
+    const controller = new ProfileController(registry)
+    const profile = await controller.create('Kept active')
+    await controller.open(profile.id)
+    blockDeletion = true
+    await expect(controller.delete(profile.id, profile.name)).rejects.toThrow(
+      'profiles.error.delete',
+    )
+    expect(controller.getActive()?.id).toBe(profile.id)
+    expect(controller.list().profiles).toEqual([profile])
+    controller.close()
   })
 
   test('keeps the last ten startup backups, including repeated opens at the same time', async () => {
@@ -303,7 +356,7 @@ describe('profile application API', () => {
             backupId,
             confirmed: true,
           }),
-        ).rejects.toThrow('Backup not found')
+        ).rejects.toThrow('backups.error.notFound')
         expect(firstApplication.queries.getProfileInfo().id).toBe(first.id)
       }
     } finally {
@@ -347,7 +400,7 @@ describe('profile application API', () => {
           backupId: olderBackup.id,
           confirmed: true,
         }),
-      ).rejects.toThrow('previous database was reopened')
+      ).rejects.toThrow('backups.error.restore')
       expect(application.queries.getProfileInfo().schemaVersion).toBe(
         currentVersion + 1,
       )
@@ -395,7 +448,7 @@ describe('profile application API', () => {
           backupId: olderBackup.id,
           confirmed: true,
         }),
-      ).rejects.toThrow('previous database was reopened')
+      ).rejects.toThrow('backups.error.restore')
       expect(application.queries.getProfileInfo()).toMatchObject({
         createdAt: profile.createdAt,
         schemaVersion: currentVersion + 1,
@@ -460,7 +513,7 @@ describe('profile application API', () => {
           backupId: backup.id,
           confirmed: true,
         }),
-      ).rejects.toBeInstanceOf(NewerSchemaError)
+      ).rejects.toThrow('backups.error.newerSchema')
       expect(application.queries.getProfileInfo().schemaVersion).toBe(
         currentVersion,
       )
@@ -501,7 +554,7 @@ describe('profile application API', () => {
           backupId: backup.id,
           confirmed: true,
         }),
-      ).rejects.toThrow('does not belong to this profile')
+      ).rejects.toThrow('backups.error.foreign')
       expect(application.queries.getProfileInfo().id).toBe(first.id)
     } finally {
       application.close()
@@ -568,7 +621,7 @@ describe('profile application API', () => {
     expect(readdirSync(paths.preMigrationBackupDirectory)).toHaveLength(1)
   })
 
-  test('two profiles can only query their own profile data', async () => {
+  test('two profiles isolate transactions and payees through the application API', async () => {
     const { registry } = setup()
     const first = registry.createProfile('First')
     const second = registry.createProfile('Second')
@@ -595,6 +648,50 @@ describe('profile application API', () => {
       expect(firstApplication.queries.getProfileInfo().id).not.toBe(
         secondApplication.queries.getProfileInfo().id,
       )
+      const firstAccount = firstApplication.commands.createAccount({
+        name: 'First cash',
+        currency: 'HUF',
+        openingBalance: 0,
+        openingDate: '2026-01-01',
+      })
+      const firstTransaction = firstApplication.commands.createTransaction({
+        accountId: firstAccount.id,
+        kind: 'expense',
+        date: '2026-01-15',
+        totalMinor: 123,
+        payeeName: 'First payee',
+        categoryId: null,
+        note: '',
+      })
+      expect(secondApplication.queries.listTransactions().rows).toEqual([])
+      expect(secondApplication.queries.listPayees()).toEqual([])
+      const secondAccount = secondApplication.commands.createAccount({
+        name: 'Second cash',
+        currency: 'HUF',
+        openingBalance: 0,
+        openingDate: '2026-01-01',
+      })
+      const secondTransaction = secondApplication.commands.createTransaction({
+        accountId: secondAccount.id,
+        kind: 'income',
+        date: '2026-01-15',
+        totalMinor: 456,
+        payeeName: 'Second payee',
+        categoryId: null,
+        note: '',
+      })
+      expect(firstApplication.queries.listTransactions().rows).toEqual([
+        firstTransaction,
+      ])
+      expect(
+        firstApplication.queries.listPayees().map(({ name }) => name),
+      ).toEqual(['First payee'])
+      expect(secondApplication.queries.listTransactions().rows).toEqual([
+        secondTransaction,
+      ])
+      expect(
+        secondApplication.queries.listPayees().map(({ name }) => name),
+      ).toEqual(['Second payee'])
     } finally {
       firstApplication.close()
       secondApplication.close()
@@ -683,7 +780,7 @@ describe('profile application API', () => {
         migrations: [...CURRENT_MIGRATIONS, failingMigration],
         clock,
       }),
-    ).rejects.toThrow('fails after changing the schema')
+    ).rejects.toThrow('profiles.error.migration')
 
     const reopened = await openProfileApplication({ profile, paths, clock })
     try {
