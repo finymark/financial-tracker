@@ -113,8 +113,8 @@ export async function createStartupBackup(
       const pool = join(directory, 'attachments')
       mkdirSync(pool, { recursive: true })
       for (const storedName of storedAttachmentNames(database)) {
-        const destination = attachmentStoredPath(pool, storedName)
         try {
+          const destination = attachmentStoredPath(pool, storedName)
           if (existsSync(destination)) {
             try {
               readVerifiedAttachment(destination, storedName)
@@ -153,12 +153,12 @@ export function restoreMissingAttachments(
   const pool = join(backupDirectory, 'attachments')
   mkdirSync(attachmentStoreDirectory, { recursive: true })
   for (const storedName of storedAttachmentNames(database)) {
-    const destination = attachmentStoredPath(
-      attachmentStoreDirectory,
-      storedName,
-    )
-    if (!existsSync(destination)) {
-      try {
+    try {
+      const destination = attachmentStoredPath(
+        attachmentStoreDirectory,
+        storedName,
+      )
+      if (!existsSync(destination)) {
         atomicWrite(
           destination,
           readVerifiedAttachment(
@@ -166,9 +166,9 @@ export function restoreMissingAttachments(
             storedName,
           ),
         )
-      } catch (error) {
-        logSkippedAttachment(logger, 'restore', storedName, error)
       }
+    } catch (error) {
+      logSkippedAttachment(logger, 'restore', storedName, error)
     }
   }
 }

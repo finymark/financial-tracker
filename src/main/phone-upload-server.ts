@@ -407,7 +407,7 @@ export async function startPhoneUploadServer(
     request.on('aborted', release)
   })
   server.headersTimeout = 30_000
-  server.requestTimeout = 120_000
+  server.requestTimeout = 300_000
 
   const stop = (): Promise<void> => {
     if (stopping) return stopping
