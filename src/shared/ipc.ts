@@ -1,3 +1,4 @@
+import type { Tag, TagIdInput, RenameTagInput } from './tags'
 import type {
   Category,
   CategoryIdInput,
@@ -91,6 +92,9 @@ export const IPC_CHANNELS = {
   adjustmentsDelete: 'adjustments:delete',
   undoLast: 'undo:last',
   payeesList: 'payees:list',
+  tagsList: 'tags:list',
+  tagsRename: 'tags:rename',
+  tagsDelete: 'tags:delete',
 } as const
 
 export interface AppBridge {
@@ -118,6 +122,11 @@ export interface AppBridge {
   }
   undo: {
     last(): Promise<boolean>
+  }
+  tags: {
+    list(): Promise<Tag[]>
+    rename(input: RenameTagInput): Promise<Tag>
+    delete(input: TagIdInput): Promise<void>
   }
   payees: {
     list(): Promise<Payee[]>

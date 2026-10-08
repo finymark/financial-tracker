@@ -99,19 +99,20 @@ export function TransactionTable({
       onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
     >
       <table
-        className="w-full min-w-[800px] table-fixed text-sm"
+        className="w-full min-w-[950px] table-fixed text-sm"
         aria-rowcount={items.length + 1}
       >
         <thead className="sticky top-0 z-10 bg-background text-left">
           <tr style={{ height: ROW_HEIGHT }}>
-            <th className="w-[22%] px-3">{t('transactions.payee')}</th>
-            <th className="w-[15%] px-3">{t('transactions.account')}</th>
-            <th className="w-[15%] px-3">{t('transactions.category')}</th>
-            <th className="w-[20%] px-3">{t('transactions.note')}</th>
+            <th className="w-[18%] px-3">{t('transactions.payee')}</th>
+            <th className="w-[14%] px-3">{t('transactions.account')}</th>
+            <th className="w-[14%] px-3">{t('transactions.category')}</th>
+            <th className="w-[14%] px-3">{t('tags.title')}</th>
+            <th className="w-[14%] px-3">{t('transactions.note')}</th>
             <th className="w-[14%] px-3 text-right">
               {t('transactions.amount')}
             </th>
-            <th className="w-[14%] px-3">
+            <th className="w-[12%] px-3">
               <span className="sr-only">{t('transactions.actions')}</span>
             </th>
           </tr>
@@ -120,7 +121,7 @@ export function TransactionTable({
           {start > 0 && (
             <tr aria-hidden="true">
               <td
-                colSpan={6}
+                colSpan={7}
                 style={{ height: start * ROW_HEIGHT, padding: 0 }}
               />
             </tr>
@@ -136,7 +137,7 @@ export function TransactionTable({
                 >
                   <th
                     scope="rowgroup"
-                    colSpan={6}
+                    colSpan={7}
                     className="px-3 text-left font-medium"
                   >
                     <div className="flex items-center justify-between gap-3">
@@ -192,6 +193,7 @@ export function TransactionTable({
                   <td className="truncate px-3" title={rateText}>
                     {rateText}
                   </td>
+                  <td />
                   <td className="truncate px-3" title={transaction.note}>
                     {transaction.note}
                   </td>
@@ -256,6 +258,7 @@ export function TransactionTable({
                   <td className="truncate px-3">
                     {t('adjustments.observedBalance')}
                   </td>
+                  <td />
                   <td className="truncate px-3" title={transaction.note}>
                     {transaction.note}
                   </td>
@@ -322,6 +325,14 @@ export function TransactionTable({
                 <td className="truncate px-3" title={category?.name}>
                   {category?.name ?? t('transactions.noCategory')}
                 </td>
+                <td
+                  className="truncate px-3"
+                  title={transaction.line.tags
+                    .map((tag) => tag.name)
+                    .join(', ')}
+                >
+                  {transaction.line.tags.map((tag) => tag.name).join(', ')}
+                </td>
                 <td className="truncate px-3" title={transaction.note}>
                   {transaction.note}
                 </td>
@@ -365,7 +376,7 @@ export function TransactionTable({
           {end < items.length && (
             <tr aria-hidden="true">
               <td
-                colSpan={6}
+                colSpan={7}
                 style={{
                   height: (items.length - end) * ROW_HEIGHT,
                   padding: 0,

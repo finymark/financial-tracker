@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { X } from 'lucide-react'
 import type { Account } from '../../shared/accounts'
 import type { Category } from '../../shared/categories'
+import type { Tag } from '../../shared/tags'
 import type {
   Payee,
   Transaction,
@@ -37,6 +38,9 @@ const errorKeys = [
   'transactions.error.lines',
   'transactions.error.filters',
   'transactions.error.totals',
+  'tags.error.name',
+  'tags.error.notFound',
+  'tags.error.duplicate',
   'transfers.error.accountsDiffer',
   'transfers.error.equalAmounts',
   'transfers.error.notFound',
@@ -74,6 +78,8 @@ interface FormState {
   payeeName: string
   categoryId: string
   note: string
+  tagNames: string[]
+  pendingTagName: string
   toAccountId: string
   toAmount: string
   feeAmount: string
@@ -92,6 +98,8 @@ function emptyForm(accountId = ''): FormState {
     payeeName: '',
     categoryId: '',
     note: '',
+    tagNames: [],
+    pendingTagName: '',
     toAccountId: '',
     toAmount: '',
     feeAmount: '',
@@ -132,6 +140,7 @@ export function TransactionsPage({
     accountId: '',
     categoryId: '',
     payeeId: '',
+    tagId: '',
     search: '',
     exclusion: 'all' as TransactionExclusionFilter,
   })
@@ -143,6 +152,12 @@ export function TransactionsPage({
     Record<TransactionKind, Category[]>
   >({ expense: [], income: [] })
   const [payees, setPayees] = useState<Payee[]>([])
+  const [tags, setTags] = useState<Tag[]>([])
+  const [renamingTag, setRenamingTag] = useState<{
+    id: string
+    name: string
+  } | null>(null)
+  const [deletingTag, setDeletingTag] = useState<Tag | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<MessageKey | null>(null)
@@ -165,6 +180,7 @@ export function TransactionsPage({
         window.app.categories.listOptions({ kind: 'income' }),
       ]),
       window.app.payees.list(),
+      window.app.tags.list(),
     ])
       .then(
         ([
@@ -174,6 +190,7 @@ export function TransactionsPage({
           nextAccountOptions,
           [expenseOptions, incomeOptions],
           nextPayees,
+          nextTags,
         ]) => {
           if (ignore) return
           setPage(nextPage)
@@ -182,6 +199,7 @@ export function TransactionsPage({
           setAccountOptions(nextAccountOptions)
           setCategoryOptions({ expense: expenseOptions, income: incomeOptions })
           setPayees(nextPayees)
+          setTags(nextTags)
         },
       )
       .catch((error: unknown) => {
@@ -209,6 +227,7 @@ export function TransactionsPage({
       accountId: filters.accountId || undefined,
       categoryId: filters.categoryId || undefined,
       payeeId: filters.payeeId || undefined,
+      tagId: filters.tagId || undefined,
       search: filters.search,
       exclusion: filters.exclusion,
       limit: 200,
@@ -226,6 +245,8 @@ export function TransactionsPage({
       setRevision((current) => current + 1)
       setForm(null)
       setDeleting(null)
+      setRenamingTag(null)
+      setDeletingTag(null)
     } catch (error) {
       setError(
         errorKeys.find((key) => String(error).includes(key)) ??
@@ -300,12 +321,29 @@ export function TransactionsPage({
         payeeName: form.payeeName,
         categoryId: form.categoryId || null,
         note: form.note,
+        tagNames: form.pendingTagName.trim()
+          ? [...form.tagNames, form.pendingTagName.trim()]
+          : form.tagNames,
         excluded: form.excluded,
       }
       return form.id
         ? window.app.transactions.update({ id: form.id, ...input })
         : window.app.transactions.create(input)
     }, true)
+  }
+
+  function addTag() {
+    if (!form || !form.pendingTagName.trim()) return
+    const name = form.pendingTagName.trim()
+    const key = (value: string) =>
+      value.normalize('NFC').toLocaleLowerCase('und').normalize('NFC')
+    setForm({
+      ...form,
+      tagNames: form.tagNames.some((tag) => key(tag) === key(name))
+        ? form.tagNames
+        : [...form.tagNames, name],
+      pendingTagName: '',
+    })
   }
 
   const selectedAccount = form
@@ -479,6 +517,22 @@ export function TransactionsPage({
           </NativeSelect>
         </label>
         <label className="space-y-1 text-xs font-medium">
+          {t('tags.title')}
+          <NativeSelect
+            value={filters.tagId}
+            onChange={(event) =>
+              setFilters({ ...filters, tagId: event.target.value })
+            }
+          >
+            <option value="">{t('tags.all')}</option>
+            {tags.map((tag) => (
+              <option key={tag.id} value={tag.id}>
+                {tag.name}
+              </option>
+            ))}
+          </NativeSelect>
+        </label>
+        <label className="space-y-1 text-xs font-medium">
           {t('transactions.search')}
           <Input
             value={filters.search}
@@ -548,6 +602,8 @@ export function TransactionsPage({
                       ? {
                           id: transaction.id,
                           kind: 'transfer',
+                          tagNames: [],
+                          pendingTagName: '',
                           date: transaction.date,
                           accountId: transaction.fromAccountId,
                           amount: amountInput(transaction.fromAmountMinor),
@@ -567,6 +623,8 @@ export function TransactionsPage({
                         ? {
                             id: transaction.id,
                             kind: 'adjustment',
+                            tagNames: [],
+                            pendingTagName: '',
                             date: transaction.date,
                             accountId: transaction.accountId,
                             amount: amountInput(transaction.observedMinor),
@@ -583,6 +641,10 @@ export function TransactionsPage({
                         : {
                             id: transaction.id,
                             kind: transaction.kind,
+                            tagNames: transaction.line.tags.map(
+                              (tag) => tag.name,
+                            ),
+                            pendingTagName: '',
                             date: transaction.date,
                             accountId: transaction.accountId,
                             amount: amountInput(transaction.totalMinor),
@@ -639,6 +701,109 @@ export function TransactionsPage({
           </>
         )
       )}
+      <details className="space-y-3 rounded-md border p-3">
+        <summary className="cursor-pointer text-sm font-medium">
+          {t('tags.manage')}
+        </summary>
+        {tags.length === 0 && (
+          <p className="text-sm text-muted-foreground">{t('tags.empty')}</p>
+        )}
+        <ul className="space-y-2">
+          {tags.map((tag) => (
+            <li
+              key={tag.id}
+              className="flex flex-wrap items-center gap-2 text-sm"
+            >
+              <span className="mr-auto">{tag.name}</span>
+              <Button
+                variant="ghost"
+                disabled={busy || loading}
+                onClick={() => {
+                  setRenamingTag({ id: tag.id, name: tag.name })
+                  setDeletingTag(null)
+                }}
+              >
+                {t('tags.rename')}
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={busy || loading}
+                onClick={() => {
+                  setDeletingTag(tag)
+                  setRenamingTag(null)
+                }}
+              >
+                {t('tags.delete')}
+              </Button>
+            </li>
+          ))}
+        </ul>
+        {renamingTag && (
+          <form
+            className="flex flex-wrap items-end gap-2"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void run(() => window.app.tags.rename(renamingTag), true)
+            }}
+          >
+            <label className="space-y-1 text-sm">
+              {t('tags.name')}
+              <Input
+                value={renamingTag.name}
+                maxLength={100}
+                required
+                disabled={busy}
+                onChange={(event) =>
+                  setRenamingTag({ ...renamingTag, name: event.target.value })
+                }
+              />
+            </label>
+            <Button type="submit" disabled={busy}>
+              {t('tags.save')}
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() => setRenamingTag(null)}
+            >
+              {t('transactions.cancel')}
+            </Button>
+          </form>
+        )}
+        {deletingTag && (
+          <section role="alert" className="space-y-2 rounded-md bg-muted p-3">
+            <p className="text-sm">
+              {t('tags.deleteConfirmation')} <strong>{deletingTag.name}</strong>
+            </p>
+            <div className="flex gap-2">
+              <Button
+                disabled={busy}
+                onClick={() =>
+                  void run(async () => {
+                    await window.app.tags.delete({ id: deletingTag.id })
+                    if (filters.tagId === deletingTag.id)
+                      setFilters({ ...filters, tagId: '' })
+                    setRequest((current) =>
+                      current.tagId === deletingTag.id
+                        ? { ...current, tagId: undefined, offset: 0 }
+                        : current,
+                    )
+                  }, true)
+                }
+              >
+                {t('tags.delete')}
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() => setDeletingTag(null)}
+              >
+                {t('transactions.cancel')}
+              </Button>
+            </div>
+          </section>
+        )}
+      </details>
       {deleting && (
         <section role="alert" className="space-y-3 rounded-lg bg-muted p-4">
           <p className="text-sm">
@@ -1022,6 +1187,75 @@ export function TransactionsPage({
                       ))}
                     </NativeSelect>
                   </div>
+                </div>
+              )}
+              {(form.kind === 'expense' || form.kind === 'income') && (
+                <div className="space-y-2">
+                  <label
+                    htmlFor="transaction-tag"
+                    className="text-sm font-medium"
+                  >
+                    {t('tags.title')}
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="transaction-tag"
+                      list="transaction-tags"
+                      value={form.pendingTagName}
+                      maxLength={100}
+                      disabled={busy}
+                      onChange={(event) =>
+                        setForm({ ...form, pendingTagName: event.target.value })
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          addTag()
+                        }
+                      }}
+                    />
+                    <Button
+                      disabled={busy || !form.pendingTagName.trim()}
+                      onClick={addTag}
+                    >
+                      {t('tags.add')}
+                    </Button>
+                  </div>
+                  <datalist id="transaction-tags">
+                    {tags.map((tag) => (
+                      <option key={tag.id} value={tag.name} />
+                    ))}
+                  </datalist>
+                  <p className="text-xs text-muted-foreground">
+                    {t('tags.hint')}
+                  </p>
+                  <ul className="flex flex-wrap gap-2">
+                    {form.tagNames.map((name, index) => (
+                      <li
+                        key={name}
+                        className="inline-flex items-center rounded-md bg-muted px-2 text-sm"
+                      >
+                        {name}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7"
+                          disabled={busy}
+                          aria-label={`${t('tags.remove')}: ${name}`}
+                          onClick={() =>
+                            setForm({
+                              ...form,
+                              tagNames: form.tagNames.filter(
+                                (_, candidate) => candidate !== index,
+                              ),
+                            })
+                          }
+                        >
+                          <X aria-hidden="true" className="size-3" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
               <div className="space-y-2">

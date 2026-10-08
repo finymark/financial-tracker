@@ -129,7 +129,7 @@ them, and pattern matching cannot detect every possible form of sensitive data.
 
 The renderer has no Node access; a sandboxed, isolated preload exposes only the
 typed app, update, profile (including settings), account, category, transaction,
-transfer, balance adjustment, payee, and backup commands/queries. Every IPC input is validated in the main
+transfer, balance adjustment, payee, tag, and backup commands/queries. Every IPC input is validated in the main
 process, and every handler rejects calls not sent by the app's own renderer frame.
 Production CSP permits only same-origin connections; localhost WebSockets are
 added only by the development server for hot reload. SQLite foreign-key
@@ -347,7 +347,7 @@ not off-device copies or backups of the separate data folder.
 - **Transactions → Record transaction** opens a right-side drawer for an expense,
   income, or transfer. Expenses and income choose one non-archived account, a
   calendar date no later than today, a positive amount, an optional payee and
-  category, and a note.
+  category, any number of tags, and a note.
 - A transfer is one record containing source and destination accounts and positive
   amounts, date, and note. The accounts must differ. Same-currency amounts must
   match; cross-currency amounts are both authoritative and the list derives and
@@ -366,7 +366,9 @@ not off-device copies or backups of the separate data folder.
   expense or income categories matching the transaction kind and preserve the
   two-level hierarchy.
 - Each transaction currently has exactly one line whose amount equals its total.
-  This is the unsplit ledger shape; split transactions are not included yet.
+  Tags are many-to-many associations on that line (`transaction_line_tags`), not
+  duplicated on the header, so #66 can give each split part its own tags without
+  migrating existing associations. Split transactions are not included yet.
 - Edit any listed transaction or transfer from the same drawer, or delete it after
   confirmation. Create, edit, delete, category reassignment, and balance updates
   run through the profile application command boundary in one SQLite transaction.
@@ -375,6 +377,9 @@ not off-device copies or backups of the separate data folder.
   editing control. Undo restores the transaction header, all of its lines,
   timestamps, identifiers, payee reference, and any payee created by that command
   from before/after aggregate images captured in the original write transaction.
+  Tag associations and inline-created tags are included; undo removes only tags
+  created by the undone command, not reused tags. Tag rename and delete use the
+  same undo extension point and offer the same toast and keyboard action.
   Transfer undo includes both legs and its linked fee.
   History is in memory for the open profile only and is cleared by profile
   switching, restart, restore, or another profile write that has no declared undo
@@ -384,7 +389,7 @@ not off-device copies or backups of the separate data folder.
   an expense awaiting reimbursement). The table shows an Excluded badge. The
   **Excluded transactions** filter offers all transactions (default), only
   excluded, or hide excluded and combines with the other filters. Only-excluded
-  hides transfers; hide-excluded keeps them (transfers have no exclusion flag). Filtered-set
+  hides transfers and balance adjustments; hide-excluded keeps both (neither has an exclusion flag). Filtered-set
   and whole-day totals always ignore excluded amounts, including in the
   only-excluded view, where matching days/currencies show zero totals. Saving a
   flag change uses the same Undo toast and Ctrl+Z as other transaction edits.
@@ -396,9 +401,9 @@ not off-device copies or backups of the separate data folder.
   counted twice. Adjustments affect balances but never expense/income totals;
   they have a distinct list row and a **No correction needed** flag when their
   current difference is zero. Create, edit, delete, and undo use the same profile
-  command boundary. Migration 10 appends the adjustment table after transfers.
+  command boundary. Migration 11 appends the adjustment table after tags, preserving migrations 8–10 unchanged.
 - Account history is chronological. On one calendar day the opening balance is
-  applied first, ordinary transactions and transfer legs are applied next, and
+  applied first, ordinary transactions (including linked fee expenses) and transfer legs are applied next, and
   adjustments apply at the end of the day in creation-time/UUID order. Therefore
   a movement entered later for an adjustment's date is included before that
   observation and changes the adjustment's effective difference.
@@ -408,7 +413,7 @@ not off-device copies or backups of the separate data folder.
   whole filtered day, even when it continues onto another page. Only the visible
   rows plus a small overscan are mounted in the fixed-height scrolling viewport.
 - Combine period (all dates, this month, last month, this year, or an inclusive
-  custom range), account, category, payee, and free-text filters with **Apply
+  custom range), account, category, payee, tag, and free-text filters with **Apply
   filters**. Presets use the application's injected clock. A main category
   includes its subcategories; archived accounts/categories remain filterable.
   Free text matches payee name or note, ignoring case and diacritics, and treats
@@ -477,6 +482,50 @@ keyboard navigation and light/dark themes. These renderer checks remain manual;
 the automated pure-parser tests cover arithmetic, ambiguous inputs, rounding,
 invalid expressions, sign constraints, and safe-integer bounds.
 
+## Tags
+
+- Tags use appended migration 10, after unchanged migrations 8 (excluded
+  transactions) and 9 (transfers). Transfers and their linked fees do not accept
+  tag input; a tag filter hides transfers and balance adjustments because neither has tags.
+- In the expense/income drawer, choose an existing tag or type a new name, then
+  press Enter or **Add tag**. Add several tags and remove individual tags before
+  saving; a name still in the input is also included when saving. Cancelling
+  creates nothing. Tag names are trimmed and must have 1–100 characters.
+- Tags belong only to the active profile. As with payees, reuse ignores case
+  with Unicode NFC normalization, including Hungarian/German accented names;
+  accents themselves remain significant. Repeated equivalent names produce one
+  association and keep the existing tag's spelling and identifier.
+- The table shows tags and the tag filter combines with all other filters using
+  AND. Filtered and daily totals cover the entire matching set, not only the
+  current page. Multiple tags never multiply a transaction's amount.
+- Expand **Transactions → Manage tags** to rename or delete a tag. Renaming
+  changes its name everywhere without changing identity. A name already used by
+  another tag is rejected (tags are not silently merged). Confirming deletion
+  removes the tag and all its associations, not the transactions or balances;
+  undo restores its exact identity, spelling, and associations.
+- Removing tags from a transaction or deleting a transaction leaves the tags
+  available for reuse. Tag rename/delete and transaction tag changes are
+  undoable within the current profile session. Restart, profile switching,
+  restore, and successful writes without an undo aggregate still clear history.
+
+### Manual Tags check
+
+Run `npm run dev` and open Transactions. Create a transaction with several tags
+by typing and by choosing suggestions; save with a name still in the input.
+Cancel a second draft with a new tag and verify it was not created. Reuse
+`Élelmiszer`/`élelmiszer` and `Ärztin`/`ärztin`, verify each retains one tag with
+its original spelling, and remove tags during edit. Combine tag, period,
+account, category, payee, and search filters; compare whole-set/day totals and
+page through more than 200 matches. Rename a tag, try a conflicting name, then
+cancel and confirm tag deletion. Verify affected transactions remain and tags
+and totals refresh. Use the toast and Ctrl+Z after create/edit/delete and tag
+rename/delete; check tags and associations restore, including an unused reused
+tag. Switch profiles and restart to check isolation, persistence, and cleared
+undo history. Repeat with keyboard navigation, light/dark appearance, and
+HU/EN/DE. UI checks remain manual; real SQLite application-API tests cover tag
+reuse, filtering/totals, validation/atomicity, rename/delete, undo, isolation,
+upgrade preservation, and reopening.
+
 ### Manual Transactions check
 
 Run `npm run dev`, open a profile with active HUF and CHF accounts, and navigate
@@ -502,7 +551,7 @@ Then enter a forgotten 1,500 HUF expense dated 5 October: the difference must
 become zero, the row must show **No correction needed**, and the balance must
 stay 50,000 HUF. Try zero and negative observations, reject tomorrow's date,
 then create, edit, delete, and undo an adjustment. Check period/account/search
-filters include it, category/payee/only-excluded filters do not, and
+filters include it, category/payee/tag/only-excluded filters do not, and
 hide-excluded keeps it.
 After create, edit, and delete, use
 both the toast action and `Ctrl+Z` and verify
