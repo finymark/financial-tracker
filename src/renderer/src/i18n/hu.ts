@@ -2,7 +2,48 @@ import { categoryNames } from '../../../shared/category-translations'
 import type { MessageCatalog } from './en'
 
 export const hu = {
+  'shortcuts.closeHelp': 'Billentyűsúgó bezárása',
+  'transactions.saveAndAddAnother': 'Mentés és újabb hozzáadása',
+  'shortcuts.scope':
+    'Nyitott profilban: az új tranzakció és a visszavonás szövegbevitelen kívül működik. A típusváltás és a mentés a tranzakcióablakban használható.',
+  'shortcuts.navigation':
+    'A Tab / Shift+Tab a mezők között lépked, és a nyitott párbeszédablakban marad.',
+  'shortcuts.undo':
+    'Legutóbbi tranzakcióművelet visszavonása (szövegbevitelen kívül)',
+  'shortcuts.close': 'Mégse / tranzakcióablak vagy billentyűsúgó bezárása',
+  'shortcuts.help': 'Billentyűparancsok',
+  'shortcuts.save':
+    'Mentés (többsoros jegyzetben nem; a gombok saját művelete megmarad)',
+  'shortcuts.saveAndAddAnother':
+    'Mentés és újabb hozzáadása (dátum, számlák és típus megtartása)',
+  'shortcuts.newTransaction': 'Új tranzakció (szövegbevitelen kívül)',
   ...categoryNames.hu,
+  'payees.title': 'Kedvezményezettek',
+  'payees.description':
+    'Az álnevek a nyers neveket egy kedvezményezetthez rendelik. Az egyezés nem tesz különbséget kis- és nagybetűk, illetve ékezetek között. Az összevonás a tranzakciókat és álneveket a megmaradó kedvezményezetthez helyezi át.',
+  'payees.loading': 'Kedvezményezettek betöltése…',
+  'payees.empty':
+    'A kedvezményezettek egy tranzakció rögzítése után jelennek meg itt.',
+  'payees.aliases': 'Álnevek',
+  'payees.noAliases': 'Nincs álnév.',
+  'payees.aliasName': 'Nyers kedvezményezettnév',
+  'payees.addAlias': 'Álnév hozzáadása',
+  'payees.removeAlias': 'Eltávolítás',
+  'payees.mergeInto': 'Kedvezményezett összevonása ezzel:',
+  'payees.chooseSurvivor': 'Válaszd ki a megmaradó kedvezményezettet',
+  'payees.merge': 'Kedvezményezettek összevonása',
+  'payees.mergeHint':
+    'Minden tranzakció és álnév a megmaradó kedvezményezetthez kerül. A módosítás visszavonható.',
+  'payees.refresh': 'Frissítés',
+  'payees.error': 'A kedvezményezettművelet nem sikerült. Próbáld újra.',
+  'payees.error.notFound':
+    'A kedvezményezett nem található. Frissítsd a listát.',
+  'payees.error.aliasNotFound': 'Az álnév nem található. Frissítsd a listát.',
+  'payees.error.aliasName': 'Adj meg egy 1–100 karakter hosszú álnevet.',
+  'payees.error.aliasConflict':
+    'Ez a nyers név már egy kedvezményezetthez vagy álnévhez tartozik.',
+  'payees.error.samePayee': 'Válassz másik megmaradó kedvezményezettet.',
+  'payees.error.query': 'A kedvezményezett keresése érvénytelen.',
   'categories.title': 'Kategóriák',
   'categories.description':
     'A kiadási és bevételi kategóriák legfeljebb kétszintűek. Az alapértelmezett nevek követik a nyelvet; az egyéni nevek változatlanok maradnak. A főkategória archiválása az alkategóriáit is elrejti a választókból.',
@@ -102,6 +143,28 @@ export const hu = {
     'Rögzítsd kiadásaidat, bevételeidet és átvezetéseidet, hogy a számlaegyenlegek naprakészek legyenek.',
   'transactions.listDescription':
     'Szűrd a tranzakciókat időszak, számla, kategória, partner, címke vagy megjegyzés szerint.',
+  'adjustments.setRealBalance': 'Valós egyenleg beállítása',
+  'adjustments.edit': 'Egyenlegkorrekció szerkesztése',
+  'adjustments.save': 'Egyenlegkorrekció mentése',
+  'adjustments.deleteConfirmation':
+    'Végleg törlöd ezt az egyenlegkorrekciót? A számlaegyenleg frissülni fog.',
+  'adjustments.confirmDelete': 'Egyenlegkorrekció törlése',
+  'adjustments.rowType': 'Egyenlegkorrekció',
+  'adjustments.observedBalance': 'Megfigyelt egyenleg',
+  'adjustments.difference': 'Aktuális eltérés',
+  'adjustments.zeroDifference': 'Nincs szükség korrekcióra',
+  'adjustments.zeroDifferenceHint':
+    'Ez a korrekció már semmit sem korrigál, ezért törölhető.',
+  'adjustments.error.account': 'Válassz aktív számlát.',
+  'adjustments.error.date': 'Adj meg érvényes naptári dátumot.',
+  'adjustments.error.futureDate':
+    'Az egyenleg megfigyelésének dátuma nem lehet jövőbeli.',
+  'adjustments.error.balance':
+    'Adj meg érvényes egyenleget ±90 071 992 547 409,91 határon belül.',
+  'adjustments.error.note':
+    'Legfeljebb 1000 karakter hosszú megjegyzést adj meg.',
+  'adjustments.error.notFound':
+    'Az egyenlegkorrekció nem található. Frissítsd a listát.',
   'transactions.excluded': 'Kizárt',
   'transactions.excludedHint':
     'A számla egyenlegébe beleszámít, de a kiadások és bevételek összesítéséből kimarad.',
@@ -154,6 +217,7 @@ export const hu = {
   'templates.amountRequired':
     'A tranzakció mentése előtt adj meg egy összeget.',
   'templates.error.name': 'Adj meg egy 1–100 karakter hosszú sablonnevet.',
+  'templates.error.split': 'Felosztott tranzakció nem menthető sablonként.',
   'templates.error.notFound':
     'A tranzakciós sablon nem található. Frissítsd a listát.',
   'transactions.create': 'Tranzakció rögzítése',
@@ -215,6 +279,13 @@ export const hu = {
     'A tranzakció nem található. Frissítsd a listát.',
   'transactions.error.lines':
     'A tranzakció sorainak összege nem egyezik a végösszeggel.',
+  'splits.split': 'Felosztás',
+  'splits.unsplit': 'Vissza egy részre',
+  'splits.remaining': 'Fennmaradó összeg',
+  'splits.part': 'Rész',
+  'splits.remove': 'Rész eltávolítása',
+  'splits.addPart': 'Rész hozzáadása',
+  'splits.indicator': 'Felosztott',
   'tags.title': 'Címkék',
   'tags.all': 'Minden címke',
   'tags.manage': 'Címkék kezelése',
@@ -243,7 +314,7 @@ export const hu = {
   'undo.error': 'A módosítást nem sikerült visszavonni.',
   'accounts.title': 'Minden számlának saját hely',
   'accounts.description':
-    'Minden egyenleg a nyitó egyenleget, valamint a számla pénznemében rögzített bevételeket és kiadásokat összesíti.',
+    'Minden egyenleg a számla pénznemében rögzített, dátumozott pénzmozgásokat és egyenlegkorrekciókat összesíti.',
   'accounts.create': 'Számla létrehozása',
   'accounts.name': 'Számla neve',
   'accounts.currency': 'Pénznem',

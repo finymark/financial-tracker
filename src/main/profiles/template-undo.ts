@@ -86,6 +86,7 @@ export function saveTransactionAsTemplateUndoableCommand(
         database,
         validateTransactionId(input.transactionId),
       )
+      if (source.lines.length !== 1) throw new Error('templates.error.split')
       return createTemplate(
         database,
         {
@@ -96,7 +97,7 @@ export function saveTransactionAsTemplateUndoableCommand(
           payeeName: source.payeeName,
           categoryId: source.line.categoryId,
           tagNames: source.line.tags.map((tag) => tag.name),
-          note: source.note,
+          note: source.line.note,
         },
         clock,
       )

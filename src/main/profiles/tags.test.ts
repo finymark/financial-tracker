@@ -193,6 +193,7 @@ test('renames tags everywhere and undo restores the original identity and spelli
       .rows.every(
         (transaction) =>
           transaction.kind !== 'transfer' &&
+          transaction.kind !== 'adjustment' &&
           transaction.line.tags[0].name === 'Vacation',
       ),
   ).toBe(true)
@@ -226,10 +227,14 @@ test('deleting a tag removes all associations and undo restores them without cha
   const deleted = application.queries.listTransactions()
   expect(deleted.rows).toEqual(
     before.rows.map((transaction) =>
-      transaction.kind === 'transfer'
+      transaction.kind === 'transfer' || transaction.kind === 'adjustment'
         ? transaction
         : {
             ...transaction,
+            lines: transaction.lines.map((line) => ({
+              ...line,
+              tags: line.tags.filter((candidate) => candidate.id !== tag.id),
+            })),
             line: {
               ...transaction.line,
               tags: transaction.line.tags.filter(
@@ -323,7 +328,7 @@ test('tags stay isolated by profile', async () => {
   expect(first.application.queries.listTags()).toEqual(tagged.line.tags)
 })
 
-test('appending tags migration 10 preserves the version 9 ledger and tags persist on reopen while undo history does not', async () => {
+test('appending tags and split-line migrations preserves the version 9 ledger and tags persist on reopen while undo history does not', async () => {
   const {
     application: previous,
     input,

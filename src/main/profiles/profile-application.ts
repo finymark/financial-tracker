@@ -54,18 +54,36 @@ import type { ProfilePaths } from './profile-registry'
 import { parseSettingsChanges } from './profile-settings'
 import type {
   CreateTransactionInput,
-  Payee,
   TransactionListInput,
   TransactionPage,
   Transaction,
   UpdateTransactionInput,
 } from '../../shared/transactions'
 import type {
+  AddPayeeAliasInput,
+  Payee,
+  PayeeAlias,
+  PayeeSuggestion,
+  PayeeSuggestionInput,
+  MergePayeesInput,
+} from '../../shared/payees'
+import type {
   CreateTransferInput,
   Transfer,
   UpdateTransferInput,
 } from '../../shared/transfers'
-import { listPayees, listTransactions } from './profile-transactions'
+import type {
+  BalanceAdjustment,
+  CreateBalanceAdjustmentInput,
+  UpdateBalanceAdjustmentInput,
+} from '../../shared/adjustments'
+import { listTransactions } from './profile-transactions'
+import { listPayeeAliases, listPayees, suggestPayees } from './profile-payees'
+import {
+  addPayeeAliasUndoableCommand,
+  mergePayeesUndoableCommand,
+  removePayeeAliasUndoableCommand,
+} from './payee-undo'
 import type { Tag, RenameTagInput } from '../../shared/tags'
 import { renameTagUndoableCommand, deleteTagUndoableCommand } from './tag-undo'
 import { listTags } from './profile-tags'
@@ -105,6 +123,11 @@ import {
   deleteTransferUndoableCommand,
   updateTransferUndoableCommand,
 } from './transfer-undo'
+import {
+  createBalanceAdjustmentUndoableCommand,
+  deleteBalanceAdjustmentUndoableCommand,
+  updateBalanceAdjustmentUndoableCommand,
+} from './adjustment-undo'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -162,6 +185,8 @@ export interface ProfileQueries {
   listTemplates(): TransactionTemplate[]
   listTransactions(input?: TransactionListInput): TransactionPage
   listPayees(): Payee[]
+  listPayeeAliases(payeeId: string): PayeeAlias[]
+  suggestPayees(input: PayeeSuggestionInput): PayeeSuggestion[]
   listTags(): Tag[]
   hasCategoryTransactions(id: string): boolean
   listCategories(): Category[]
@@ -191,6 +216,16 @@ export interface ProfileCommands {
   createTransfer(input: CreateTransferInput): Transfer
   updateTransfer(input: UpdateTransferInput): Transfer
   deleteTransfer(id: string): void
+  addPayeeAlias(input: AddPayeeAliasInput): PayeeAlias
+  removePayeeAlias(id: string): void
+  mergePayees(input: MergePayeesInput): Payee
+  createBalanceAdjustment(
+    input: CreateBalanceAdjustmentInput,
+  ): BalanceAdjustment
+  updateBalanceAdjustment(
+    input: UpdateBalanceAdjustmentInput,
+  ): BalanceAdjustment
+  deleteBalanceAdjustment(id: string): void
   undoLast(): boolean
   createCategory(input: CreateCategoryInput): Category
   renameCategory(input: RenameCategoryInput): Category
@@ -423,6 +458,65 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
   ),
   defineSqlMigration(
     11,
+    'target-based balance adjustments',
+    `
+    CREATE TABLE balance_adjustments (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      account_id TEXT NOT NULL REFERENCES accounts(id),
+      date TEXT NOT NULL CHECK (date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+      observed_minor INTEGER NOT NULL CHECK (
+        typeof(observed_minor) = 'integer' AND
+        observed_minor BETWEEN -9007199254740991 AND 9007199254740991
+      ),
+      note TEXT NOT NULL CHECK (length(note) <= 1000),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX balance_adjustments_newest
+      ON balance_adjustments(date DESC, created_at DESC, id DESC);
+    CREATE INDEX balance_adjustments_account_history
+      ON balance_adjustments(account_id, date, created_at, id);
+  `,
+  ),
+  defineSqlMigration(
+    12,
+    'payee aliases',
+    `
+    CREATE TABLE payee_aliases (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      payee_id TEXT NOT NULL REFERENCES payees(id) ON DELETE CASCADE,
+      name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 100),
+      normalized_name TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX payee_aliases_normalized_name
+      ON payee_aliases(normalized_name);
+    CREATE INDEX payee_aliases_payee_id ON payee_aliases(payee_id);
+    CREATE TRIGGER payee_aliases_normalized_name_insert
+    BEFORE INSERT ON payee_aliases
+    WHEN NEW.normalized_name <> payee_alias_key(NEW.name)
+      BEGIN SELECT RAISE(ABORT, 'Invalid normalized payee alias'); END;
+    CREATE TRIGGER payee_aliases_normalized_name_update
+    BEFORE UPDATE OF name, normalized_name ON payee_aliases
+    WHEN NEW.normalized_name <> payee_alias_key(NEW.name)
+      BEGIN SELECT RAISE(ABORT, 'Invalid normalized payee alias'); END;
+  `,
+  ),
+  defineSqlMigration(
+    13,
+    'notes on transaction lines for splits',
+    `
+    ALTER TABLE transaction_lines
+      ADD COLUMN note TEXT NOT NULL DEFAULT '' CHECK (length(note) <= 1000);
+    UPDATE transaction_lines
+    SET note = (
+      SELECT transactions.note FROM transactions
+      WHERE transactions.id = transaction_lines.transaction_id
+    );
+  `,
+  ),
+  defineSqlMigration(
+    14,
     'transaction templates',
     `
     CREATE TABLE transaction_templates (
@@ -639,6 +733,38 @@ class OpenProfileApplication implements ProfileApplication {
         this.#executeUndoableCommand(
           deleteTransferUndoableCommand(this.#database, id),
         ),
+      addPayeeAlias: (input) =>
+        this.#executeUndoableCommand(
+          addPayeeAliasUndoableCommand(this.#database, input, this.#clock),
+        ),
+      removePayeeAlias: (id) =>
+        this.#executeUndoableCommand(
+          removePayeeAliasUndoableCommand(this.#database, id),
+        ),
+      mergePayees: (input) =>
+        this.#executeUndoableCommand(
+          mergePayeesUndoableCommand(this.#database, input, this.#clock),
+        ),
+      createBalanceAdjustment: (input) =>
+        this.#executeUndoableCommand(
+          createBalanceAdjustmentUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+          ),
+        ),
+      updateBalanceAdjustment: (input) =>
+        this.#executeUndoableCommand(
+          updateBalanceAdjustmentUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+          ),
+        ),
+      deleteBalanceAdjustment: (id) =>
+        this.#executeUndoableCommand(
+          deleteBalanceAdjustmentUndoableCommand(this.#database, id),
+        ),
       undoLast: () => {
         this.#assertAvailable()
         return this.#undoHistory.undoLast(this.#database)
@@ -699,6 +825,14 @@ class OpenProfileApplication implements ProfileApplication {
       listPayees: () => {
         this.#assertAvailable()
         return listPayees(this.#database)
+      },
+      listPayeeAliases: (payeeId) => {
+        this.#assertAvailable()
+        return listPayeeAliases(this.#database, payeeId)
+      },
+      suggestPayees: (input) => {
+        this.#assertAvailable()
+        return suggestPayees(this.#database, input)
       },
       hasCategoryTransactions: (id) => {
         this.#assertAvailable()

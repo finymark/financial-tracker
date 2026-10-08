@@ -1,7 +1,8 @@
 export function amountInput(minor: number): string {
-  const value = BigInt(minor)
+  const signed = BigInt(minor)
+  const value = signed < 0n ? -signed : signed
   const fraction = String(value % 100n).padStart(2, '0')
-  return fraction === '00'
-    ? String(value / 100n)
-    : `${value / 100n}.${fraction}`
+  const amount =
+    fraction === '00' ? String(value / 100n) : `${value / 100n}.${fraction}`
+  return signed < 0n ? `-${amount}` : amount
 }

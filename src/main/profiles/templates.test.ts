@@ -8,7 +8,6 @@ import {
   type ProfileApplication,
 } from './profile-application'
 import { ProfileRegistry } from './profile-registry'
-import { openDatabase } from '../db'
 
 const directories: string[] = []
 const applications: ProfileApplication[] = []
@@ -64,12 +63,13 @@ test('duplicates a transaction with today from the injected clock, fresh identif
     ...original,
     id: copyId,
     date: '2026-01-15',
+    lines: [{ ...original.line, id: expect.any(String) }],
     line: { ...original.line, id: expect.any(String) },
   })
   expect(copyId).not.toBe(original.id)
-  expect(copy && copy.kind !== 'transfer' && copy.line.id).not.toBe(
-    original.line.id,
-  )
+  expect(
+    copy && (copy.kind === 'expense' || copy.kind === 'income') && copy.line.id,
+  ).not.toBe(original.line.id)
   expect(application.queries.getAccountBalance(input.accountId)).toBe(-24690)
   expect(application.queries.listTransactions().totals).toEqual([
     { currency: 'CHF', expenseMinor: 0, incomeMinor: 0 },
@@ -316,7 +316,7 @@ test('template and duplicate commands cannot reach another profile and undo rema
 
 test('the appended template migration preserves the previous ledger and persists templates and copies across reopening', async () => {
   const { application, input, profile, paths } = await setup(
-    CURRENT_MIGRATIONS.slice(0, 10),
+    CURRENT_MIGRATIONS.slice(0, 13),
   )
   const original = application.commands.createTransaction(input)
   const ledger = application.queries.listTransactions()
@@ -328,9 +328,7 @@ test('the appended template migration preserves the previous ledger and persists
     clock: laterClock,
   })
   applications.push(upgraded)
-  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(
-    CURRENT_MIGRATIONS.length,
-  )
+  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(14)
   expect(upgraded.queries.listTransactions()).toEqual(ledger)
   expect(upgraded.queries.listTemplates()).toEqual([])
   const template = upgraded.commands.saveTransactionAsTemplate({
@@ -368,90 +366,90 @@ test('template tags retain the first spelling when optional names repeat with no
   expect(template.tagNames).toEqual(['Trip'])
 })
 
-test('duplicates every stored line and its tags, with line-level totals and undo observed through the application queries', async () => {
-  const { application, input, paths } = await setup()
-  const source = application.commands.createTransaction({
-    ...input,
-    totalMinor: 500,
-    excluded: false,
-    tagNames: ['Trip'],
-  })
-  const tagged = application.commands.createTransaction({
-    ...input,
-    tagNames: ['Project'],
-  })
-  const project = tagged.line.tags[0]
-  application.commands.deleteTransaction(tagged.id)
-  const secondCategory =
-    application.queries.listCategoryOptions('expense')[1].id
-  // Arrange a multi-line ledger fixture, as in the existing tag aggregate test.
-  // The current drawer is unsplit-only; observations below use the application
-  // API's bounded aggregate queries without invoking its single-line row view.
-  const database = openDatabase(paths.databasePath)
-  try {
-    database.transaction(() => {
-      database
-        .prepare('UPDATE transaction_lines SET amount_minor = 200 WHERE id = ?')
-        .run(source.line.id)
-      const lineId = '00000000-0000-4000-8000-000000000001'
-      database
-        .prepare(
-          'INSERT INTO transaction_lines (id, transaction_id, amount_minor, category_id) VALUES (?, ?, ?, ?)',
-        )
-        .run(lineId, source.id, 300, secondCategory)
-      database
-        .prepare(
-          'INSERT INTO transaction_line_tags (line_id, tag_id) VALUES (?, ?)',
-        )
-        .run(lineId, project.id)
-    })()
-  } finally {
-    database.close()
-  }
-  const copyId = application.commands.duplicateTransaction(source.id)
-  expect(copyId).not.toBe(source.id)
-  const tripPage = application.queries.listTransactions({
-    tagId: source.line.tags[0].id,
-    offset: 500,
-  })
-  const projectPage = application.queries.listTransactions({
-    tagId: project.id,
-    offset: 500,
-  })
-  expect(tripPage.totalCount).toBe(2)
-  expect(tripPage.totals).toEqual([
-    { currency: 'CHF', expenseMinor: 400, incomeMinor: 0 },
-  ])
-  expect(projectPage.totalCount).toBe(2)
-  expect(projectPage.totals).toEqual([
-    { currency: 'CHF', expenseMinor: 600, incomeMinor: 0 },
-  ])
-  expect(
-    application.queries.listTransactions({
-      categoryId: secondCategory,
-      offset: 500,
-    }).totalCount,
-  ).toBe(2)
-  expect(application.queries.getAccountBalance(input.accountId)).toBe(-1000)
-  expect(application.commands.undoLast()).toBe(true)
-  expect(
-    application.queries.listTransactions({
-      tagId: source.line.tags[0].id,
-      offset: 500,
-    }).totals,
-  ).toEqual([{ currency: 'CHF', expenseMinor: 200, incomeMinor: 0 }])
-  expect(
-    application.queries.listTransactions({ tagId: project.id, offset: 500 })
-      .totals,
-  ).toEqual([{ currency: 'CHF', expenseMinor: 300, incomeMinor: 0 }])
-  expect(application.queries.listTransactions({ offset: 500 }).totalCount).toBe(
-    1,
-  )
-  expect(application.queries.getAccountBalance(input.accountId)).toBe(-500)
-  expect(application.queries.listTags()).toEqual(
-    expect.arrayContaining([project, ...source.line.tags]),
-  )
-})
+test.each([true, false])(
+  'duplicates all split categories, notes and tags (excluded=%s); undo keeps the source and payee aliases',
+  async (excluded) => {
+    const { application, input } = await setup()
+    const categories = application.queries.listCategoryOptions('expense')
+    const source = application.commands.createTransaction({
+      ...input,
+      totalMinor: 500,
+      note: 'Transaction note',
+      excluded,
+      lines: [
+        {
+          amountMinor: 200,
+          categoryId: categories[0].id,
+          note: 'First part',
+          tagNames: ['Trip'],
+        },
+        {
+          amountMinor: 300,
+          categoryId: categories[1].id,
+          note: 'Second part',
+          tagNames: ['Project'],
+        },
+      ],
+    })
+    const alias = application.commands.addPayeeAlias({
+      payeeId: source.payeeId!,
+      name: 'CAFE SHOP',
+    })
+    const copyId = application.commands.duplicateTransaction(source.id)
+    const copy = application.queries
+      .listTransactions()
+      .rows.find((row) => row.id === copyId)
+    expect(copy).toEqual({
+      ...source,
+      id: copyId,
+      date: '2026-01-15',
+      lines: source.lines.map((line) => ({ ...line, id: expect.any(String) })),
+      line: { ...source.line, id: expect.any(String) },
+    })
+    if (!copy || (copy.kind !== 'expense' && copy.kind !== 'income'))
+      throw new Error('Expected transaction copy')
+    expect(
+      copy.lines.every(
+        (line) => !source.lines.some((original) => original.id === line.id),
+      ),
+    ).toBe(true)
+    expect(copy.line).toEqual(copy.lines[0])
+    expect(application.queries.getAccountBalance(input.accountId)).toBe(-1000)
+    expect(application.queries.listTransactions().totals).toEqual([
+      { currency: 'CHF', expenseMinor: excluded ? 0 : 1000, incomeMinor: 0 },
+    ])
+    for (const line of source.lines) {
+      const filtered = application.queries.listTransactions({
+        tagId: line.tags[0].id,
+        categoryId: line.categoryId!,
+      })
+      expect(filtered.totalCount).toBe(2)
+      expect(filtered.totals).toEqual([
+        {
+          currency: 'CHF',
+          expenseMinor: excluded ? 0 : line.amountMinor * 2,
+          incomeMinor: 0,
+        },
+      ])
+    }
+    expect(application.commands.undoLast()).toBe(true)
+    expect(application.queries.listTransactions().rows).toEqual([source])
+    expect(application.queries.listPayeeAliases(source.payeeId!)).toEqual([
+      alias,
+    ])
+    expect(application.queries.getAccountBalance(input.accountId)).toBe(-500)
+    expect(() =>
+      application.commands.saveTransactionAsTemplate({
+        transactionId: source.id,
+        name: 'Cannot flatten',
+      }),
+    ).toThrow('templates.error.split')
+    expect(application.queries.listTemplates()).toEqual([])
+    // A rejected split save must not replace the previous undo entry.
+    expect(application.commands.undoLast()).toBe(true)
+    expect(application.queries.listPayeeAliases(source.payeeId!)).toEqual([])
+  },
+)
 
 test('duplicates income without exclusions and preserves the source when undoing the copy', async () => {
   const { application, input } = await setup()
@@ -509,4 +507,36 @@ test('deleting unused account and category references clears only those template
     { ...template, accountId: null, categoryId: null },
   ])
   expect(application.commands.undoLast()).toBe(false)
+})
+
+test('template prefill resolves aliases and template undo coexists with transaction and alias undo', async () => {
+  const { application, input } = await setup()
+  const source = application.commands.createTransaction(input)
+  const alias = application.commands.addPayeeAlias({
+    payeeId: source.payeeId!,
+    name: 'CAFÉ SHOP',
+  })
+  const template = application.commands.createTemplate({
+    name: 'Alias purchase',
+    payeeName: 'cafe shop',
+    totalMinor: 375,
+  })
+  const recorded = application.commands.createTransaction({
+    ...input,
+    payeeName: template.payeeName,
+    totalMinor: template.totalMinor!,
+    excluded: false,
+  })
+  expect(recorded.payeeId).toBe(source.payeeId)
+  expect(recorded.payeeName).toBe(source.payeeName)
+  expect(application.queries.listPayees()).toHaveLength(1)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toEqual([source])
+  expect(application.queries.listTemplates()).toEqual([template])
+  expect(application.queries.listPayeeAliases(source.payeeId!)).toEqual([alias])
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTemplates()).toEqual([])
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listPayeeAliases(source.payeeId!)).toEqual([])
+  expect(application.queries.listTransactions().rows).toEqual([source])
 })

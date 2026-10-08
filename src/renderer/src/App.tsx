@@ -13,9 +13,13 @@ import type {
   ActiveProfileInfo,
   ProfileRegistrySnapshot,
 } from '../../shared/profiles'
+import { ShortcutHelp } from './components/shortcut-help'
+import { matchShortcut } from './lib/shortcuts'
+import { shortcutTargetContext } from './lib/shortcut-context'
 import { UpdateNotice } from './components/update-notice'
 import { BackupSettings } from './components/backup-settings'
 import { CategorySettings } from './components/category-settings'
+import { PayeeSettings } from './components/payee-settings'
 import { AccountsPage } from './AccountsPage'
 import { TransactionsPage } from './TransactionsPage'
 import { Button } from './components/ui/button'
@@ -45,13 +49,6 @@ const pages = [
 ] as const
 type Page = (typeof pages)[number]['id']
 type Translate = (key: MessageKey) => string
-
-function isEditingText(target: EventTarget | null): boolean {
-  return (
-    target instanceof Element &&
-    target.closest('input, textarea, select, [contenteditable="true"]') !== null
-  )
-}
 
 const emptySnapshot: ProfileRegistrySnapshot = {
   profiles: [],
@@ -359,12 +356,19 @@ function Shell({
   onRestored,
 }: ShellProps) {
   const [page, setPage] = useState<Page>('overview')
+  const [newTransactionRequested, setNewTransactionRequested] = useState(false)
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false)
+  const transactionRequestHandled = useCallback(
+    () => setNewTransactionRequested(false),
+    [],
+  )
   const [collapsed, setCollapsed] = useState(false)
   const { language, theme, baseCurrency } = active.settings
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsError, setSettingsError] = useState(false)
   const [backupBusy, setBackupBusy] = useState(false)
   const [categoryBusy, setCategoryBusy] = useState(false)
+  const [payeeBusy, setPayeeBusy] = useState(false)
   const [categoryRevision, setCategoryRevision] = useState(0)
   const [undoRevision, setUndoRevision] = useState(0)
   const [undoOffered, setUndoOffered] = useState(false)
@@ -392,23 +396,38 @@ function Shell({
   }, [undoBusy])
 
   useEffect(() => {
-    const handleUndoShortcut = (event: KeyboardEvent) => {
-      if (
-        event.key.toLowerCase() !== 'z' ||
-        !event.ctrlKey ||
-        event.altKey ||
-        event.metaKey ||
-        event.shiftKey ||
-        isEditingText(event.target)
-      ) {
-        return
+    const handleShortcut = (event: KeyboardEvent) => {
+      const action = matchShortcut(event, {
+        scope: 'app',
+        ...shortcutTargetContext(event.target),
+      })
+      if (!action || showShortcutHelp) return
+      // Do not open a second drawer or undo the ledger beneath a modal.
+      if (action !== 'help' && document.querySelector('[role="dialog"]')) return
+      if (action === 'newTransaction') {
+        if (savingSettings || backupBusy || categoryBusy || undoBusy) return
+        event.preventDefault()
+        setNewTransactionRequested(true)
+        setPage('transactions')
+      } else if (action === 'help') {
+        event.preventDefault()
+        setShowShortcutHelp(true)
+      } else if (action === 'undo') {
+        if (savingSettings || backupBusy || categoryBusy) return
+        event.preventDefault()
+        void undoLast()
       }
-      event.preventDefault()
-      void undoLast()
     }
-    window.addEventListener('keydown', handleUndoShortcut)
-    return () => window.removeEventListener('keydown', handleUndoShortcut)
-  }, [undoLast])
+    window.addEventListener('keydown', handleShortcut)
+    return () => window.removeEventListener('keydown', handleShortcut)
+  }, [
+    undoLast,
+    undoBusy,
+    savingSettings,
+    backupBusy,
+    categoryBusy,
+    showShortcutHelp,
+  ])
 
   async function saveSettings(changes: ProfileSettingsChanges) {
     setSavingSettings(true)
@@ -473,7 +492,7 @@ function Shell({
               aria-label={t(`navigation.${id}`)}
               aria-current={page === id ? 'page' : undefined}
               title={collapsed ? t(`navigation.${id}`) : undefined}
-              disabled={backupBusy || categoryBusy}
+              disabled={backupBusy || categoryBusy || payeeBusy}
               onClick={() => setPage(id)}
             >
               <Icon aria-hidden="true" />
@@ -492,7 +511,7 @@ function Shell({
           title={
             collapsed ? `${active.name} — ${t('profile.switch')}` : undefined
           }
-          disabled={backupBusy || categoryBusy}
+          disabled={backupBusy || categoryBusy || payeeBusy}
           onClick={onSwitchProfile}
         >
           <UsersRound className="size-5 shrink-0" aria-hidden="true" />
@@ -513,6 +532,13 @@ function Shell({
       >
         <div className="mx-auto max-w-4xl space-y-8">
           <header>
+            <Button
+              className="float-right"
+              variant="ghost"
+              onClick={() => setShowShortcutHelp(true)}
+            >
+              {t('shortcuts.help')}
+            </Button>
             <p className="mb-2 text-sm text-muted-foreground">
               {t('app.tagline')}
             </p>
@@ -541,6 +567,8 @@ function Shell({
                 language={language}
                 t={t}
                 undoRevision={undoRevision}
+                newTransactionRequested={newTransactionRequested}
+                onNewTransactionHandled={transactionRequestHandled}
                 onTransactionChanged={() => {
                   setUndoError(false)
                   setUndoOffered(true)
@@ -557,7 +585,12 @@ function Shell({
                     <NativeSelect
                       id="language"
                       value={language}
-                      disabled={savingSettings || backupBusy || categoryBusy}
+                      disabled={
+                        savingSettings ||
+                        backupBusy ||
+                        categoryBusy ||
+                        payeeBusy
+                      }
                       onChange={(event) => {
                         const value = languages.find(
                           (item) => item === event.target.value,
@@ -579,7 +612,12 @@ function Shell({
                     <NativeSelect
                       id="theme"
                       value={theme}
-                      disabled={savingSettings || backupBusy || categoryBusy}
+                      disabled={
+                        savingSettings ||
+                        backupBusy ||
+                        categoryBusy ||
+                        payeeBusy
+                      }
                       onChange={(event) => {
                         const value = themeModes.find(
                           (item) => item === event.target.value,
@@ -604,7 +642,12 @@ function Shell({
                     <NativeSelect
                       id="base-currency"
                       value={baseCurrency}
-                      disabled={savingSettings || backupBusy || categoryBusy}
+                      disabled={
+                        savingSettings ||
+                        backupBusy ||
+                        categoryBusy ||
+                        payeeBusy
+                      }
                       onChange={(event) => {
                         const value = baseCurrencies.find(
                           (item) => item === event.target.value,
@@ -661,10 +704,22 @@ function Shell({
             )}
           </Card>
           {page === 'settings' && (
+            <PayeeSettings
+              key={`${active.id}:${undoRevision}`}
+              t={t}
+              disabled={savingSettings || backupBusy || categoryBusy}
+              onBusyChange={setPayeeBusy}
+              onChanged={() => {
+                setUndoError(false)
+                setUndoOffered(true)
+              }}
+            />
+          )}
+          {page === 'settings' && (
             <CategorySettings
               key={`${active.id}:${categoryRevision}:${undoRevision}`}
               t={t}
-              disabled={savingSettings || backupBusy}
+              disabled={savingSettings || backupBusy || payeeBusy}
               onBusyChange={setCategoryBusy}
             />
           )}
@@ -678,11 +733,14 @@ function Shell({
                 setCategoryRevision((revision) => revision + 1)
               }}
               onBusyChange={setBackupBusy}
-              disabled={savingSettings || categoryBusy}
+              disabled={savingSettings || categoryBusy || payeeBusy}
             />
           )}
         </div>
       </main>
+      {showShortcutHelp && (
+        <ShortcutHelp t={t} onClose={() => setShowShortcutHelp(false)} />
+      )}
       {undoOffered && (
         <aside
           role="status"
