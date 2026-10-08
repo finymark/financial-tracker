@@ -168,6 +168,8 @@ import {
 } from './profile-exchange-rates'
 import type {
   CategoryBreakdownReport,
+  SpendingPaceReport,
+  MonthlyTrendReport,
   ReportDateRangeInput,
 } from '../../shared/reports'
 import {
@@ -177,6 +179,10 @@ import {
 import { getCategoryBreakdown } from './profile-reports'
 import type { CashFlowReport } from '../../shared/report-cash-flow'
 import { getCashFlow } from './profile-report-cash-flow'
+import { getSpendingPace } from './profile-report-pace'
+import { getOverviewDashboard } from './profile-report-overview'
+import type { OverviewDashboard } from '../../shared/report-overview'
+import { getMonthlyTrend } from './profile-report-trend'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -232,6 +238,9 @@ export interface OpenProfileApplicationOptions {
 
 export interface ProfileQueries {
   getCashFlow(input: ReportDateRangeInput): CashFlowReport
+  getSpendingPace(): SpendingPaceReport
+  getOverviewDashboard(): OverviewDashboard
+  getMonthlyTrend(input: ReportDateRangeInput): MonthlyTrendReport
   getCategoryBreakdown(input: ReportDateRangeInput): CategoryBreakdownReport
   convertToBaseCurrency(
     lines: readonly ConversionLine[],
@@ -1152,6 +1161,28 @@ class OpenProfileApplication implements ProfileApplication {
         )
         return this.#database.transaction(() =>
           getCashFlow(this.#database, range, this.#clock),
+        )()
+      },
+      getSpendingPace: () => {
+        this.#assertAvailable()
+        return this.#database.transaction(() =>
+          getSpendingPace(this.#database, this.#clock),
+        )()
+      },
+      getOverviewDashboard: () => {
+        this.#assertAvailable()
+        return this.#database.transaction(() =>
+          getOverviewDashboard(this.#database, this.#clock),
+        )()
+      },
+      getMonthlyTrend: (input) => {
+        this.#assertAvailable()
+        const range = resolveReportDateRange(
+          parseReportDateRangeInput(input),
+          this.#clock,
+        )
+        return this.#database.transaction(() =>
+          getMonthlyTrend(this.#database, range, this.#clock),
         )()
       },
       getCategoryBreakdown: (input) => {

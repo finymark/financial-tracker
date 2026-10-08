@@ -18,6 +18,29 @@ export function registerReportIpc(
   )
   registerIpcHandler(
     ipcMain,
+    IPC_CHANNELS.reportsSpendingPace,
+    (): Awaited<ReturnType<AppBridge['reports']['spendingPace']>> =>
+      controller.getActiveApplication().queries.getSpendingPace(),
+  )
+  registerIpcHandler(
+    ipcMain,
+    IPC_CHANNELS.reportsOverviewDashboard,
+    (): Awaited<ReturnType<AppBridge['reports']['overviewDashboard']>> =>
+      controller.getActiveApplication().queries.getOverviewDashboard(),
+  )
+  registerIpcHandler(
+    ipcMain,
+    IPC_CHANNELS.reportsMonthlyTrend,
+    (
+      _event,
+      value,
+    ): Awaited<ReturnType<AppBridge['reports']['monthlyTrend']>> =>
+      controller
+        .getActiveApplication()
+        .queries.getMonthlyTrend(parseReportDateRangeInput(value)),
+  )
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.reportsCategoryBreakdown,
     (
       _event,

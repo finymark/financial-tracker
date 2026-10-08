@@ -19,11 +19,13 @@ import type {
   ReportPeriod,
 } from '../../shared/reports'
 import { CashFlowReport } from './CashFlowReport'
+import { SpendingPaceSection } from './SpendingPaceSection'
 import { Button } from './components/ui/button'
 import { CardContent } from './components/ui/card'
 import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
 import { createFormatters, type Language, type MessageKey } from './i18n'
+import { MonthlyTrendReport } from './MonthlyTrendReport'
 
 interface ReportsPageProps {
   language: Language
@@ -50,6 +52,9 @@ export function ReportsPage({
   onOpenTransactions,
 }: ReportsPageProps) {
   const format = createFormatters(language)
+  const [tab, setTab] = useState<'category' | 'trend' | 'pace' | 'cashFlow'>(
+    'category',
+  )
   const [filters, setFilters] = useState({
     period: 'thisMonth' as ReportPeriod,
     from: '',
@@ -66,15 +71,13 @@ export function ReportsPage({
   } | null>(null)
   const currentResult = result?.key === reportKey ? result : null
   const report = currentResult?.report ?? null
-  const loading = currentResult === null
+  const loading = tab === 'category' && currentResult === null
   const error = currentResult?.error ?? false
-  const [reportView, setReportView] = useState<'categories' | 'cashFlow'>(
-    'categories',
-  )
   const [chartKind, setChartKind] = useState<ChartKind>('pie')
   const [selectedId, setSelectedId] = useState<string | null | undefined>()
 
   useEffect(() => {
+    if (tab !== 'category') return
     let ignore = false
     void window.app.reports
       .categoryBreakdown(request)
@@ -90,7 +93,7 @@ export function ReportsPage({
     return () => {
       ignore = true
     }
-  }, [request, reportKey])
+  }, [request, reportKey, tab])
 
   const chartData = useMemo(
     () =>
@@ -145,101 +148,126 @@ export function ReportsPage({
 
   return (
     <CardContent className="space-y-6">
-      <div className="flex gap-2" role="group" aria-label={t('reports.view')}>
+      <div
+        className="flex flex-wrap gap-2"
+        role="group"
+        aria-label={t('reports.view')}
+      >
         <Button
           type="button"
-          variant={reportView === 'categories' ? 'default' : 'ghost'}
-          aria-pressed={reportView === 'categories'}
-          onClick={() => setReportView('categories')}
+          variant={tab === 'category' ? 'default' : 'ghost'}
+          aria-pressed={tab === 'category'}
+          onClick={() => setTab('category')}
         >
           {t('reports.title')}
         </Button>
         <Button
           type="button"
-          variant={reportView === 'cashFlow' ? 'default' : 'ghost'}
-          aria-pressed={reportView === 'cashFlow'}
-          onClick={() => setReportView('cashFlow')}
+          variant={tab === 'trend' ? 'default' : 'ghost'}
+          aria-pressed={tab === 'trend'}
+          onClick={() => setTab('trend')}
+        >
+          {t('reports.trend.title')}
+        </Button>
+        <Button
+          type="button"
+          variant={tab === 'pace' ? 'default' : 'ghost'}
+          aria-pressed={tab === 'pace'}
+          onClick={() => setTab('pace')}
+        >
+          {t('reports.pace.title')}
+        </Button>
+        <Button
+          type="button"
+          variant={tab === 'cashFlow' ? 'default' : 'ghost'}
+          aria-pressed={tab === 'cashFlow'}
+          onClick={() => setTab('cashFlow')}
         >
           {t('reports.cashFlow.title')}
         </Button>
       </div>
-      <form
-        className="flex flex-wrap items-end gap-3 rounded-md border p-3"
-        onSubmit={apply}
-        aria-label={t('reports.dateRange')}
-      >
-        <label className="min-w-40 space-y-1 text-xs font-medium">
-          {t('transactions.period')}
-          <NativeSelect
-            value={filters.period}
-            onChange={(event) =>
-              setFilters({
-                ...filters,
-                period: event.target.value as ReportPeriod,
-              })
-            }
-          >
-            {(
-              [
-                'thisMonth',
-                'lastMonth',
-                'thisYear',
-                'last12Months',
-                'custom',
-              ] as const
-            ).map((period) => (
-              <option key={period} value={period}>
-                {t(`reports.period.${period}`)}
-              </option>
-            ))}
-          </NativeSelect>
-        </label>
-        {filters.period === 'custom' && (
-          <>
-            <label className="space-y-1 text-xs font-medium">
-              {t('transactions.from')}
-              <Input
-                type="date"
-                value={filters.from}
-                required
-                onChange={(event) =>
-                  setFilters({ ...filters, from: event.target.value })
-                }
-              />
-            </label>
-            <label className="space-y-1 text-xs font-medium">
-              {t('transactions.to')}
-              <Input
-                type="date"
-                value={filters.to}
-                min={filters.from || undefined}
-                required
-                onChange={(event) =>
-                  setFilters({ ...filters, to: event.target.value })
-                }
-              />
-            </label>
-          </>
-        )}
-        <Button type="submit" disabled={reportView === 'categories' && loading}>
-          {t('reports.apply')}
-        </Button>
-      </form>
+      {tab !== 'pace' && (
+        <form
+          className="flex flex-wrap items-end gap-3 rounded-md border p-3"
+          onSubmit={apply}
+          aria-label={t('reports.dateRange')}
+        >
+          <label className="min-w-40 space-y-1 text-xs font-medium">
+            {t('transactions.period')}
+            <NativeSelect
+              value={filters.period}
+              onChange={(event) =>
+                setFilters({
+                  ...filters,
+                  period: event.target.value as ReportPeriod,
+                })
+              }
+            >
+              {(
+                [
+                  'thisMonth',
+                  'lastMonth',
+                  'thisYear',
+                  'last12Months',
+                  'custom',
+                ] as const
+              ).map((period) => (
+                <option key={period} value={period}>
+                  {t(`reports.period.${period}`)}
+                </option>
+              ))}
+            </NativeSelect>
+          </label>
+          {filters.period === 'custom' && (
+            <>
+              <label className="space-y-1 text-xs font-medium">
+                {t('transactions.from')}
+                <Input
+                  type="date"
+                  value={filters.from}
+                  required
+                  onChange={(event) =>
+                    setFilters({ ...filters, from: event.target.value })
+                  }
+                />
+              </label>
+              <label className="space-y-1 text-xs font-medium">
+                {t('transactions.to')}
+                <Input
+                  type="date"
+                  value={filters.to}
+                  min={filters.from || undefined}
+                  required
+                  onChange={(event) =>
+                    setFilters({ ...filters, to: event.target.value })
+                  }
+                />
+              </label>
+            </>
+          )}
+          <Button type="submit" disabled={loading}>
+            {t('reports.apply')}
+          </Button>
+        </form>
+      )}
 
-      {reportView === 'cashFlow' && (
+      {tab === 'cashFlow' && (
         <CashFlowReport request={request} language={language} t={t} />
       )}
-      {reportView === 'categories' && loading && (
+      {tab === 'trend' && (
+        <MonthlyTrendReport request={request} language={language} t={t} />
+      )}
+      {tab === 'category' && loading && (
         <p role="status" className="text-sm text-muted-foreground">
           {t('reports.loading')}
         </p>
       )}
-      {reportView === 'categories' && error && (
+      {tab === 'category' && error && (
         <p role="alert" className="text-sm font-medium text-error">
           {t('reports.error')}
         </p>
       )}
-      {reportView === 'categories' && !loading && !error && report && (
+      {tab === 'category' && !loading && !error && report && (
         <>
           <section className="space-y-3" aria-labelledby="report-total">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -474,6 +502,7 @@ export function ReportsPage({
           </section>
         </>
       )}
+      {tab === 'pace' && <SpendingPaceSection language={language} t={t} />}
     </CardContent>
   )
 }

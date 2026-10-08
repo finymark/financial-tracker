@@ -5,6 +5,11 @@ const bridge: AppBridge = {
   reports: {
     cashFlow: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.reportsCashFlow, input),
+    spendingPace: () => ipcRenderer.invoke(IPC_CHANNELS.reportsSpendingPace),
+    overviewDashboard: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.reportsOverviewDashboard),
+    monthlyTrend: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.reportsMonthlyTrend, input),
     categoryBreakdown: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.reportsCategoryBreakdown, input),
   },

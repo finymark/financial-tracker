@@ -196,13 +196,55 @@ export const en = {
     'The profile database does not match the selected profile.',
   'overview.title': 'A clear view of your finances',
   'overview.description':
-    'A summarized financial overview will be available here later.',
+    'This month to date compared with the full last month, in your base currency.',
+  'overview.error': 'The overview could not be loaded.',
+  'overview.expenses': 'Expenses',
+  'overview.incomes': 'Income',
+  'overview.net': 'Net',
+  'overview.thisMonthToDate': 'This month to date',
+  'overview.fullLastMonth': 'Full last month',
+  'overview.change': 'Change vs last month',
+  'overview.topCategories': 'Top 5 expense categories this month',
+  'overview.transactions': 'View transactions',
+  'overview.reports': 'View reports',
+  'overview.chartLabel': 'Top five expense categories this month',
+  'overview.shareHint':
+    'Shares use converted expenses across all categories, not only the top five. Unconverted amounts are shown separately and are not included in shares.',
+  'reports.trend.title': 'Monthly trend',
+  'reports.trend.description':
+    'Expenses, incomes and net in your base currency.',
+  'reports.trend.partial': 'partial',
+  'reports.trend.partialHint':
+    'Partial months include only days within the selected range.',
+  'reports.trend.unconvertedHint':
+    'Amounts without a rate are not in the chart. Each month lists them separately below.',
+  'reports.trend.chartLabel': 'Monthly expenses and incomes with a net line',
+  'reports.trend.month': 'Month',
+  'reports.trend.expenses': 'Expenses',
+  'reports.trend.incomes': 'Incomes',
+  'reports.trend.net': 'Net',
+  'reports.pace.title': 'Spending pace',
+  'reports.pace.description':
+    'This month so far compared with the average of the previous three calendar months up to the same day, clamped to each month’s length.',
+  'reports.pace.current': 'This month so far',
+  'reports.pace.average': 'Three-month average',
+  'reports.pace.difference': 'Compared with usual spending',
+  'reports.pace.ahead': 'Ahead',
+  'reports.pace.behind': 'Behind',
+  'reports.pace.onPace': 'On pace',
+  'reports.pace.noBaseline': 'No baseline for a percentage',
+  'reports.pace.partial':
+    'Partial comparison: some amounts could not be converted. See the affected months below.',
+  'reports.pace.months': 'Comparison months',
+  'reports.pace.refresh': 'Refresh pace',
+  'reports.pace.chartLabel':
+    'This month’s expenses so far versus the three-month average',
   'reports.title': 'Expenses by category',
   'reports.description':
     'Compare category totals in your base currency and drill down to the transactions behind them.',
   'reports.heading': 'Reports in your base currency',
   'reports.introduction':
-    'Explore categories and cash flow for your chosen date range.',
+    'Explore categories, monthly trends and cash flow for your chosen range, or compare this month’s spending pace.',
   'reports.view': 'Report view',
   'reports.cashFlow.title': 'Cash flow',
   'reports.cashFlow.income': 'Income',

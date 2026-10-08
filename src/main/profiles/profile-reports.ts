@@ -14,9 +14,10 @@ interface ReportLine extends ConversionLine {
   categoryId: string | null
 }
 
-function reportLines(
+export function reportLines(
   database: Database.Database,
   range: ReportDateRange,
+  kind: 'expense' | 'income' = 'expense',
 ): ReportLine[] {
   return database
     .prepare(
@@ -26,11 +27,11 @@ function reportLines(
        FROM transaction_lines
        JOIN transactions ON transactions.id = transaction_lines.transaction_id
        JOIN accounts ON accounts.id = transactions.account_id
-       WHERE transactions.kind = 'expense'
+       WHERE transactions.kind = ?
          AND transactions.excluded = 0
          AND transactions.date >= ? AND transactions.date <= ?`,
     )
-    .all(range.from, range.to) as ReportLine[]
+    .all(kind, range.from, range.to) as ReportLine[]
 }
 
 export function getCategoryBreakdown(
