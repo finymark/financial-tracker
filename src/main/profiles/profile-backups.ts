@@ -1,10 +1,20 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, readdirSync, rmSync } from 'node:fs'
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import type Database from 'better-sqlite3'
 import type { ProfileBackup } from '../../shared/profiles'
 import { openDatabase } from '../db'
 import { formatBackupTimestamp, parseBackupTimestamp } from './backup-timestamp'
+import {
+  attachmentStoredPath,
+  storedAttachmentNames,
+} from './profile-attachments'
 
 const BACKUP_FILE_PATTERN =
   /^(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)-(\d{6})-([0-9a-f-]{36})\.sqlite$/
@@ -45,6 +55,7 @@ export async function createStartupBackup(
   database: Database.Database,
   directory: string,
   clock: () => Date,
+  attachmentStoreDirectory?: string,
 ): Promise<void> {
   const existing = listBackupFiles(directory)
   const timestamp = formatBackupTimestamp(clock())
@@ -59,6 +70,18 @@ export async function createStartupBackup(
   try {
     await database.backup(path)
     verifySqliteBackup(path, () => {})
+    if (attachmentStoreDirectory) {
+      const pool = join(directory, 'attachments')
+      mkdirSync(pool, { recursive: true })
+      for (const storedName of storedAttachmentNames(database)) {
+        const destination = join(pool, storedName)
+        if (!existsSync(destination))
+          copyFileSync(
+            attachmentStoredPath(attachmentStoreDirectory, storedName),
+            destination,
+          )
+      }
+    }
   } catch (error) {
     rmSync(path, { force: true })
     throw new Error('backups.error.create', {
@@ -67,5 +90,22 @@ export async function createStartupBackup(
   }
   for (const backup of listBackupFiles(directory).slice(10)) {
     rmSync(join(directory, backup.filename))
+  }
+}
+
+export function restoreMissingAttachments(
+  database: Database.Database,
+  backupDirectory: string,
+  attachmentStoreDirectory: string,
+): void {
+  const pool = join(backupDirectory, 'attachments')
+  mkdirSync(attachmentStoreDirectory, { recursive: true })
+  for (const storedName of storedAttachmentNames(database)) {
+    const destination = attachmentStoredPath(
+      attachmentStoreDirectory,
+      storedName,
+    )
+    if (!existsSync(destination))
+      copyFileSync(join(pool, storedName), destination)
   }
 }

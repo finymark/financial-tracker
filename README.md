@@ -176,9 +176,10 @@ rename this folder or change the appId. Uninstalling keeps profile data.
 `electron-builder.yml` produces a per-user, one-click **unsigned NSIS x64**
 installer. Windows may show an unknown-publisher/SmartScreen warning; code
 signing is not configured. Executable resource editing is disabled, so the
-installer/app currently use Electron's default icon. Native SQLite binaries are
-explicitly unpacked from asar, and native dependency rebuilding is disabled:
-`better-sqlite3` 13 already ships the compatible Node-API binary.
+installer/app currently use Electron's default icon. Native SQLite and Sharp
+image-processing binaries are explicitly unpacked from asar, and native
+dependency rebuilding is disabled. `better-sqlite3` 13 already ships the
+compatible Node-API binary.
 
 ### Validate without publishing
 
@@ -209,9 +210,10 @@ Get-Content $log
 $process.ExitCode
 ```
 
-It must print `SQLite smoke test OK` and exit 0. The flag opens a temporary
-file-backed database, runs a query, closes it, deletes it, and exits without
-opening a window or reading profiles. For an installed-artifact check, silently
+It must print `SQLite smoke test OK`, then `Image smoke test OK`, and exit 0.
+The flag opens a temporary file-backed database, runs a query, and processes a
+tiny in-memory image with Sharp before cleaning up and exiting without opening a
+window or reading profiles. For an installed-artifact check, silently
 install `Financial Tracker Setup <version>.exe` with `/S /D=<temporary-directory>`
 (the directory argument must be last), then run the installed executable with
 `--smoke-test`. Uninstall that temporary installation afterwards. Do not use this
@@ -271,8 +273,13 @@ and safely reopens it, applying supported migrations if necessary. A temporary
 online recovery snapshot protects the previous database if reopening fails.
 Corrupt, foreign-profile, or newer-schema snapshots are refused without changing
 the live database. Profile switching is disabled during restore, and quitting
-waits for the database operation to finish. These are local database backups,
-not off-device copies or backups of the separate data folder.
+waits for the database operation to finish. Attachment content is included
+incrementally: each startup backup copies only content-addressed files not already
+present in `backups/attachments/`. Restoring a database copies every referenced
+file missing from the live attachment store back from that pool. Startup
+retention still applies only to the last 10 SQLite snapshots. The shared
+attachment pool and verified `backups/pre-migration/` snapshots are deliberately
+not pruned. These are local backups, not off-device copies.
 
 ## App shell
 
@@ -409,7 +416,7 @@ and light/dark mode where applicable:
    `release/win-unpacked/Financial Tracker.exe`, and repeat shortcut, tray,
    profile-picker, Enter/Esc, privacy, and conflict checks. Then run
    `release/win-unpacked/Financial Tracker.exe --smoke-test`; it must print
-   `SQLite smoke test OK` and exit 0.
+   `SQLite smoke test OK`, then `Image smoke test OK`, and exit 0.
 
 ## Exchange rates and base-currency conversion
 
@@ -715,6 +722,22 @@ missing buckets, staleness, range validation and empty data.
   only matching parts. The Excluded flag remains on the transaction header and
   therefore excludes every part from totals. Per-line notes use appended
   migration 13 after unchanged migrations 10–12.
+- Saved and new expense/income drawers accept JPEG, PNG, WebP, and PDF
+  attachments through **Add** or the drop zone. The main process detects the
+  type from file contents and rejects unsupported or larger-than-25-MB sources.
+  Images apply EXIF orientation and are downscaled only when their long side is
+  over 2,000 pixels; smaller images and PDFs retain their exact bytes.
+  Content-addressed immutable files live under
+  `profiles/<id>/data/attachments/`, so identical stored content is copied only
+  once. **Open** first copies an attachment to a per-run temporary folder; the
+  immutable store path is never exposed to another application.
+- Attach, remove, create-with-attachments, and transaction deletion are atomic
+  row commands and are undoable. Deleting a transaction with attachments offers
+  either **Delete transaction and its attachments** or **Save attachment copies
+  to a folder…, then delete**; copy names are de-duplicated in the selected
+  folder. Content no longer referenced by either SQLite or the in-memory Undo
+  history is swept on the next profile open. Transfers and balance adjustments
+  do not accept attachments. Attachments use appended migration 21.
 - Edit any listed transaction or transfer from the same drawer, or delete it after
   confirmation. Create, edit, delete, category reassignment, and balance updates
   run through the profile application command boundary in one SQLite transaction.
@@ -770,6 +793,27 @@ missing buckets, staleness, range validation and empty data.
 - Categorisation rules use migration 15 for their original schema. Appended
   migration 16 adds payee actions, currency-aware amount conditions, and the
   broader condition constraint without changing migrations 1–15.
+
+### Manual Attachments check
+
+Run `npm run dev` with synthetic files only. In a new expense/income drawer,
+add several JPEG/PNG/WebP/PDF files with the native picker and with drag and
+drop, remove one staged file, save, and reopen the transaction. Verify names,
+sizes, type icons, ordering, split support, and translated errors for an
+unsupported file and a source over 25 MB. Open each attachment and confirm the
+temporary copy launches while edits to that copy do not change the stored file.
+Attach and remove files on a saved transaction and undo each operation. Delete
+a transaction with attachments using both choices: first delete directly and
+undo; then save copies to a folder containing a same-named file, verify the
+de-duplicated names, delete, and undo. Repeat in HU/EN/DE and with keyboard
+navigation and light/dark themes. Close and reopen a profile to check referenced
+files remain and removed content is swept. Create two startup backups with a new
+attachment between them, remove a live stored file, restore the relevant backup,
+and verify the attachment opens again.
+
+Build with `npx electron-builder --win nsis --publish never`, then run
+`"release/win-unpacked/Financial Tracker.exe" --smoke-test`. It must print
+`SQLite smoke test OK` followed by `Image smoke test OK` and exit successfully.
 
 ### Manual Categorisation rules check
 
@@ -1387,8 +1431,9 @@ window lifecycle are manual checks, not covered by the unit suite.
 
 1. Run `npm run build`, then `npx electron-builder --win nsis --publish never`.
    Run `"release/win-unpacked/Financial Tracker.exe" --smoke-test` and also with
-   `--hidden --smoke-test`: both must print **SQLite smoke test OK** and exit with
-   code 0 without a tray icon or window. Repeat the smoke test while a normal
+   `--hidden --smoke-test`: both must print **SQLite smoke test OK** followed by
+   **Image smoke test OK** and exit with code 0 without a tray icon or window.
+   Repeat the smoke test while a normal
    instance is running to check it does not acquire/block the single-instance
    lock or steal focus. Install the generated NSIS installer from `release/`.
 2. On a fresh app-data installation, open Settings: **Start with Windows** must

@@ -51,7 +51,17 @@ import type {
   Transaction,
   TransactionIdInput,
   UpdateTransactionInput,
+  DeleteTransactionInput,
 } from './transactions'
+import type {
+  Attachment,
+  AttachmentIdInput,
+  AttachmentTransactionInput,
+  AttachAttachmentInput,
+  ImportAttachmentInput,
+  OpenAttachmentInput,
+  StagedAttachment,
+} from './attachments'
 import type {
   CreateTransferInput,
   Transfer,
@@ -152,6 +162,13 @@ export const IPC_CHANNELS = {
   transactionsCreate: 'transactions:create',
   transactionsUpdate: 'transactions:update',
   transactionsDelete: 'transactions:delete',
+  attachmentsPick: 'attachments:pick',
+  attachmentsPickCopyFolder: 'attachments:pick-copy-folder',
+  attachmentsImport: 'attachments:import',
+  attachmentsList: 'attachments:list',
+  attachmentsAttach: 'attachments:attach',
+  attachmentsRemove: 'attachments:remove',
+  attachmentsOpen: 'attachments:open',
   transfersCreate: 'transfers:create',
   transfersUpdate: 'transfers:update',
   transfersDelete: 'transfers:delete',
@@ -195,6 +212,18 @@ export const IPC_CHANNELS = {
 } as const
 
 export interface AppBridge {
+  files: {
+    path(file: File): string
+  }
+  attachments: {
+    pick(): Promise<string[]>
+    pickCopyFolder(): Promise<string | null>
+    import(input: ImportAttachmentInput): Promise<StagedAttachment>
+    list(input: AttachmentTransactionInput): Promise<Attachment[]>
+    attach(input: AttachAttachmentInput): Promise<Attachment>
+    remove(input: AttachmentIdInput): Promise<void>
+    open(input: OpenAttachmentInput): Promise<void>
+  }
   desktop: {
     autostartStatus(): Promise<AutostartStatus>
     setAutostart(input: SetAutostartInput): Promise<AutostartStatus>
@@ -268,7 +297,7 @@ export interface AppBridge {
     list(input?: TransactionListInput): Promise<TransactionPage>
     create(input: CreateTransactionInput): Promise<Transaction>
     update(input: UpdateTransactionInput): Promise<Transaction>
-    delete(input: TransactionIdInput): Promise<void>
+    delete(input: DeleteTransactionInput): Promise<void>
   }
   transfers: {
     create(input: CreateTransferInput): Promise<Transfer>
