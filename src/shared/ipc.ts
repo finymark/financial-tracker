@@ -110,6 +110,12 @@ import type {
   RecurringTransactionIdInput,
   UpdateRecurringTransactionInput,
 } from './recurring'
+import type {
+  PhoneUploadReceivedEvent,
+  PhoneUploadStartInput,
+  PhoneUploadStartResult,
+  PhoneUploadStopInput,
+} from './phone-upload'
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
@@ -209,9 +215,17 @@ export const IPC_CHANNELS = {
   pendingConfirm: 'pending:confirm',
   pendingSkip: 'pending:skip',
   pendingChanged: 'pending:changed',
+  phoneUploadStart: 'phone-upload:start',
+  phoneUploadStop: 'phone-upload:stop',
+  phoneUploadReceived: 'phone-upload:received',
 } as const
 
 export interface AppBridge {
+  phoneUpload: {
+    start(input: PhoneUploadStartInput): Promise<PhoneUploadStartResult>
+    stop(input: PhoneUploadStopInput): Promise<void>
+    onReceived(listener: (event: PhoneUploadReceivedEvent) => void): () => void
+  }
   files: {
     path(file: File): string
   }

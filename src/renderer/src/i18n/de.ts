@@ -670,4 +670,20 @@ export const de = {
   'settings.preview': 'Formatierungsvorschau',
   'settings.date': 'Datum',
   'settings.number': 'Zahl',
+  'phoneUpload.title': 'Vom Handy hochladen',
+  'phoneUpload.starting': 'Privater Netzwerk-Upload wird gestartet…',
+  'phoneUpload.noPrivateNetwork':
+    'Keine Verbindung mit einem privaten Netzwerk. Verbinde diesen PC mit deinem privaten WLAN und versuche es erneut.',
+  'phoneUpload.error':
+    'Der Handy-Upload konnte nicht gestartet werden. Versuche es erneut.',
+  'phoneUpload.interface': 'Private Netzwerkverbindung',
+  'phoneUpload.qrAlt': 'QR-Code für die Handy-Upload-Adresse',
+  'phoneUpload.address': 'Oder öffne diese Adresse auf dem Handy',
+  'phoneUpload.expiresIn': 'Automatischer Stopp in {time}',
+  'phoneUpload.expired': 'Diese Upload-Sitzung wurde beendet.',
+  'phoneUpload.uploaded': '{count} hochgeladen',
+  'phoneUpload.firewallTitle': 'Windows-Firewall',
+  'phoneUpload.firewallGuidance':
+    'Windows fragt möglicherweise nach einer Freigabe für „Financial Tracker“. Erlaube sie nur in privaten Netzwerken. Wenn das Handy keine Verbindung herstellen kann, müssen beide Geräte dasselbe WLAN verwenden und das Windows-Netzwerk muss auf Privat eingestellt sein.',
+  'phoneUpload.close': 'Schließen',
 } satisfies MessageCatalog

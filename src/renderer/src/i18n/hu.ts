@@ -644,4 +644,19 @@ export const hu = {
   'settings.preview': 'Formázási előnézet',
   'settings.date': 'Dátum',
   'settings.number': 'Szám',
+  'phoneUpload.title': 'Feltöltés telefonról',
+  'phoneUpload.starting': 'A privát hálózati feltöltés indítása…',
+  'phoneUpload.noPrivateNetwork':
+    'Nincs kapcsolat privát hálózattal. Csatlakoztasd ezt a számítógépet a privát Wi-Fi-hálózathoz, majd próbáld újra.',
+  'phoneUpload.error': 'A telefonos feltöltés nem indítható el. Próbáld újra.',
+  'phoneUpload.interface': 'Privát hálózati kapcsolat',
+  'phoneUpload.qrAlt': 'QR-kód a telefonos feltöltési címhez',
+  'phoneUpload.address': 'Vagy nyisd meg ezt a címet a telefonon',
+  'phoneUpload.expiresIn': 'Automatikus leállítás ennyi idő múlva: {time}',
+  'phoneUpload.expired': 'Ez a feltöltési munkamenet leállt.',
+  'phoneUpload.uploaded': 'Feltöltve: {count}',
+  'phoneUpload.firewallTitle': 'Windows tűzfal',
+  'phoneUpload.firewallGuidance':
+    'A Windows kérheti a „Financial Tracker” engedélyezését. Csak a privát hálózatokon engedélyezd. Ha a telefon nem tud kapcsolódni, mindkét eszköz ugyanazt a Wi-Fi-hálózatot használja, és a Windows hálózata legyen Privát beállítású.',
+  'phoneUpload.close': 'Bezárás',
 } satisfies MessageCatalog
