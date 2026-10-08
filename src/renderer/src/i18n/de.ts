@@ -105,7 +105,7 @@ export const de = {
     'Eine zusammengefasste Finanzübersicht wird später hier verfügbar sein.',
   'transactions.title': 'Deine Transaktionen an einem Ort',
   'transactions.description':
-    'Erfasse Ausgaben und Einnahmen, damit deine Kontosalden aktuell bleiben.',
+    'Erfasse Ausgaben, Einnahmen und Umbuchungen, damit deine Kontosalden aktuell bleiben.',
   'transactions.listDescription':
     'Transaktionen nach Zeitraum, Konto, Kategorie, Zahlungspartner oder Notiz filtern.',
   'transactions.filters': 'Transaktionsfilter',
@@ -146,14 +146,23 @@ export const de = {
   'transactions.noAccounts':
     'Erstelle ein aktives Konto, bevor du eine Transaktion erfasst.',
   'transactions.refresh': 'Aktualisieren',
-  'transactions.kind': 'Ausgabe oder Einnahme',
+  'transactions.kind': 'Transaktionstyp',
   'transactions.expense': 'Ausgabe',
   'transactions.income': 'Einnahme',
+  'transactions.transfer': 'Umbuchung',
   'transactions.date': 'Datum',
   'transactions.amount': 'Betrag',
   'transactions.amountHint':
     'Gib einen positiven Betrag mit Punkt oder Komma und höchstens zwei Nachkommastellen ein.',
   'transactions.account': 'Konto',
+  'transactions.fromAccount': 'Quellkonto',
+  'transactions.toAccount': 'Zielkonto',
+  'transactions.fromAmount': 'Gesendeter Betrag',
+  'transactions.toAmount': 'Empfangener Betrag',
+  'transactions.actualRate': 'Tatsächlicher Kurs',
+  'transactions.fee': 'Gebühr',
+  'transactions.feeCategory': 'Gebührenkategorie',
+  'transactions.optional': 'Optional',
   'transactions.chooseAccount': 'Aktives Konto auswählen',
   'transactions.payee': 'Zahlungspartner',
   'transactions.payeeHint':
@@ -181,6 +190,13 @@ export const de = {
     'Die Transaktion wurde nicht gefunden. Aktualisiere die Liste.',
   'transactions.error.lines':
     'Die Transaktionszeilen entsprechen nicht dem Gesamtbetrag.',
+  'transfers.error.accountsDiffer': 'Wähle zwei verschiedene Konten.',
+  'transfers.error.equalAmounts':
+    'Bei gleicher Währung müssen beide Beträge gleich sein.',
+  'transfers.error.notFound':
+    'Die Umbuchung wurde nicht gefunden. Aktualisiere die Liste.',
+  'transfers.error.linkedFee':
+    'Bearbeite oder lösche diese Gebühr über die zugehörige Umbuchung.',
   'undo.available': 'Transaktion geändert.',
   'undo.action': 'Rückgängig',
   'undo.error': 'Die Änderung konnte nicht rückgängig gemacht werden.',

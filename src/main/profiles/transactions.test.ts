@@ -1029,6 +1029,8 @@ test('payee-key migration merges Unicode case duplicates and repoints their tran
     { id: oldest.payeeId, name: 'Élelmiszer', createdAt: oldest.createdAt },
   ])
   expect(
-    upgraded.queries.listTransactions().rows.map(({ payeeId }) => payeeId),
+    upgraded.queries
+      .listTransactions()
+      .rows.map((row) => (row.kind === 'transfer' ? null : row.payeeId)),
   ).toEqual([oldest.payeeId, oldest.payeeId])
 })

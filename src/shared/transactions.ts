@@ -1,5 +1,6 @@
 import type { CategoryKind } from './categories'
 import type { Currency } from './accounts'
+import type { Transfer } from './transfers'
 
 export type TransactionKind = CategoryKind
 
@@ -27,6 +28,7 @@ export interface Transaction {
   createdAt: string
   updatedAt: string
   line: TransactionLine
+  linkedTransferId?: string
 }
 
 export interface CreateTransactionInput {
@@ -76,7 +78,7 @@ export interface TransactionDayTotals {
 }
 
 export interface TransactionPage {
-  rows: Transaction[]
+  rows: (Transaction | Transfer)[]
   totalCount: number
   // Aggregates cover the entire filtered set, independent of offset/limit.
   totals: TransactionTotals[]
