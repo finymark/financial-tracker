@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    name: checks
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install npm 12.2.0
+        run: npm install --global npm@12.2.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Guard changed files
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          base="$BASE_SHA"
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            # Scan the PR's changes, not unrelated changes on its base branch.
+            base="$(git merge-base "$BASE_SHA" "$HEAD_SHA" 2>/dev/null)" || base=""
+          fi
+
+          if [[ -n "$base" && ! "$base" =~ ^0+$ ]] &&
+            git cat-file -e "$base^{commit}" 2>/dev/null &&
+            git diff --name-only -z "$base" "$HEAD_SHA" -- > "$RUNNER_TEMP/guard-files"; then
+            echo "Scanning changed files."
+          else
+            echo "No usable diff base; scanning all tracked files."
+            git ls-files -z > "$RUNNER_TEMP/guard-files"
+          fi
+
+          mapfile -d '' -t files < "$RUNNER_TEMP/guard-files"
+          if (( ${#files[@]} )); then
+            npm run guard -- "${files[@]}"
+          else
+            echo "No changed files to scan."
+          fi
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
