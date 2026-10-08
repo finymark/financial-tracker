@@ -40,6 +40,19 @@ export function registerTransactionIpc(
 ): void {
   registerIpcHandler(
     ipcMain,
+    IPC_CHANNELS.transactionsDuplicate,
+    (
+      _event,
+      value,
+    ): Awaited<ReturnType<AppBridge['transactions']['duplicate']>> =>
+      controller
+        .getActiveApplication()
+        .commands.duplicateTransaction(
+          validateTransactionId(inputRecord(value).id),
+        ),
+  )
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.transactionsList,
     (
       _event,

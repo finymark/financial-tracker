@@ -13,7 +13,17 @@ const bridge: AppBridge = {
     restart: () => ipcRenderer.invoke(IPC_CHANNELS.updatesRestart),
   },
   getVersion: () => ipcRenderer.invoke(IPC_CHANNELS.getVersion),
+  templates: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.templatesList),
+    create: (input) => ipcRenderer.invoke(IPC_CHANNELS.templatesCreate, input),
+    update: (input) => ipcRenderer.invoke(IPC_CHANNELS.templatesUpdate, input),
+    delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.templatesDelete, input),
+    saveTransaction: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.templatesSaveTransaction, input),
+  },
   transactions: {
+    duplicate: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.transactionsDuplicate, input),
     list: (input) => ipcRenderer.invoke(IPC_CHANNELS.transactionsList, input),
     create: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.transactionsCreate, input),

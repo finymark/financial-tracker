@@ -355,7 +355,9 @@ test('appending tags migration 10 preserves the version 9 ledger and tags persis
   previous.close()
   const upgraded = await openProfileApplication({ profile, paths, clock })
   applications.push(upgraded)
-  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(10)
+  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(
+    CURRENT_MIGRATIONS.length,
+  )
   expect(upgraded.queries.getAccountBalance(input.accountId)).toBe(balance)
   expect(upgraded.queries.listTransactions()).toEqual(before)
   expect(upgraded.queries.listTags()).toEqual([])

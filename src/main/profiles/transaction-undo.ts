@@ -9,6 +9,7 @@ import type { Tag } from '../../shared/tags'
 import { hasTagSchema, getLineTags } from './profile-tags'
 import {
   createTransaction,
+  duplicateTransaction,
   deleteTransaction,
   updateTransaction,
 } from './profile-transactions'
@@ -341,6 +342,33 @@ export function deleteTransactionUndoableCommand(
       captureAggregate(
         database,
         null,
+        affectedPayeeIds(before),
+        before.tags.map((tag) => tag.id),
+      ),
+    restoreBefore: (before, after) => restoreAggregate(database, before, after),
+  }
+}
+
+export function duplicateTransactionUndoableCommand(
+  database: Database.Database,
+  id: string,
+  clock: () => Date,
+): UndoableCommand<
+  TransactionAggregateImage,
+  TransactionAggregateImage,
+  string
+> {
+  return {
+    captureBefore: () => {
+      const source = captureAggregate(database, id)
+      if (!source.transaction) throw new Error('transactions.error.notFound')
+      return { ...source, transaction: null, lines: [], lineTags: [] }
+    },
+    execute: () => duplicateTransaction(database, id, clock),
+    captureAfter: (result, before) =>
+      captureAggregate(
+        database,
+        result,
         affectedPayeeIds(before),
         before.tags.map((tag) => tag.id),
       ),

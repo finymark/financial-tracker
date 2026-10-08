@@ -25,7 +25,12 @@ import {
 import { today } from '../../shared/date'
 import { normalizePayeeKey } from '../db'
 import { validateTagNames } from './tag-validation'
-import { getLineTags, getLinesTags, setLineTags } from './profile-tags'
+import {
+  getLineTags,
+  getLinesTags,
+  setLineTags,
+  hasTagSchema,
+} from './profile-tags'
 import type { Tag } from '../../shared/tags'
 import { getTransfer } from './profile-transfers'
 
@@ -231,6 +236,57 @@ export function createTransaction(
       .run(Number(excluded), id)
   }
   return getTransaction(database, id)
+}
+
+// Copy the ledger aggregate rather than reconstructing the single-line drawer
+// input: every stored line and its tag associations keeps its own values.
+export function duplicateTransaction(
+  database: Database.Database,
+  sourceId: string,
+  clock: () => Date,
+): string {
+  const source = database
+    .prepare('SELECT * FROM transactions WHERE id = ?')
+    .get(validateTransactionId(sourceId)) as { excluded?: number } | undefined
+  if (!source) throw new Error('transactions.error.notFound')
+  const id = randomUUID()
+  const timestamp = clock().toISOString()
+  database
+    .prepare(
+      `INSERT INTO transactions
+    (id, account_id, kind, date, total_minor, payee_id, note, created_at, updated_at)
+    SELECT ?, account_id, kind, ?, total_minor, payee_id, note, ?, ?
+    FROM transactions WHERE id = ?`,
+    )
+    .run(id, today(clock), timestamp, timestamp, sourceId)
+  if (source.excluded !== undefined) {
+    database
+      .prepare('UPDATE transactions SET excluded = ? WHERE id = ?')
+      .run(source.excluded, id)
+  }
+  const lines = database
+    .prepare(
+      'SELECT id FROM transaction_lines WHERE transaction_id = ? ORDER BY rowid',
+    )
+    .all(sourceId) as { id: string }[]
+  for (const line of lines) {
+    const lineId = randomUUID()
+    database
+      .prepare(
+        `INSERT INTO transaction_lines (id, transaction_id, amount_minor, category_id)
+      SELECT ?, ?, amount_minor, category_id FROM transaction_lines WHERE id = ?`,
+      )
+      .run(lineId, id, line.id)
+    if (hasTagSchema(database)) {
+      database
+        .prepare(
+          `INSERT INTO transaction_line_tags (line_id, tag_id)
+        SELECT ?, tag_id FROM transaction_line_tags WHERE line_id = ?`,
+        )
+        .run(lineId, line.id)
+    }
+  }
+  return id
 }
 
 export function updateTransaction(

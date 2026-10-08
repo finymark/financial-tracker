@@ -134,6 +134,28 @@ export const hu = {
     'Válassz érvényes szűrőket és helyes dátumtartományt.',
   'transactions.error.totals':
     'A szűrt összeg túl nagy a pontos megjelenítéshez.',
+  'transactions.duplicate': 'Tranzakció másolása',
+  'templates.title': 'Tranzakciós sablonok',
+  'templates.choose': 'Válassz sablont',
+  'templates.use': 'Sablon használata',
+  'templates.create': 'Sablon létrehozása',
+  'templates.edit': 'Sablon szerkesztése',
+  'templates.delete': 'Sablon törlése',
+  'templates.save': 'Sablon mentése',
+  'templates.name': 'Sablon neve',
+  'templates.saveTransaction': 'Mentés sablonként',
+  'templates.savedTransactionHint':
+    'A mentett tranzakciót használja, nem az űrlap nem mentett módosításait.',
+  'templates.optionalHint':
+    'Csak a név kötelező. A többi mezőt üresen hagyhatod, és a sablon használatakor töltheted ki.',
+  'templates.tagsHint':
+    'Soronként egy címkenév. A címkék csak a tranzakció rögzítésekor jönnek létre.',
+  'templates.deleteConfirmation': 'Törlöd ezt a tranzakciós sablont?',
+  'templates.amountRequired':
+    'A tranzakció mentése előtt adj meg egy összeget.',
+  'templates.error.name': 'Adj meg egy 1–100 karakter hosszú sablonnevet.',
+  'templates.error.notFound':
+    'A tranzakciós sablon nem található. Frissítsd a listát.',
   'transactions.create': 'Tranzakció rögzítése',
   'transactions.edit': 'Tranzakció szerkesztése',
   'transactions.delete': 'Törlés',

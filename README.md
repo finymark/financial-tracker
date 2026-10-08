@@ -129,7 +129,7 @@ them, and pattern matching cannot detect every possible form of sensitive data.
 
 The renderer has no Node access; a sandboxed, isolated preload exposes only the
 typed app, update, profile (including settings), account, category, transaction,
-payee, tag, and backup commands/queries. Every IPC input is validated in the main
+payee, tag, transaction-template, and backup commands/queries. Every IPC input is validated in the main
 process, and every handler rejects calls not sent by the app's own renderer frame.
 Production CSP permits only same-origin connections; localhost WebSockets are
 added only by the development server for hot reload. SQLite foreign-key
@@ -419,6 +419,60 @@ not off-device copies or backups of the separate data folder.
   test times a filtered first page plus all aggregates with a generous 500 ms
   bound, arranging the 20 000 transactions through application commands in one
   fixture transaction (outside the measured query).
+
+### Duplicate and transaction templates
+
+- **Duplicate transaction** in an expense/income row or its edit drawer immediately
+  records a copy dated today (using the application's clock). The source stays
+  unchanged. The copy has fresh transaction/line identifiers and timestamps,
+  while preserving its account, kind, amounts, payee, note, excluded flag, every
+  stored line, category, and line-tag association. Duplication and undo run through
+  the same profile application command boundary; Undo removes only the copy.
+  Transfers are not duplicated by this action.
+- **Transaction templates** opens the drawer's template picker, also available
+  from **Record transaction**. Create a template from scratch, or open a saved
+  expense/income transaction and choose **Save as template** with a name. This
+  uses the saved transaction, not unsaved drawer changes. Templates support only
+  unsplit expense/income transactions, not transfers or split editing.
+- Only the template name is required (1–100 characters). Kind, account, positive
+  amount, payee, category, tags, and note are optional. The amount uses the shared
+  calculator and exact integer-hundredths storage. In the template editor, enter
+  one tag name per line. Payee and tag names are saved as prefill text: creating
+  or editing a template does not create payees, tags, transactions, or balances.
+  Later tag/payee renames do not rewrite this saved text.
+- Select a template and choose **Use template** to replace the drawer draft with
+  a new transaction dated today. An omitted kind defaults to its category's kind
+  (otherwise expense), and an omitted account uses the first active account.
+  Archived references are preserved in the draft, but must be replaced with active
+  choices before saving a new transaction. Deleted account/category references
+  become empty without blocking account/category deletion. Verify the draft
+  before saving. A template without an amount leaves it blank, focuses the amount
+  field, and requires a positive amount before the transaction can be saved.
+- Choose **Edit template**, or **Delete template** and confirm, in the same picker.
+  Create, save-as-template, edit, and delete all offer the existing Undo toast and
+  Ctrl+Z. Templates persist only in the active profile's database (migration 11);
+  undo history remains session-only and clears on switching/reopening/restoring
+  a profile or a successful write without an undo aggregate.
+
+### Manual Duplicate and templates check
+
+Run `npm run dev`. Duplicate an included expense, an excluded expense, and an
+income from the table and drawer. Verify today's date, all values/tags, balances,
+and totals, then use the toast and Ctrl+Z to remove just the copy. In the drawer,
+create a name-only template, one with every optional field, and one without an
+amount; cancel another new template and verify no payees/tags or transactions
+were created. Save an existing transaction as a template and check unsaved edits
+are not included. Edit and clear individual template fields, confirm/cancel
+its deletion, and undo each template operation. Use a variable-amount template:
+verify focus moves to the empty amount field and blank, zero, and invalid amounts
+cannot save; enter a calculator expression and save. Check category-only templates,
+archived/deleted references, use from an income or transfer draft, and template
+creation with no accounts. Switch profiles and restart to verify isolation,
+persistence, and cleared undo history. Repeat with keyboard navigation, light/dark
+appearance, and HU/EN/DE. These UI checks remain manual; real temporary SQLite
+application-API tests cover duplicate fields and line-level tags/totals, injected
+clock dates/timestamps, template optional fields, validation/atomicity, all new
+command undo, profile isolation, migration preservation, and reopening.
 
 ### Amount calculator
 

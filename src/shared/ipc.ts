@@ -1,3 +1,10 @@
+import type {
+  CreateTemplateInput,
+  UpdateTemplateInput,
+  TransactionTemplate,
+  TemplateIdInput,
+  SaveTransactionAsTemplateInput,
+} from './templates'
 import type { Tag, TagIdInput, RenameTagInput } from './tags'
 import type {
   Category,
@@ -74,6 +81,12 @@ export const IPC_CHANNELS = {
   accountsArchive: 'accounts:archive',
   accountsDelete: 'accounts:delete',
   profilesUpdateSettings: 'profiles:update-settings',
+  templatesList: 'templates:list',
+  templatesCreate: 'templates:create',
+  templatesUpdate: 'templates:update',
+  templatesDelete: 'templates:delete',
+  templatesSaveTransaction: 'templates:save-transaction',
+  transactionsDuplicate: 'transactions:duplicate',
   transactionsList: 'transactions:list',
   transactionsCreate: 'transactions:create',
   transactionsUpdate: 'transactions:update',
@@ -95,7 +108,17 @@ export interface AppBridge {
     restart(): Promise<void>
   }
   getVersion(): Promise<string>
+  templates: {
+    list(): Promise<TransactionTemplate[]>
+    create(input: CreateTemplateInput): Promise<TransactionTemplate>
+    update(input: UpdateTemplateInput): Promise<TransactionTemplate>
+    delete(input: TemplateIdInput): Promise<void>
+    saveTransaction(
+      input: SaveTransactionAsTemplateInput,
+    ): Promise<TransactionTemplate>
+  }
   transactions: {
+    duplicate(input: TransactionIdInput): Promise<string>
     list(input?: TransactionListInput): Promise<TransactionPage>
     create(input: CreateTransactionInput): Promise<Transaction>
     update(input: UpdateTransactionInput): Promise<Transaction>
