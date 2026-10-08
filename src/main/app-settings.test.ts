@@ -10,7 +10,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, test, vi } from 'vitest'
 import { AppSettingsFile } from './app-settings'
-import { parseAutostartInput } from './desktop-ipc'
+import { parseAutostartInput, parseShortcutInput } from './desktop-ipc'
+import { DEFAULT_QUICK_ADD_ACCELERATOR } from '../shared/accelerator'
 
 const directories: string[] = []
 function temporaryUserData() {
@@ -30,11 +31,20 @@ test('notice is app-level, defaults to unseen, and persists across reopening', (
   const directory = temporaryUserData()
   const settings = new AppSettingsFile(directory)
   expect(settings.isTrayNoticeShown()).toBe(false)
+  expect(settings.getQuickAddAccelerator()).toBe(DEFAULT_QUICK_ADD_ACCELERATOR)
   settings.markTrayNoticeShown()
+  settings.setQuickAddAccelerator('Control+Shift+K')
   expect(new AppSettingsFile(directory).isTrayNoticeShown()).toBe(true)
+  expect(new AppSettingsFile(directory).getQuickAddAccelerator()).toBe(
+    'Control+Shift+K',
+  )
   expect(
     JSON.parse(readFileSync(join(directory, 'app-settings.json'), 'utf8')),
-  ).toEqual({ version: 1, trayNoticeShown: true })
+  ).toEqual({
+    version: 1,
+    trayNoticeShown: true,
+    quickAddAccelerator: 'Control+Shift+K',
+  })
   expect(existsSync(join(directory, 'app-settings.json.tmp'))).toBe(false)
 })
 
@@ -46,6 +56,8 @@ test.each([
   '{"version":2,"trayNoticeShown":true}',
   '{"version":1,"trayNoticeShown":"true"}',
   '{"version":1,"trayNoticeShown":0}',
+  '{"version":1,"trayNoticeShown":true,"quickAddAccelerator":"N"}',
+  '{"version":1,"trayNoticeShown":true,"quickAddAccelerator":42}',
   '{"version":1,"trayNoticeShown":true,"profileId":"unexpected"}',
 ])(
   'rejects invalid stored settings without overwriting them: %s',
@@ -57,6 +69,17 @@ test.each([
     expect(readFileSync(path, 'utf8')).toBe(contents)
   },
 )
+
+test('loads the pre-shortcut app settings shape with the default accelerator', () => {
+  const directory = temporaryUserData()
+  writeFileSync(
+    join(directory, 'app-settings.json'),
+    '{"version":1,"trayNoticeShown":true}',
+  )
+  const settings = new AppSettingsFile(directory)
+  expect(settings.isTrayNoticeShown()).toBe(true)
+  expect(settings.getQuickAddAccelerator()).toBe(DEFAULT_QUICK_ADD_ACCELERATOR)
+})
 
 test('ignores a stale temporary file; never treats it as saved settings', () => {
   const directory = temporaryUserData()
@@ -130,4 +153,20 @@ test.each([
   { openAtLogin: true, profileId: 'unexpected' },
 ])('rejects malformed autostart IPC input: %j', (value) => {
   expect(() => parseAutostartInput(value)).toThrow()
+})
+
+test('normalises a valid shortcut IPC input', () => {
+  expect(parseShortcutInput({ accelerator: 'Ctrl+Shift+k' })).toEqual({
+    accelerator: 'Control+Shift+K',
+  })
+})
+
+test.each([
+  null,
+  {},
+  { accelerator: 1 },
+  { accelerator: 'N' },
+  { accelerator: 'Control+N', extra: true },
+])('rejects malformed shortcut IPC input: %j', (value) => {
+  expect(() => parseShortcutInput(value)).toThrow()
 })

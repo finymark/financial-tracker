@@ -2,9 +2,11 @@ import {
   app,
   BrowserWindow,
   dialog,
+  globalShortcut,
   ipcMain,
   Menu,
   nativeImage,
+  screen,
   Tray,
 } from 'electron'
 import { join } from 'node:path'
@@ -26,7 +28,7 @@ import { registerTransferIpc } from './profiles/transfer-ipc'
 import { registerPayeeIpc } from './profiles/payee-ipc'
 import { registerBalanceAdjustmentIpc } from './profiles/adjustment-ipc'
 import { ProfileRegistry } from './profiles/profile-registry'
-import { registerIpcHandler } from './ipc'
+import { configureTrustedIpcWebContents, registerIpcHandler } from './ipc'
 import { registerCategorisationRuleIpc } from './profiles/rule-ipc'
 import { registerExchangeRateIpc } from './profiles/exchange-rate-ipc'
 import {
@@ -42,11 +44,13 @@ import { registerDesktopIpc } from './desktop-ipc'
 import { buildTrayMenu, trayLanguage } from './tray-menu'
 import { desktopMessages } from '../shared/desktop-translations'
 import { startsHidden } from '../shared/desktop'
+import { QuickAddShortcut } from './global-shortcut'
 
 let mainWindow: BrowserWindow | null = null
+let quickAddWindow: BrowserWindow | null = null
 let quitting = false
-let quickAddRequested = false
 let pendingSecondLaunch = false
+let openQuickAddImplementation: () => Promise<void> = async () => {}
 
 function showMainWindow(): void {
   if (quitting || !mainWindow || mainWindow.isDestroyed()) return
@@ -55,12 +59,9 @@ function showMainWindow(): void {
   mainWindow.focus()
 }
 
-// #81 replaces this entry point with the standalone quick-add window.
 export function openQuickAdd(): void {
   if (quitting) return
-  showMainWindow()
-  quickAddRequested = true
-  mainWindow?.webContents.send(IPC_CHANNELS.desktopQuickAdd)
+  void openQuickAddImplementation()
 }
 
 const APP_ID = 'com.finymark.financial-tracker'
@@ -93,6 +94,75 @@ function createWindow(hidden: boolean): BrowserWindow {
     void window.loadFile(join(import.meta.dirname, '../renderer/index.html'))
   }
   return window
+}
+
+function positionOnActiveDisplay(window: BrowserWindow): void {
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+  const bounds = window.getBounds()
+  window.setPosition(
+    Math.round(
+      display.workArea.x + (display.workArea.width - bounds.width) / 2,
+    ),
+    Math.round(
+      display.workArea.y + (display.workArea.height - bounds.height) / 2,
+    ),
+  )
+}
+
+function createQuickAddWindow(): BrowserWindow {
+  const window = new BrowserWindow({
+    show: false,
+    width: 560,
+    height: 720,
+    minWidth: 460,
+    minHeight: 560,
+    title: 'Financial Tracker — Quick add',
+    alwaysOnTop: true,
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: join(import.meta.dirname, '../preload/index.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  })
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  window.webContents.on('will-navigate', (event) => event.preventDefault())
+  window.on('close', (event) => {
+    if (quitting) return
+    event.preventDefault()
+    window.hide()
+  })
+  window.on('closed', () => {
+    if (quickAddWindow === window) quickAddWindow = null
+  })
+  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
+    const url = new URL(process.env.ELECTRON_RENDERER_URL)
+    url.searchParams.set('view', 'quick-add')
+    void window.loadURL(url.href)
+  } else {
+    void window.loadFile(join(import.meta.dirname, '../renderer/index.html'), {
+      query: { view: 'quick-add' },
+    })
+  }
+  return window
+}
+
+function showQuickAddWindow(created: boolean): void {
+  const window = quickAddWindow
+  if (!window || window.isDestroyed() || quitting) return
+  const show = () => {
+    if (quitting || window.isDestroyed()) return
+    positionOnActiveDisplay(window)
+    window.show()
+    window.focus()
+  }
+  if (created || window.webContents.isLoadingMainFrame()) {
+    window.once('ready-to-show', show)
+  } else {
+    window.webContents.once('did-finish-load', show)
+    window.webContents.reload()
+  }
 }
 
 function smokeTest(): void {
@@ -169,6 +239,14 @@ function startApplication(): void {
   const recurring = new RecurringScheduler(profiles)
   recurring.start()
 
+  configureTrustedIpcWebContents(() =>
+    [mainWindow, quickAddWindow]
+      .filter((window): window is BrowserWindow =>
+        Boolean(window && !window.isDestroyed()),
+      )
+      .map((window) => window.webContents),
+  )
+
   const activeLanguage = () =>
     trayLanguage(profiles.getActive()?.settings.language, app.getLocale())
   const updateTray = () => {
@@ -185,10 +263,61 @@ function startApplication(): void {
       ),
     )
   }
-  registerDesktopIpc(ipcMain, app, () => {
-    const requested = quickAddRequested
-    quickAddRequested = false
-    return requested
+
+  const profileOpenedOutsideMainRenderer = () => {
+    exchangeRates.start()
+    void exchangeRates.refreshActive()
+    recurring.start()
+    updateTray()
+    if (mainWindow && !mainWindow.isDestroyed())
+      mainWindow.webContents.send(IPC_CHANNELS.desktopProfileChanged)
+  }
+  let openingQuickAdd = false
+  openQuickAddImplementation = async () => {
+    if (openingQuickAdd || quitting) return
+    if (
+      quickAddWindow &&
+      !quickAddWindow.isDestroyed() &&
+      quickAddWindow.isVisible()
+    ) {
+      quickAddWindow.focus()
+      return
+    }
+    openingQuickAdd = true
+    try {
+      const hadActiveProfile = profiles.getActive() !== null
+      const opened = await profiles.openLastUsed()
+      if (!hadActiveProfile && opened) profileOpenedOutsideMainRenderer()
+      const created = !quickAddWindow || quickAddWindow.isDestroyed()
+      if (created) quickAddWindow = createQuickAddWindow()
+      showQuickAddWindow(created)
+    } catch (error) {
+      console.error('Could not open quick add.', error)
+      showMainWindow()
+    } finally {
+      openingQuickAdd = false
+    }
+  }
+
+  const quickAddShortcut = new QuickAddShortcut(
+    globalShortcut,
+    settings,
+    openQuickAdd,
+  )
+  quickAddShortcut.start()
+
+  registerDesktopIpc(ipcMain, app, {
+    shortcutStatus: () => quickAddShortcut.status(),
+    setShortcut: (accelerator) => quickAddShortcut.set(accelerator),
+    showMain: showMainWindow,
+    closeQuickAdd: () => quickAddWindow?.hide(),
+    quickAddSaved: () => {
+      if (mainWindow && !mainWindow.isDestroyed())
+        mainWindow.webContents.send(
+          IPC_CHANNELS.desktopDataChanged,
+          mainWindow.isVisible(),
+        )
+    },
   })
 
   registerIpcHandler(
@@ -251,7 +380,10 @@ function startApplication(): void {
   tray.on('click', showMainWindow)
   tray.on('double-click', showMainWindow)
   updateTray()
-  app.on('will-quit', () => tray?.destroy())
+  app.on('will-quit', () => {
+    quickAddShortcut.dispose()
+    tray?.destroy()
+  })
 
   mainWindow = createWindow(startsHidden(process.argv))
   mainWindow.on('close', (event) => {

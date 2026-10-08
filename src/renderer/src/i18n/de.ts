@@ -9,6 +9,13 @@ export const de = {
   'privacy.hiddenAmount': 'Verborgener Betrag',
   'privacy.shortcutScope':
     'Der Privatmodus funktioniert überall, auch beim Tippen (Ctrl+Shift+H).',
+  'quickAdd.title': 'Schnellerfassung',
+  'quickAdd.noProfiles':
+    'Erstelle im Hauptfenster ein Profil, bevor du eine Transaktion erfasst.',
+  'quickAdd.noAccounts':
+    'Erstelle im Hauptfenster ein Konto, bevor du eine Transaktion erfasst.',
+  'quickAdd.saved': 'Gespeichert.',
+  'quickAdd.loading': 'Schnellerfassung wird vorbereitet…',
 
   'shortcuts.closeHelp': 'Tastaturhilfe schließen',
   'transactions.saveAndAddAnother': 'Speichern und weitere hinzufügen',

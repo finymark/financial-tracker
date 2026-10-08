@@ -7,6 +7,13 @@ export const en = {
   'privacy.hiddenAmount': 'Hidden amount',
   'privacy.shortcutScope':
     'Privacy mode works everywhere, including while typing (Ctrl+Shift+H).',
+  'quickAdd.title': 'Quick add',
+  'quickAdd.noProfiles':
+    'Create a profile in the main window before adding a transaction.',
+  'quickAdd.noAccounts':
+    'Create an account in the main window before adding a transaction.',
+  'quickAdd.saved': 'Saved.',
+  'quickAdd.loading': 'Preparing quick add…',
 
   'shortcuts.closeHelp': 'Close shortcut help',
   'transactions.saveAndAddAnother': 'Save and add another',

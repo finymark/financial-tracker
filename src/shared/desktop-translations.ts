@@ -11,6 +11,13 @@ type DesktopKey =
   | 'settings.autostartDescription'
   | 'settings.autostartUnavailable'
   | 'settings.autostartError'
+  | 'settings.shortcut'
+  | 'settings.shortcutDescription'
+  | 'settings.shortcutCapture'
+  | 'settings.shortcutReset'
+  | 'settings.shortcutConflict'
+  | 'settings.shortcutConflictKept'
+  | 'settings.shortcutError'
 
 export const desktopMessages = {
   en: {
@@ -28,6 +35,16 @@ export const desktopMessages = {
       'Available only in the installed Windows app, not in development mode.',
     'settings.autostartError':
       'Could not read or change the Windows startup setting.',
+    'settings.shortcut': 'Global quick-add shortcut',
+    'settings.shortcutDescription':
+      'Press a new shortcut. This app-level setting is shared by every profile on this Windows account.',
+    'settings.shortcutCapture': 'Press the new shortcut',
+    'settings.shortcutReset': 'Reset to Ctrl+Alt+N',
+    'settings.shortcutConflict':
+      'The shortcut {shortcut} is used by another program. Choose a different shortcut.',
+    'settings.shortcutConflictKept':
+      'The shortcut {shortcut} is used by another program. The previous shortcut is still active; choose a different one.',
+    'settings.shortcutError': 'Could not change the global shortcut.',
   },
   hu: {
     'tray.tooltip': 'Financial Tracker — a tálcán fut',
@@ -44,6 +61,17 @@ export const desktopMessages = {
       'Csak a telepített Windows-alkalmazásban érhető el, fejlesztői módban nem.',
     'settings.autostartError':
       'Nem sikerült lekérni vagy módosítani a Windows indítási beállítását.',
+    'settings.shortcut': 'Globális gyorsrögzítési billentyűparancs',
+    'settings.shortcutDescription':
+      'Nyomd le az új billentyűparancsot. Ez az alkalmazásszintű beállítás a Windows-fiók minden profiljára érvényes.',
+    'settings.shortcutCapture': 'Nyomd le az új billentyűparancsot',
+    'settings.shortcutReset': 'Visszaállítás: Ctrl+Alt+N',
+    'settings.shortcutConflict':
+      'A(z) {shortcut} billentyűparancsot egy másik program használja. Válassz másik billentyűparancsot.',
+    'settings.shortcutConflictKept':
+      'A(z) {shortcut} billentyűparancsot egy másik program használja. Az előző billentyűparancs továbbra is aktív; válassz másikat.',
+    'settings.shortcutError':
+      'Nem sikerült módosítani a globális billentyűparancsot.',
   },
   de: {
     'tray.tooltip': 'Financial Tracker — läuft im Infobereich',
@@ -60,5 +88,16 @@ export const desktopMessages = {
       'Nur in der installierten Windows-App verfügbar, nicht im Entwicklungsmodus.',
     'settings.autostartError':
       'Die Windows-Starteinstellung konnte nicht gelesen oder geändert werden.',
+    'settings.shortcut': 'Globales Tastenkürzel für Schnellerfassung',
+    'settings.shortcutDescription':
+      'Drücke das neue Tastenkürzel. Diese App-Einstellung gilt für alle Profile dieses Windows-Kontos.',
+    'settings.shortcutCapture': 'Neues Tastenkürzel drücken',
+    'settings.shortcutReset': 'Auf Ctrl+Alt+N zurücksetzen',
+    'settings.shortcutConflict':
+      'Das Tastenkürzel {shortcut} wird von einem anderen Programm verwendet. Wähle ein anderes Tastenkürzel.',
+    'settings.shortcutConflictKept':
+      'Das Tastenkürzel {shortcut} wird von einem anderen Programm verwendet. Das bisherige Tastenkürzel bleibt aktiv; wähle ein anderes.',
+    'settings.shortcutError':
+      'Das globale Tastenkürzel konnte nicht geändert werden.',
   },
 } satisfies Record<Language, Record<DesktopKey, string>>
