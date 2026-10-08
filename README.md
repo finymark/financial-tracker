@@ -122,6 +122,16 @@ profile lives in `profiles/<id>/` (database, data folder, pre-migration
 backups). Migrations are forward-only and run after a verified backup; a
 database with a newer schema is refused. Installer packaging is not included yet.
 
+## Continuous integration
+
+Every pull request (regardless of its base branch) and every push to `main` runs
+the `checks` job in `.github/workflows/ci.yml` on `windows-latest`. CI reads Node
+from `.nvmrc`, installs npm 12.2.0, and runs `npm ci`, the changed-file guard,
+lint, formatting checks, typechecking, tests, and the build. If a diff base is
+unavailable (including the first push), the guard scans all tracked files instead.
+New PR runs cancel older runs for the same PR. The stable required check name
+for the `main` ruleset is `checks`.
+
 ## App shell
 
 - The shell uses Tailwind CSS 4 via its Vite plugin, lucide icons, and the
