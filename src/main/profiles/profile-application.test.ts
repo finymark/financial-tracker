@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 import { ProfileRegistry } from './profile-registry'
+import { ProfileController } from './profile-controller'
 import {
   CURRENT_MIGRATIONS,
   NewerSchemaError,
@@ -19,6 +20,7 @@ import {
 } from './profile-application'
 
 const temporaryDirectories: string[] = []
+const currentVersion = CURRENT_MIGRATIONS.length
 const clock = () => new Date('2026-01-15T10:00:00.000Z')
 
 function setup() {
@@ -119,6 +121,128 @@ describe('profile application API', () => {
     }
   })
 
+  test('controller restore returns saved settings and restores accounts while blocking overlapping operations', async () => {
+    const { registry } = setup()
+    const profile = registry.createProfile('Saved finances')
+    const paths = registry.getProfilePaths(profile.id)
+    const initial = await openProfileApplication({ profile, paths, clock })
+    const settings = {
+      language: 'de',
+      theme: 'dark',
+      baseCurrency: 'CHF',
+    } as const
+    const account = initial.commands.createAccount({
+      name: 'Saved account',
+      currency: 'CHF',
+      openingBalance: 12345,
+      openingDate: '2026-01-01',
+    })
+    initial.commands.updateSettings(settings)
+    initial.close()
+
+    const controller = new ProfileController(registry)
+    await controller.open(profile.id)
+    try {
+      const backup = controller.listBackups()[0]
+      controller.updateSettings({
+        id: profile.id,
+        settings: { language: 'en', theme: 'light', baseCurrency: 'HUF' },
+      })
+      const application = controller.getActiveApplication()
+      application.commands.renameAccount({ id: account.id, name: 'Later name' })
+      application.commands.archiveAccount(account.id)
+      const restoring = controller.restoreBackup({
+        backupId: backup.id,
+        confirmed: true,
+      })
+      expect(() => controller.getActiveApplication()).toThrow(
+        'operation is in progress',
+      )
+      expect(() =>
+        controller.updateSettings({
+          id: profile.id,
+          settings: { language: 'hu' },
+        }),
+      ).toThrow('operation is in progress')
+      expect(() => application.queries.getSettings()).toThrow(
+        'restore is in progress',
+      )
+      expect(() => application.queries.listAccounts()).toThrow(
+        'restore is in progress',
+      )
+      expect(() =>
+        application.commands.renameAccount({
+          id: account.id,
+          name: 'Overlapping name',
+        }),
+      ).toThrow('restore is in progress')
+      const restored = await restoring
+      expect(restored).toMatchObject({
+        id: profile.id,
+        schemaVersion: currentVersion,
+        settings,
+      })
+      expect(controller.getActive()).toEqual(restored)
+      expect(application.queries.listAccounts()).toEqual([account])
+      expect(application.queries.listAccountOptions()).toEqual([account])
+    } finally {
+      controller.close()
+    }
+  })
+
+  test('restoring a settings-only snapshot upgrades to accounts without changing its saved settings', async () => {
+    const { registry } = setup()
+    const profile = registry.createProfile('Older settings snapshot')
+    const paths = registry.getProfilePaths(profile.id)
+    const options = { profile, paths, clock }
+    const settings = {
+      language: 'hu',
+      theme: 'dark',
+      baseCurrency: 'CHF',
+    } as const
+    const olderOptions = {
+      ...options,
+      migrations: CURRENT_MIGRATIONS.slice(0, 2),
+    }
+    const initial = await openProfileApplication(olderOptions)
+    initial.commands.updateSettings(settings)
+    initial.close()
+    const older = await openProfileApplication(olderOptions)
+    const backup = older.queries.listBackups()[0]
+    older.close()
+
+    const application = await openProfileApplication(options)
+    try {
+      expect(application.queries.getSettings()).toEqual(settings)
+      application.commands.createAccount({
+        name: 'Later account',
+        currency: 'HUF',
+        openingBalance: 0,
+        openingDate: '2026-01-01',
+      })
+      application.commands.updateSettings({ language: 'de' })
+      await application.commands.restoreBackup({
+        backupId: backup.id,
+        confirmed: true,
+      })
+      expect(application.queries.getProfileInfo().schemaVersion).toBe(
+        currentVersion,
+      )
+      expect(application.queries.getSettings()).toEqual(settings)
+      expect(application.queries.listAccounts()).toEqual([])
+      const created = application.commands.createAccount({
+        name: 'Restored account',
+        currency: 'CHF',
+        openingBalance: -12345,
+        openingDate: '2026-01-01',
+      })
+      expect(created.createdAt).toBe(clock().toISOString())
+      expect(application.queries.listAccounts()).toEqual([created])
+    } finally {
+      application.close()
+    }
+  })
+
   test('startup backup is consistent while another connection has an uncommitted write', async () => {
     const { registry } = setup()
     const profile = registry.createProfile('Writing')
@@ -197,7 +321,7 @@ describe('profile application API', () => {
     initial.close()
     let failUpgrade = false
     const nextMigration = defineSqlMigration(
-      2,
+      currentVersion + 1,
       'restored schema upgrade',
       'CREATE TABLE restored_upgrade (value TEXT)',
     )
@@ -224,7 +348,9 @@ describe('profile application API', () => {
           confirmed: true,
         }),
       ).rejects.toThrow('previous database was reopened')
-      expect(application.queries.getProfileInfo().schemaVersion).toBe(2)
+      expect(application.queries.getProfileInfo().schemaVersion).toBe(
+        currentVersion + 1,
+      )
       application.commands.ensureProfileIdentity()
     } finally {
       application.close()
@@ -240,7 +366,7 @@ describe('profile application API', () => {
     initial.close()
     let invalidateIdentity = false
     const nextMigration = defineSqlMigration(
-      2,
+      currentVersion + 1,
       'identity validation upgrade',
       'CREATE TABLE identity_upgrade (value TEXT)',
     )
@@ -272,7 +398,7 @@ describe('profile application API', () => {
       ).rejects.toThrow('previous database was reopened')
       expect(application.queries.getProfileInfo()).toMatchObject({
         createdAt: profile.createdAt,
-        schemaVersion: 2,
+        schemaVersion: currentVersion + 1,
       })
       application.commands.ensureProfileIdentity()
     } finally {
@@ -322,7 +448,12 @@ describe('profile application API', () => {
         .prepare(
           'INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (?, ?, ?, ?)',
         )
-        .run(2, 'future schema', '0'.repeat(64), clock().toISOString())
+        .run(
+          currentVersion + 1,
+          'future schema',
+          '0'.repeat(64),
+          clock().toISOString(),
+        )
       futureFixture.close()
       await expect(
         application.commands.restoreBackup({
@@ -330,7 +461,9 @@ describe('profile application API', () => {
           confirmed: true,
         }),
       ).rejects.toBeInstanceOf(NewerSchemaError)
-      expect(application.queries.getProfileInfo().schemaVersion).toBe(1)
+      expect(application.queries.getProfileInfo().schemaVersion).toBe(
+        currentVersion,
+      )
       application.commands.ensureProfileIdentity()
     } finally {
       application.close()
@@ -413,7 +546,7 @@ describe('profile application API', () => {
     const migrations = [
       ...CURRENT_MIGRATIONS,
       defineSqlMigration(
-        2,
+        currentVersion + 1,
         'retention upgrade',
         'CREATE TABLE retention_upgrade (value TEXT)',
       ),
@@ -470,13 +603,16 @@ describe('profile application API', () => {
 
   test('upgrades from every earlier schema version', async () => {
     const secondMigration = defineSqlMigration(
-      2,
+      currentVersion + 1,
       'migration mechanism proof',
       'CREATE TABLE migration_proof (value TEXT NOT NULL)',
     )
     const migrations = [...CURRENT_MIGRATIONS, secondMigration]
 
-    for (const startingVersion of [0, 1]) {
+    for (const startingVersion of Array.from(
+      { length: currentVersion + 1 },
+      (_, version) => version,
+    )) {
       const { registry } = setup()
       const profile = registry.createProfile(`Version ${startingVersion}`)
       const paths = registry.getProfilePaths(profile.id)
@@ -489,7 +625,7 @@ describe('profile application API', () => {
         const application = await openProfileApplication({
           profile,
           paths,
-          migrations: CURRENT_MIGRATIONS,
+          migrations: CURRENT_MIGRATIONS.slice(0, startingVersion),
           clock,
         })
         application.close()
@@ -502,7 +638,15 @@ describe('profile application API', () => {
         clock,
       })
       try {
-        expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(2)
+        expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(
+          currentVersion + 1,
+        )
+        expect(upgraded.queries.listAccounts()).toEqual([])
+        expect(upgraded.queries.getSettings()).toEqual({
+          language: 'en',
+          theme: 'system',
+          baseCurrency: 'HUF',
+        })
       } finally {
         upgraded.close()
       }
@@ -514,9 +658,20 @@ describe('profile application API', () => {
     const profile = registry.createProfile('Migration failure')
     const paths = registry.getProfilePaths(profile.id)
     const initial = await openProfileApplication({ profile, paths, clock })
+    const account = initial.commands.createAccount({
+      name: 'Preserved account',
+      currency: 'HUF',
+      openingBalance: 12345,
+      openingDate: '2026-01-01',
+    })
+    initial.commands.updateSettings({
+      language: 'hu',
+      theme: 'dark',
+      baseCurrency: 'CHF',
+    })
     initial.close()
     const failingMigration = defineSqlMigration(
-      2,
+      currentVersion + 1,
       'fails after changing the schema',
       'CREATE TABLE should_be_rolled_back (value TEXT); INVALID SQL',
     )
@@ -532,7 +687,15 @@ describe('profile application API', () => {
 
     const reopened = await openProfileApplication({ profile, paths, clock })
     try {
-      expect(reopened.queries.getProfileInfo().schemaVersion).toBe(1)
+      expect(reopened.queries.getProfileInfo().schemaVersion).toBe(
+        currentVersion,
+      )
+      expect(reopened.queries.listAccounts()).toEqual([account])
+      expect(reopened.queries.getSettings()).toEqual({
+        language: 'hu',
+        theme: 'dark',
+        baseCurrency: 'CHF',
+      })
     } finally {
       reopened.close()
     }
@@ -552,7 +715,15 @@ describe('profile application API', () => {
       clock,
     })
     try {
-      expect(backupApplication.queries.getProfileInfo().schemaVersion).toBe(1)
+      expect(backupApplication.queries.getProfileInfo().schemaVersion).toBe(
+        currentVersion,
+      )
+      expect(backupApplication.queries.listAccounts()).toEqual([account])
+      expect(backupApplication.queries.getSettings()).toEqual({
+        language: 'hu',
+        theme: 'dark',
+        baseCurrency: 'CHF',
+      })
     } finally {
       backupApplication.close()
     }
@@ -574,7 +745,7 @@ describe('profile application API', () => {
       openProfileApplication({
         profile,
         paths,
-        migrations: [changedFirstMigration],
+        migrations: [changedFirstMigration, ...CURRENT_MIGRATIONS.slice(1)],
         clock,
       }),
     ).rejects.toThrow('migration record 1 is invalid')
@@ -585,7 +756,7 @@ describe('profile application API', () => {
     const profile = registry.createProfile('Newer schema')
     const paths = registry.getProfilePaths(profile.id)
     const secondMigration = defineSqlMigration(
-      2,
+      currentVersion + 1,
       'future schema',
       'CREATE TABLE future_data (value TEXT NOT NULL)',
     )

@@ -39,10 +39,47 @@ export const en = {
     'Recording and reviewing expenses and incomes will be available here later.',
   'accounts.title': 'A place for each account',
   'accounts.description':
-    'Your accounts and their balances will be available here later.',
+    'Each balance is shown in the account currency. Balances currently equal opening balances.',
+  'accounts.create': 'Create account',
+  'accounts.name': 'Account name',
+  'accounts.currency': 'Currency',
+  'accounts.openingBalance': 'Opening balance',
+  'accounts.openingDate': 'Opening date',
+  'accounts.balance': 'Balance',
+  'accounts.balanceHint':
+    'Use a dot or comma and up to two decimal places, without thousands separators. Negative balances are allowed.',
+  'accounts.empty': 'Create an account to start tracking its balance.',
+  'accounts.loading': 'Loading accounts…',
+  'accounts.rename': 'Rename',
+  'accounts.changeCurrency': 'Change currency',
+  'accounts.archive': 'Archive',
+  'accounts.archived': 'Archived — hidden from account pickers',
+  'accounts.delete': 'Delete',
+  'accounts.deleteConfirmation': 'Permanently delete this account?',
+  'accounts.confirmDelete': 'Delete account permanently',
+  'accounts.save': 'Save',
+  'accounts.cancel': 'Cancel',
+  'accounts.refresh': 'Refresh',
+  'accounts.locked':
+    'Accounts with transactions cannot be deleted or have their currency changed.',
+  'accounts.error':
+    'The account operation could not be completed. Refresh and try again.',
+  'accounts.error.name': 'Enter an account name between 1 and 100 characters.',
+  'accounts.error.currency': 'Choose HUF or CHF.',
+  'accounts.error.balance':
+    'Enter a valid balance with up to two decimal places, no grouping, and within ±90,071,992,547,409.91.',
+  'accounts.error.date': 'Enter a valid opening date.',
+  'accounts.error.notFound':
+    'The account could not be found. Refresh the list.',
+  'accounts.error.currencyLocked':
+    'Currency cannot change once the account has transactions.',
+  'accounts.error.notEmpty':
+    'This account has transactions and cannot be deleted. Archive it instead.',
   'settings.title': 'Make yourself at home',
   'settings.description':
-    'Language and appearance changes apply immediately. These temporary choices reset when the app restarts; profile settings will come later.',
+    'Language, appearance and base currency are saved for this profile and apply immediately.',
+  'settings.baseCurrency': 'Base currency',
+  'settings.error': 'The settings could not be saved. Please try again.',
   'backups.title': 'Backups',
   'backups.description':
     'A database backup is taken whenever you open this profile. The last 10 startup backups are kept; pre-migration backups are stored separately.',

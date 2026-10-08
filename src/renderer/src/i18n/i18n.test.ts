@@ -48,3 +48,25 @@ test.each([
     new Intl.NumberFormat(locale).format(12345.67),
   )
 })
+
+test.each([
+  ['hu', '12\u00a0346\u00a0Ft', '123,45\u00a0CHF'],
+  ['en', 'HUF\u00a012,346', 'CHF\u00a0123.45'],
+  ['de', '12.346\u00a0HUF', '123,45\u00a0CHF'],
+] as const)(
+  'displays HUF without decimals and CHF with hundredths in %s',
+  (language, huf, chf) => {
+    const format = createFormatters(language)
+    expect(format.money(1234567, 'HUF')).toBe(huf)
+    expect(format.money(12345, 'CHF')).toBe(chf)
+  },
+)
+
+test('formats exact large and negative CHF hundredths without losing cents', () => {
+  const format = createFormatters('en')
+  expect(format.money(9007199254740991, 'CHF')).toBe(
+    'CHF\u00a090,071,992,547,409.91',
+  )
+  expect(format.money(-1, 'CHF')).toBe('-CHF\u00a00.01')
+  expect(format.money(0, 'CHF')).toBe('CHF\u00a00.00')
+})

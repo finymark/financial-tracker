@@ -41,10 +41,46 @@ export const hu = {
     'A kiadások és bevételek rögzítése és áttekintése később itt lesz elérhető.',
   'accounts.title': 'Minden számlának saját hely',
   'accounts.description':
-    'A számláid és egyenlegeik később itt lesznek elérhetők.',
+    'Minden egyenleg a számla pénznemében látható. Az egyenlegek jelenleg a nyitó egyenlegekkel egyeznek meg.',
+  'accounts.create': 'Számla létrehozása',
+  'accounts.name': 'Számla neve',
+  'accounts.currency': 'Pénznem',
+  'accounts.openingBalance': 'Nyitó egyenleg',
+  'accounts.openingDate': 'Nyitás dátuma',
+  'accounts.balance': 'Egyenleg',
+  'accounts.balanceHint':
+    'Pontot vagy vesszőt és legfeljebb két tizedesjegyet használj, ezres tagolás nélkül. Negatív egyenleg is megadható.',
+  'accounts.empty': 'Hozz létre egy számlát az egyenleg követéséhez.',
+  'accounts.loading': 'Számlák betöltése…',
+  'accounts.rename': 'Átnevezés',
+  'accounts.changeCurrency': 'Pénznem módosítása',
+  'accounts.archive': 'Archiválás',
+  'accounts.archived': 'Archivált — nem jelenik meg a számlaválasztókban',
+  'accounts.delete': 'Törlés',
+  'accounts.deleteConfirmation': 'Végleg törlöd ezt a számlát?',
+  'accounts.confirmDelete': 'Számla végleges törlése',
+  'accounts.save': 'Mentés',
+  'accounts.cancel': 'Mégse',
+  'accounts.refresh': 'Frissítés',
+  'accounts.locked':
+    'A tranzakciókkal rendelkező számla nem törölhető, és a pénzneme nem módosítható.',
+  'accounts.error':
+    'A számlaműveletet nem sikerült végrehajtani. Frissíts, és próbáld újra.',
+  'accounts.error.name': 'Adj meg egy 1–100 karakter hosszú számlanevet.',
+  'accounts.error.currency': 'Válaszd a HUF vagy CHF pénznemet.',
+  'accounts.error.balance':
+    'Adj meg érvényes egyenleget legfeljebb két tizedesjeggyel, tagolás nélkül, ±90 071 992 547 409,91 határon belül.',
+  'accounts.error.date': 'Adj meg érvényes nyitási dátumot.',
+  'accounts.error.notFound': 'A számla nem található. Frissítsd a listát.',
+  'accounts.error.currencyLocked':
+    'A pénznem nem módosítható, ha a számlán már vannak tranzakciók.',
+  'accounts.error.notEmpty':
+    'A számlán vannak tranzakciók, ezért nem törölhető. Archiváld helyette.',
   'settings.title': 'Érezd magad otthon',
   'settings.description':
-    'A nyelv és a megjelenés módosítása azonnal érvényesül. Ezek az ideiglenes beállítások az alkalmazás újraindításakor visszaállnak; a profilbeállítások később érkeznek.',
+    'A nyelv, a megjelenés és az alap pénznem a profilhoz mentődik, és azonnal érvényesül.',
+  'settings.baseCurrency': 'Alap pénznem',
+  'settings.error': 'A beállításokat nem sikerült menteni. Próbáld újra.',
   'backups.title': 'Biztonsági mentések',
   'backups.description':
     'A profil minden megnyitásakor adatbázismentés készül. Az utolsó 10 indítási mentés marad meg; a migráció előtti mentések külön tárolódnak.',

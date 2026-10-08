@@ -1,10 +1,12 @@
 import type {
   ProfileBackup,
-  ProfileInfo,
   RestoreBackupInput,
+  ActiveProfileInfo,
+  UpdateProfileSettingsInput,
   ProfileRegistrySnapshot,
   ProfileSummary,
 } from '../../shared/profiles'
+import type { ProfileSettings } from '../../shared/settings'
 import {
   openProfileApplication,
   type ProfileApplication,
@@ -63,7 +65,7 @@ export class ProfileController {
     this.#registry.deleteProfile(id, confirmation)
   }
 
-  async open(id: string): Promise<ProfileInfo> {
+  async open(id: string): Promise<ActiveProfileInfo> {
     return this.#changeProfile(async () => {
       const profile = this.#registry.getProfile(id)
       const application = await openProfileApplication({
@@ -78,15 +80,33 @@ export class ProfileController {
       }
       this.#closeActive()
       this.#active = { id, application }
-      return this.getActive() as ProfileInfo
+      return this.getActive() as ActiveProfileInfo
     })
   }
 
-  getActive(): ProfileInfo | null {
+  getActive(): ActiveProfileInfo | null {
     if (!this.#active) return null
     const info = this.#active.application.queries.getProfileInfo()
     const currentProfile = this.#registry.getProfile(this.#active.id)
-    return { ...info, name: currentProfile.name }
+    return {
+      ...info,
+      name: currentProfile.name,
+      settings: this.#active.application.queries.getSettings(),
+    }
+  }
+
+  updateSettings(input: UpdateProfileSettingsInput): ProfileSettings {
+    this.#assertIdle()
+    if (!this.#active || this.#active.id !== input.id) {
+      throw new Error('Settings can only be changed for the active profile')
+    }
+    return this.#active.application.commands.updateSettings(input.settings)
+  }
+
+  getActiveApplication(): ProfileApplication {
+    this.#assertIdle()
+    if (!this.#active) throw new Error('No profile is open')
+    return this.#active.application
   }
 
   listBackups(): ProfileBackup[] {
@@ -95,11 +115,11 @@ export class ProfileController {
     return this.#active.application.queries.listBackups()
   }
 
-  async restoreBackup(input: RestoreBackupInput): Promise<ProfileInfo> {
+  async restoreBackup(input: RestoreBackupInput): Promise<ActiveProfileInfo> {
     return this.#changeProfile(async () => {
       if (!this.#active) throw new Error('No profile is open')
       await this.#active.application.commands.restoreBackup(input)
-      return this.getActive() as ProfileInfo
+      return this.getActive() as ActiveProfileInfo
     })
   }
 

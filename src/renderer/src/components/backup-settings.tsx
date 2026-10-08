@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { ProfileBackup, ProfileInfo } from '../../../shared/profiles'
+import type { ProfileBackup, ActiveProfileInfo } from '../../../shared/profiles'
 import { createFormatters, type Language, type MessageKey } from '../i18n'
 import { Button } from './ui/button'
 import {
@@ -13,13 +13,15 @@ import { NativeSelect } from './ui/native-select'
 
 interface BackupSettingsProps {
   language: Language
+  disabled: boolean
   t(key: MessageKey): string
-  onRestored(profile: ProfileInfo): void
+  onRestored(profile: ActiveProfileInfo): void
   onBusyChange(busy: boolean): void
 }
 
 export function BackupSettings({
   language,
+  disabled,
   t,
   onRestored,
   onBusyChange,
@@ -96,7 +98,7 @@ export function BackupSettings({
               <NativeSelect
                 id="backup"
                 value={selectedId}
-                disabled={busy || confirming}
+                disabled={disabled || busy || confirming}
                 onChange={(event) => {
                   setSelectedId(event.target.value)
                   setRestored(false)
@@ -129,12 +131,15 @@ export function BackupSettings({
           <div className="space-y-3 rounded-lg border p-4">
             <p className="text-sm">{t('backups.confirmDescription')}</p>
             <div className="flex flex-wrap gap-2">
-              <Button disabled={busy} onClick={() => void restore()}>
+              <Button
+                disabled={disabled || busy}
+                onClick={() => void restore()}
+              >
                 {t('backups.confirmRestore')}
               </Button>
               <Button
                 variant="ghost"
-                disabled={busy}
+                disabled={disabled || busy}
                 onClick={() => setConfirming(false)}
               >
                 {t('backups.cancel')}
@@ -143,7 +148,7 @@ export function BackupSettings({
           </div>
         ) : (
           <Button
-            disabled={loading || !selectedId || busy}
+            disabled={disabled || loading || !selectedId || busy}
             onClick={() => {
               setConfirming(true)
               setRestored(false)
