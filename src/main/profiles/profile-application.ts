@@ -2236,21 +2236,27 @@ async function openProfileDatabase(
       )
     }
 
-    for (const migration of pending) {
+    if (pending.length > 0) {
+      let migration = pending[0]
       try {
+        // Pending migrations share one atomic transaction. They must remain
+        // synchronous and must not depend on intermediate commits.
         database.transaction(() => {
           database.exec(MIGRATION_TABLE_SQL)
-          migration.apply(database)
-          database
-            .prepare(
-              'INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (?, ?, ?, ?)',
-            )
-            .run(
-              migration.version,
-              migration.name,
-              migration.checksum,
-              clock().toISOString(),
-            )
+          for (const pendingMigration of pending) {
+            migration = pendingMigration
+            migration.apply(database)
+            database
+              .prepare(
+                'INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (?, ?, ?, ?)',
+              )
+              .run(
+                migration.version,
+                migration.name,
+                migration.checksum,
+                clock().toISOString(),
+              )
+          }
         })()
       } catch (error) {
         database.close()

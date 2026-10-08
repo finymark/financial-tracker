@@ -1,8 +1,10 @@
+import type Database from 'better-sqlite3'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import {
+  CURRENT_MIGRATIONS,
   openProfileApplication,
   type ProfileApplication,
 } from './profile-application'
@@ -12,12 +14,29 @@ const directories: string[] = []
 const applications: ProfileApplication[] = []
 const clock = () => new Date('2026-01-15T10:00:00.000Z')
 
-async function setup() {
+async function setup({
+  arrange,
+}: {
+  arrange?: (
+    application: ProfileApplication,
+    account: ReturnType<ProfileApplication['commands']['createAccount']>,
+  ) => void
+} = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'financial-tracker-csv-'))
   directories.push(directory)
   const registry = new ProfileRegistry({ userDataDirectory: directory, clock })
   const profile = registry.createProfile('CSV test')
+  let fixtureDatabase: Database.Database | undefined
   const application = await openProfileApplication({
+    migrations: arrange
+      ? CURRENT_MIGRATIONS.map((migration) => ({
+          ...migration,
+          apply(database) {
+            migration.apply(database)
+            fixtureDatabase = database
+          },
+        }))
+      : CURRENT_MIGRATIONS,
     profile,
     paths: registry.getProfilePaths(profile.id),
     clock,
@@ -30,6 +49,9 @@ async function setup() {
     openingBalance: 0,
     openingDate: '2025-01-01',
   })
+  if (arrange) {
+    fixtureDatabase!.transaction(() => arrange(application, account))()
+  }
   return { application, account }
 }
 
@@ -429,18 +451,21 @@ test('presets use the injected clock, and an empty filtered set still exports a 
 })
 
 test('exports beyond the maximum list page and leaves transaction undo history untouched', async () => {
-  const { application, account } = await setup()
-  for (let index = 0; index < 501; index++) {
-    application.commands.createTransaction({
-      accountId: account.id,
-      kind: 'income',
-      date: '2026-01-15',
-      totalMinor: 1,
-      payeeName: null,
-      categoryId: null,
-      note: '',
-    })
-  }
+  const { application } = await setup({
+    arrange(application, account) {
+      for (let index = 0; index < 501; index++) {
+        application.commands.createTransaction({
+          accountId: account.id,
+          kind: 'income',
+          date: '2026-01-15',
+          totalMinor: 1,
+          payeeName: null,
+          categoryId: null,
+          note: '',
+        })
+      }
+    },
+  })
   const csv = application.queries.exportTransactionsCsv({
     offset: 500,
     limit: 1,

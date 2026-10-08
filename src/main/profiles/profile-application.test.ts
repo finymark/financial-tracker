@@ -15,6 +15,7 @@ import { ProfileRegistry } from './profile-registry'
 import { ProfileController } from './profile-controller'
 import {
   CURRENT_MIGRATIONS,
+  MigrationError,
   NewerSchemaError,
   defineSqlMigration,
   openProfileApplication,
@@ -819,6 +820,8 @@ describe('profile application API', () => {
           paths,
           migrations: CURRENT_MIGRATIONS.slice(0, startingVersion),
           clock,
+          createStartupBackup: false,
+          startBackgroundWork: false,
         })
         application.close()
       }
@@ -847,7 +850,113 @@ describe('profile application API', () => {
     }
   })
 
-  test('a failing migration restores the database and keeps its verified backup', async () => {
+  test('applies dependent pending migrations atomically and records each one', async () => {
+    const { registry } = setup()
+    const profile = registry.createProfile('Dependent migrations')
+    const paths = registry.getProfilePaths(profile.id)
+    const initial = await openProfileApplication({
+      profile,
+      paths,
+      clock,
+      createStartupBackup: false,
+      startBackgroundWork: false,
+    })
+    initial.close()
+    const createsDeferredReference = defineSqlMigration(
+      currentVersion + 1,
+      'create a deferred migration reference',
+      `
+        CREATE TABLE migration_parents (id INTEGER PRIMARY KEY);
+        CREATE TABLE migration_children (
+          parent_id INTEGER NOT NULL REFERENCES migration_parents(id)
+        );
+        PRAGMA defer_foreign_keys = ON;
+        INSERT INTO migration_children (parent_id) VALUES (1);
+      `,
+    )
+    const resolvesDeferredReference = defineSqlMigration(
+      currentVersion + 2,
+      'resolve the deferred migration reference',
+      'INSERT INTO migration_parents (id) VALUES (1)',
+    )
+    const observesEarlierMigrations = defineSqlMigration(
+      currentVersion + 3,
+      'observe earlier pending migrations',
+      'CREATE TABLE migration_chain_complete (value TEXT NOT NULL)',
+    )
+    let observedRows: unknown[] = []
+    let observedReferenceCount = 0
+    const observer = {
+      ...observesEarlierMigrations,
+      apply(database: Database.Database) {
+        observesEarlierMigrations.apply(database)
+        observedRows = database
+          .prepare(
+            'SELECT version, name FROM schema_migrations WHERE version > ? ORDER BY version',
+          )
+          .all(currentVersion)
+        observedReferenceCount = database
+          .prepare(
+            `SELECT count(*) AS count
+             FROM migration_children child
+             JOIN migration_parents parent ON parent.id = child.parent_id`,
+          )
+          .pluck()
+          .get() as number
+      },
+    }
+    const migrations = [
+      ...CURRENT_MIGRATIONS,
+      createsDeferredReference,
+      resolvesDeferredReference,
+      observer,
+    ]
+
+    const upgraded = await openProfileApplication({
+      profile,
+      paths,
+      migrations,
+      clock,
+      createStartupBackup: false,
+      startBackgroundWork: false,
+    })
+    try {
+      expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(
+        currentVersion + 3,
+      )
+      expect(observedRows).toEqual([
+        {
+          version: currentVersion + 1,
+          name: 'create a deferred migration reference',
+        },
+        {
+          version: currentVersion + 2,
+          name: 'resolve the deferred migration reference',
+        },
+      ])
+      expect(observedReferenceCount).toBe(1)
+    } finally {
+      upgraded.close()
+    }
+
+    const reopened = await openProfileApplication({
+      profile,
+      paths,
+      migrations,
+      clock,
+      createStartupBackup: false,
+      startBackgroundWork: false,
+    })
+    try {
+      expect(reopened.queries.getProfileInfo().schemaVersion).toBe(
+        currentVersion + 3,
+      )
+    } finally {
+      reopened.close()
+    }
+  })
+
+  test('a later failing migration restores the database and keeps its verified backup', async () => {
     const { registry } = setup()
     const profile = registry.createProfile('Migration failure')
     const paths = registry.getProfilePaths(profile.id)
@@ -864,22 +973,50 @@ describe('profile application API', () => {
       baseCurrency: 'CHF',
     })
     initial.close()
-    const failingMigration = defineSqlMigration(
+    const successfulMigration = defineSqlMigration(
       currentVersion + 1,
+      'succeeds before a later failure',
+      'CREATE TABLE should_be_rolled_back (value TEXT)',
+    )
+    const failingMigration = defineSqlMigration(
+      currentVersion + 2,
       'fails after changing the schema',
-      'CREATE TABLE should_be_rolled_back (value TEXT); INVALID SQL',
+      'CREATE TABLE failure_side_effect (value TEXT); INVALID SQL',
     )
 
-    await expect(
-      openProfileApplication({
+    let failure: unknown
+    try {
+      await openProfileApplication({
         profile,
         paths,
-        migrations: [...CURRENT_MIGRATIONS, failingMigration],
+        migrations: [
+          ...CURRENT_MIGRATIONS,
+          successfulMigration,
+          failingMigration,
+        ],
         clock,
-      }),
-    ).rejects.toThrow('profiles.error.migration')
+        createStartupBackup: false,
+        startBackgroundWork: false,
+      })
+    } catch (error) {
+      failure = error
+    }
+    expect(failure).toBeInstanceOf(MigrationError)
+    expect(failure).toMatchObject({
+      message: 'profiles.error.migration',
+      migrationVersion: currentVersion + 2,
+      migrationName: 'fails after changing the schema',
+      backupPath: expect.any(String),
+      cause: expect.objectContaining({ code: 'SQLITE_ERROR' }),
+    })
 
-    const reopened = await openProfileApplication({ profile, paths, clock })
+    const reopened = await openProfileApplication({
+      profile,
+      paths,
+      clock,
+      createStartupBackup: false,
+      startBackgroundWork: false,
+    })
     try {
       expect(reopened.queries.getProfileInfo().schemaVersion).toBe(
         currentVersion,
@@ -897,6 +1034,9 @@ describe('profile application API', () => {
     }
     const backups = readdirSync(paths.preMigrationBackupDirectory)
     expect(backups).toHaveLength(1)
+    expect((failure as MigrationError).backupPath).toBe(
+      join(paths.preMigrationBackupDirectory, backups[0]),
+    )
     const backupApplication = await openProfileApplication({
       profile,
       paths: {
@@ -909,6 +1049,8 @@ describe('profile application API', () => {
         ),
       },
       clock,
+      createStartupBackup: false,
+      startBackgroundWork: false,
     })
     try {
       expect(backupApplication.queries.getProfileInfo().schemaVersion).toBe(
@@ -925,6 +1067,136 @@ describe('profile application API', () => {
     } finally {
       backupApplication.close()
     }
+  })
+
+  test('a later failing migration removes a new database and reports the failure', async () => {
+    const { registry } = setup()
+    const profile = registry.createProfile('New migration failure')
+    const paths = registry.getProfilePaths(profile.id)
+    const successfulMigration = defineSqlMigration(
+      currentVersion + 1,
+      'succeeds in a new database',
+      'CREATE TABLE new_database_side_effect (value TEXT)',
+    )
+    const failingMigration = defineSqlMigration(
+      currentVersion + 2,
+      'fails in a new database',
+      'INVALID SQL',
+    )
+
+    let failure: unknown
+    try {
+      await openProfileApplication({
+        profile,
+        paths,
+        migrations: [
+          ...CURRENT_MIGRATIONS,
+          successfulMigration,
+          failingMigration,
+        ],
+        clock,
+        createStartupBackup: false,
+        startBackgroundWork: false,
+      })
+    } catch (error) {
+      failure = error
+    }
+    expect(failure).toBeInstanceOf(MigrationError)
+    expect(failure).toMatchObject({
+      message: 'profiles.error.migration',
+      migrationVersion: currentVersion + 2,
+      migrationName: 'fails in a new database',
+      backupPath: null,
+      cause: expect.objectContaining({ code: 'SQLITE_ERROR' }),
+    })
+    for (const suffix of ['', '-journal', '-wal', '-shm']) {
+      expect(existsSync(`${paths.databasePath}${suffix}`)).toBe(false)
+    }
+  })
+
+  test('a final commit failure restores the verified backup', async () => {
+    const { registry } = setup()
+    const profile = registry.createProfile('Migration commit failure')
+    const paths = registry.getProfilePaths(profile.id)
+    const initial = await openProfileApplication({
+      profile,
+      paths,
+      clock,
+      createStartupBackup: false,
+      startBackgroundWork: false,
+    })
+    const account = initial.commands.createAccount({
+      name: 'Preserved after commit failure',
+      currency: 'HUF',
+      openingBalance: 12345,
+      openingDate: '2026-01-01',
+    })
+    initial.close()
+    const deferredViolation = defineSqlMigration(
+      currentVersion + 1,
+      'leaves a deferred foreign-key violation',
+      `
+        CREATE TABLE commit_failure_parents (id INTEGER PRIMARY KEY);
+        CREATE TABLE commit_failure_children (
+          parent_id INTEGER NOT NULL REFERENCES commit_failure_parents(id)
+        );
+        PRAGMA defer_foreign_keys = ON;
+        INSERT INTO commit_failure_children (parent_id) VALUES (1);
+      `,
+    )
+    const lastMigration = defineSqlMigration(
+      currentVersion + 2,
+      'last migration before the final commit',
+      'CREATE TABLE commit_failure_last (value TEXT)',
+    )
+    let applyCompleted = false
+    const migration = {
+      ...lastMigration,
+      apply(database: Database.Database) {
+        lastMigration.apply(database)
+        applyCompleted = true
+      },
+    }
+
+    let failure: unknown
+    try {
+      await openProfileApplication({
+        profile,
+        paths,
+        migrations: [...CURRENT_MIGRATIONS, deferredViolation, migration],
+        clock,
+        createStartupBackup: false,
+        startBackgroundWork: false,
+      })
+    } catch (error) {
+      failure = error
+    }
+    expect(applyCompleted).toBe(true)
+    expect(failure).toBeInstanceOf(MigrationError)
+    expect(failure).toMatchObject({
+      message: 'profiles.error.migration',
+      migrationVersion: currentVersion + 2,
+      migrationName: 'last migration before the final commit',
+      backupPath: expect.any(String),
+      cause: expect.objectContaining({ code: 'SQLITE_CONSTRAINT_FOREIGNKEY' }),
+    })
+
+    const reopened = await openProfileApplication({
+      profile,
+      paths,
+      clock,
+      createStartupBackup: false,
+      startBackgroundWork: false,
+    })
+    try {
+      expect(reopened.queries.getProfileInfo().schemaVersion).toBe(
+        currentVersion,
+      )
+      expect(reopened.queries.listAccounts()).toEqual([account])
+    } finally {
+      reopened.close()
+    }
+    expect(readdirSync(paths.preMigrationBackupDirectory)).toHaveLength(1)
   })
 
   test('refuses a changed checksum for an already applied migration', async () => {
