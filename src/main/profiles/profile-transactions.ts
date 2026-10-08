@@ -25,6 +25,7 @@ import {
 import { today } from '../../shared/date'
 import { normalizePayeeKey } from '../db'
 import { getTransfer } from './profile-transfers'
+import { getBalanceAdjustment } from './profile-adjustments'
 
 interface StoredTransaction {
   id: string
@@ -320,6 +321,8 @@ export function listTransactions(
   const parameters: (string | number)[] = []
   const transferWhere: string[] = []
   const transferParameters: (string | number)[] = []
+  const adjustmentWhere: string[] = []
+  const adjustmentParameters: (string | number)[] = []
   const add = (condition: string, ...values: (string | number)[]) => {
     where.push(condition)
     parameters.push(...values)
@@ -344,13 +347,19 @@ export function listTransactions(
     transferWhere.push(condition)
     transferParameters.push(...values)
   }
+  const addAdjustment = (condition: string, ...values: (string | number)[]) => {
+    adjustmentWhere.push(condition)
+    adjustmentParameters.push(...values)
+  }
   if (from) {
     add('transactions.date >= ?', from)
     addTransfer('transfers.date >= ?', from)
+    addAdjustment('balance_adjustments.date >= ?', from)
   }
   if (to) {
     add('transactions.date <= ?', to)
     addTransfer('transfers.date <= ?', to)
+    addAdjustment('balance_adjustments.date <= ?', to)
   }
   if (input.accountId) {
     add('transactions.account_id = ?', input.accountId)
@@ -359,14 +368,17 @@ export function listTransactions(
       input.accountId,
       input.accountId,
     )
+    addAdjustment('balance_adjustments.account_id = ?', input.accountId)
   }
   if (input.exclusion === 'onlyExcluded') {
     add('transactions.excluded = 1')
     addTransfer('0 = 1')
+    addAdjustment('0 = 1')
   }
   if (input.exclusion === 'hideExcluded') add('transactions.excluded = 0')
   if (input.payeeId) add('transactions.payee_id = ?', input.payeeId)
   if (input.payeeId) addTransfer('0 = 1')
+  if (input.payeeId) addAdjustment('0 = 1')
   if (input.categoryId) {
     add(
       `EXISTS (
@@ -379,6 +391,7 @@ export function listTransactions(
       input.categoryId,
     )
     addTransfer('0 = 1')
+    addAdjustment('0 = 1')
   }
   if (input.search) {
     add(
@@ -388,6 +401,10 @@ export function listTransactions(
     )
     addTransfer(
       'instr(fold_text(transfers.note), ?) > 0',
+      foldText(input.search),
+    )
+    addAdjustment(
+      'instr(fold_text(balance_adjustments.note), ?) > 0',
       foldText(input.search),
     )
   }
@@ -405,8 +422,20 @@ export function listTransactions(
   const includeTransfers =
     transfersAvailable &&
     Boolean(database.prepare('SELECT 1 FROM transfers LIMIT 1').get())
+  const adjustmentsAvailable = Boolean(
+    database
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'balance_adjustments'",
+      )
+      .get(),
+  )
+  const includeAdjustments =
+    adjustmentsAvailable &&
+    Boolean(database.prepare('SELECT 1 FROM balance_adjustments LIMIT 1').get())
   const filteredTransfers = `FROM transfers
     ${transferWhere.length ? `WHERE ${transferWhere.join(' AND ')}` : ''}`
+  const filteredAdjustments = `FROM balance_adjustments
+    ${adjustmentWhere.length ? `WHERE ${adjustmentWhere.join(' AND ')}` : ''}`
   const entries = `
     SELECT transactions.id, 'transaction' AS entryType,
       transactions.date, transactions.created_at AS createdAt ${filtered}
@@ -416,14 +445,24 @@ export function listTransactions(
     SELECT transfers.id, 'transfer' AS entryType,
       transfers.date, transfers.created_at AS createdAt ${filteredTransfers}`
         : ''
+    }
+    ${
+      includeAdjustments
+        ? `UNION ALL
+    SELECT balance_adjustments.id, 'adjustment' AS entryType,
+      balance_adjustments.date, balance_adjustments.created_at AS createdAt ${filteredAdjustments}`
+        : ''
     }`
-  const entryParameters = includeTransfers
-    ? [...parameters, ...transferParameters]
-    : parameters
+  const entryParameters = [
+    ...parameters,
+    ...(includeTransfers ? transferParameters : []),
+    ...(includeAdjustments ? adjustmentParameters : []),
+  ]
   // One read snapshot for rows and aggregates. Offset allows arbitrary virtual
   // windows; only the bounded page goes through the ledger line checks.
   return database.transaction(() => {
-    const rows = includeTransfers
+    const hasAdditionalEntryTypes = includeTransfers || includeAdjustments
+    const rows = hasAdditionalEntryTypes
       ? (
           database
             .prepare(
@@ -432,10 +471,12 @@ export function listTransactions(
             )
             .all(...entryParameters, input.limit!, input.offset!) as {
             id: string
-            entryType: 'transaction' | 'transfer'
+            entryType: 'transaction' | 'transfer' | 'adjustment'
           }[]
         ).map(({ id, entryType }) => {
           if (entryType === 'transfer') return getTransfer(database, id)
+          if (entryType === 'adjustment')
+            return getBalanceAdjustment(database, id)
           const transaction = getTransaction(database, id)
           const link = database
             .prepare('SELECT id FROM transfers WHERE fee_transaction_id = ?')
@@ -464,12 +505,12 @@ export function listTransactions(
       (
         database
           .prepare(
-            includeTransfers
+            hasAdditionalEntryTypes
               ? `SELECT COUNT(*) AS count FROM (${entries})`
               : `SELECT COUNT(*) AS count ${filtered}`,
           )
           .safeIntegers()
-          .get(...(includeTransfers ? entryParameters : parameters)) as {
+          .get(...(hasAdditionalEntryTypes ? entryParameters : parameters)) as {
           count: bigint
         }
       ).count,
@@ -523,7 +564,7 @@ export function listTransactions(
       total.incomeMinor = safe(BigInt(total.incomeMinor) + row.incomeMinor)
       totals.set(row.currency, total)
     }
-    const days = includeTransfers
+    const days = hasAdditionalEntryTypes
       ? (
           database
             .prepare(

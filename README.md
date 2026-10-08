@@ -5,7 +5,7 @@ TypeScript, and SQLite. The app opens to a collapsible sidebar with Overview,
 Transactions, Accounts, and Settings pages. On start you pick or create a
 profile; each profile has its own SQLite database and data folder. Financial
 data stays local. Accounts track opening balances, signed expense/income
-transactions, and both legs of transfers. Settings includes two-level
+transactions, both legs of transfers, and target-based balance adjustments. Settings includes two-level
 expense/income category management.
 
 ## Requirements
@@ -129,7 +129,7 @@ them, and pattern matching cannot detect every possible form of sensitive data.
 
 The renderer has no Node access; a sandboxed, isolated preload exposes only the
 typed app, update, profile (including settings), account, category, transaction,
-payee, and backup commands/queries. Every IPC input is validated in the main
+transfer, balance adjustment, payee, and backup commands/queries. Every IPC input is validated in the main
 process, and every handler rejects calls not sent by the app's own renderer frame.
 Production CSP permits only same-origin connections; localhost WebSockets are
 added only by the development server for hot reload. SQLite foreign-key
@@ -311,9 +311,10 @@ not off-device copies or backups of the separate data folder.
   accounts remain visible on Accounts with their balance and opening date.
 - Delete an account after confirming in the page. An opening balance alone does
   not prevent deletion: "empty" means no transactions.
-- Balances equal opening balances plus income, minus expenses (including linked
-  transfer fees), and both signed transfer legs. Accounts with transactions or
-  transfers cannot be deleted or have their currency changed; archive them instead.
+- Balances walk the dated account history and include the opening balance, income,
+  expenses (including linked transfer fees), both signed transfer legs, and the
+  recomputed effects of balance adjustments. Accounts with any of those movements
+  cannot be deleted or have their currency changed; archive them instead.
 
 ## Categories
 
@@ -388,6 +389,19 @@ not off-device copies or backups of the separate data folder.
   only-excluded view, where matching days/currencies show zero totals. Saving a
   flag change uses the same Undo toast and Ctrl+Z as other transaction edits.
   Existing transactions remain included when upgrading via migration 8.
+- **Set real balance** opens the drawer for a balance adjustment: an account's
+  observed balance on a non-future date, with an optional note. The stored value
+  is the observation, never a fixed delta. Its displayed difference is recomputed
+  as history changes, so an earlier forgotten movement is absorbed instead of
+  counted twice. Adjustments affect balances but never expense/income totals;
+  they have a distinct list row and a **No correction needed** flag when their
+  current difference is zero. Create, edit, delete, and undo use the same profile
+  command boundary. Migration 10 appends the adjustment table after transfers.
+- Account history is chronological. On one calendar day the opening balance is
+  applied first, ordinary transactions and transfer legs are applied next, and
+  adjustments apply at the end of the day in creation-time/UUID order. Therefore
+  a movement entered later for an adjustment's date is included before that
+  observation and changes the adjustment's effective difference.
 - The dense table is newest first (date, creation timestamp, then UUID), grouped
   by day, with income/expense signs and icons. Transfers have a distinct row and
   icon and show both accounts and amounts. Each day shows totals for that
@@ -481,6 +495,15 @@ totals, and an optional fee defaults to Fees. Try the calculator on both transfe
 amounts and the optional fee, including Enter without saving and leaving the fee
 blank. Mark a fee Excluded, check balances stay unchanged while expense totals
 omit it, then edit/delete/undo the transfer and verify the fee flag is restored.
+Use **Set real balance** for an account showing 51,500 HUF and observe 50,000 HUF
+on 10 October. Check the distinct adjustment row shows a −1,500 HUF difference,
+the account balance becomes 50,000 HUF, and expense/income totals do not change.
+Then enter a forgotten 1,500 HUF expense dated 5 October: the difference must
+become zero, the row must show **No correction needed**, and the balance must
+stay 50,000 HUF. Try zero and negative observations, reject tomorrow's date,
+then create, edit, delete, and undo an adjustment. Check period/account/search
+filters include it, category/payee/only-excluded filters do not, and
+hide-excluded keeps it.
 After create, edit, and delete, use
 both the toast action and `Ctrl+Z` and verify
 the exact previous transaction returns. While typing in amount, payee, note, or

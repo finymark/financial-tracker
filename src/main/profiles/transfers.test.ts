@@ -494,7 +494,9 @@ test('appends transfer migration 9 to an excluded version 8 profile without chan
   previous.close()
   const upgraded = await openProfileApplication({ profile, paths, clock })
   applications.push(upgraded)
-  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(9)
+  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(
+    CURRENT_MIGRATIONS.length,
+  )
   expect(upgraded.queries.listTransactions().rows).toEqual([original])
   expect(upgraded.queries.getAccountBalance(from.id)).toBe(499_000)
   const transfer = upgraded.commands.createTransfer({
@@ -528,7 +530,9 @@ test('appends transfer migration 9 to an excluded version 8 profile without chan
   upgraded.close()
   const reopened = await openProfileApplication({ profile, paths, clock })
   applications.push(reopened)
-  expect(reopened.queries.getProfileInfo().schemaVersion).toBe(9)
+  expect(reopened.queries.getProfileInfo().schemaVersion).toBe(
+    CURRENT_MIGRATIONS.length,
+  )
   expect(reopened.queries.listTransactions().rows).toEqual(rows)
   expect(reopened.queries.listTransactions().totals).toEqual([
     { currency: 'HUF', expenseMinor: 0, incomeMinor: 0 },

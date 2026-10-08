@@ -108,6 +108,27 @@ export const de = {
     'Erfasse Ausgaben, Einnahmen und Umbuchungen, damit deine Kontosalden aktuell bleiben.',
   'transactions.listDescription':
     'Transaktionen nach Zeitraum, Konto, Kategorie, Zahlungspartner oder Notiz filtern.',
+  'adjustments.setRealBalance': 'Tatsächlichen Saldo setzen',
+  'adjustments.edit': 'Saldoabgleich bearbeiten',
+  'adjustments.save': 'Saldoabgleich speichern',
+  'adjustments.deleteConfirmation':
+    'Diesen Saldoabgleich dauerhaft löschen? Der Kontosaldo wird aktualisiert.',
+  'adjustments.confirmDelete': 'Saldoabgleich löschen',
+  'adjustments.rowType': 'Saldoabgleich',
+  'adjustments.observedBalance': 'Beobachteter Saldo',
+  'adjustments.difference': 'Aktuelle Differenz',
+  'adjustments.zeroDifference': 'Keine Korrektur nötig',
+  'adjustments.zeroDifferenceHint':
+    'Dieser Abgleich korrigiert nichts mehr und kann gelöscht werden.',
+  'adjustments.error.account': 'Wähle ein aktives Konto.',
+  'adjustments.error.date': 'Gib ein gültiges Kalenderdatum ein.',
+  'adjustments.error.futureDate':
+    'Das Datum der Saldo-Beobachtung darf nicht in der Zukunft liegen.',
+  'adjustments.error.balance':
+    'Gib einen gültigen Saldo innerhalb von ±90.071.992.547.409,91 ein.',
+  'adjustments.error.note': 'Gib eine Notiz mit höchstens 1.000 Zeichen ein.',
+  'adjustments.error.notFound':
+    'Der Saldoabgleich wurde nicht gefunden. Aktualisiere die Liste.',
   'transactions.excluded': 'Ausgeschlossen',
   'transactions.excludedHint':
     'Im Kontostand enthalten, aber nicht in den Ausgaben- und Einnahmensummen.',
@@ -207,12 +228,12 @@ export const de = {
     'Die Umbuchung wurde nicht gefunden. Aktualisiere die Liste.',
   'transfers.error.linkedFee':
     'Bearbeite oder lösche diese Gebühr über die zugehörige Umbuchung.',
-  'undo.available': 'Transaktion geändert.',
+  'undo.available': 'Änderung gespeichert.',
   'undo.action': 'Rückgängig',
   'undo.error': 'Die Änderung konnte nicht rückgängig gemacht werden.',
   'accounts.title': 'Ein Platz für jedes Konto',
   'accounts.description':
-    'Jeder Saldo kombiniert Eröffnungssaldo, Einnahmen und Ausgaben in der Kontowährung.',
+    'Jeder Saldo kombiniert datierte Kontobewegungen und beobachtete Saldoabgleiche in der Kontowährung.',
   'accounts.create': 'Konto erstellen',
   'accounts.name': 'Kontoname',
   'accounts.currency': 'Währung',

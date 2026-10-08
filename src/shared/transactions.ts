@@ -1,6 +1,7 @@
 import type { CategoryKind } from './categories'
 import type { Currency } from './accounts'
 import type { Transfer } from './transfers'
+import type { BalanceAdjustment } from './adjustments'
 
 export type TransactionKind = CategoryKind
 
@@ -85,7 +86,7 @@ export interface TransactionDayTotals {
 }
 
 export interface TransactionPage {
-  rows: (Transaction | Transfer)[]
+  rows: (Transaction | Transfer | BalanceAdjustment)[]
   totalCount: number
   // Aggregates cover the entire filtered set, independent of offset/limit,
   // and always omit excluded amounts.

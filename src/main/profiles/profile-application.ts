@@ -65,6 +65,11 @@ import type {
   Transfer,
   UpdateTransferInput,
 } from '../../shared/transfers'
+import type {
+  BalanceAdjustment,
+  CreateBalanceAdjustmentInput,
+  UpdateBalanceAdjustmentInput,
+} from '../../shared/adjustments'
 import { listPayees, listTransactions } from './profile-transactions'
 import {
   createTransactionUndoableCommand,
@@ -88,6 +93,11 @@ import {
   deleteTransferUndoableCommand,
   updateTransferUndoableCommand,
 } from './transfer-undo'
+import {
+  createBalanceAdjustmentUndoableCommand,
+  deleteBalanceAdjustmentUndoableCommand,
+  updateBalanceAdjustmentUndoableCommand,
+} from './adjustment-undo'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -163,6 +173,13 @@ export interface ProfileCommands {
   createTransfer(input: CreateTransferInput): Transfer
   updateTransfer(input: UpdateTransferInput): Transfer
   deleteTransfer(id: string): void
+  createBalanceAdjustment(
+    input: CreateBalanceAdjustmentInput,
+  ): BalanceAdjustment
+  updateBalanceAdjustment(
+    input: UpdateBalanceAdjustmentInput,
+  ): BalanceAdjustment
+  deleteBalanceAdjustment(id: string): void
   undoLast(): boolean
   createCategory(input: CreateCategoryInput): Category
   renameCategory(input: RenameCategoryInput): Category
@@ -375,6 +392,28 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
       ON transfers(to_account_id, date DESC, created_at DESC, id DESC);
   `,
   ),
+  defineSqlMigration(
+    10,
+    'target-based balance adjustments',
+    `
+    CREATE TABLE balance_adjustments (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      account_id TEXT NOT NULL REFERENCES accounts(id),
+      date TEXT NOT NULL CHECK (date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+      observed_minor INTEGER NOT NULL CHECK (
+        typeof(observed_minor) = 'integer' AND
+        observed_minor BETWEEN -9007199254740991 AND 9007199254740991
+      ),
+      note TEXT NOT NULL CHECK (length(note) <= 1000),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX balance_adjustments_newest
+      ON balance_adjustments(date DESC, created_at DESC, id DESC);
+    CREATE INDEX balance_adjustments_account_history
+      ON balance_adjustments(account_id, date, created_at, id);
+  `,
+  ),
 ]
 
 function validateMigrations(
@@ -538,6 +577,26 @@ class OpenProfileApplication implements ProfileApplication {
       deleteTransfer: (id) =>
         this.#executeUndoableCommand(
           deleteTransferUndoableCommand(this.#database, id),
+        ),
+      createBalanceAdjustment: (input) =>
+        this.#executeUndoableCommand(
+          createBalanceAdjustmentUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+          ),
+        ),
+      updateBalanceAdjustment: (input) =>
+        this.#executeUndoableCommand(
+          updateBalanceAdjustmentUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+          ),
+        ),
+      deleteBalanceAdjustment: (id) =>
+        this.#executeUndoableCommand(
+          deleteBalanceAdjustmentUndoableCommand(this.#database, id),
         ),
       undoLast: () => {
         this.#assertAvailable()
