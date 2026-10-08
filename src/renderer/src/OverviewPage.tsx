@@ -1,4 +1,4 @@
-import { useAmountFormatters } from './lib/privacy'
+import { useAmountFormatters, usePrivacy } from './lib/privacy'
 import { useEffect, useMemo, useState } from 'react'
 import {
   Bar,
@@ -31,6 +31,7 @@ export function OverviewPage({
   onOpenTransactions,
 }: OverviewPageProps) {
   const format = useAmountFormatters(language)
+  const { privacyMode } = usePrivacy()
   const requestKey = useMemo(() => ({ language }), [language])
   const [result, setResult] = useState<{
     key: typeof requestKey
@@ -216,7 +217,7 @@ export function OverviewPage({
             ) : (
               <>
                 <div
-                  className="h-64 w-full"
+                  className={`h-64 w-full${privacyMode ? ' private-amount' : ''}`}
                   role="img"
                   aria-label={t('overview.chartLabel')}
                 >
@@ -247,6 +248,12 @@ export function OverviewPage({
                             report.thisMonth.expenses.baseCurrency,
                           )
                         }
+                        contentStyle={{
+                          background: 'var(--card)',
+                          borderColor: 'var(--border)',
+                          color: 'var(--card-foreground)',
+                        }}
+                        itemStyle={{ color: 'var(--card-foreground)' }}
                       />
                       <Bar dataKey="value" radius={[0, 5, 5, 0]}>
                         {chartData.map((entry, index) => (

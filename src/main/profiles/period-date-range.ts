@@ -7,6 +7,12 @@ function isoDate(value: Date): string {
   return value.toISOString().slice(0, 10)
 }
 
+export function monthEnd(date: string): string {
+  const first = new Date(`${date.slice(0, 7)}-01T00:00:00Z`)
+  first.setUTCMonth(first.getUTCMonth() + 1, 0)
+  return isoDate(first)
+}
+
 export function resolvePresetDateRange(
   period: PresetPeriod,
   clock: () => Date,
@@ -18,9 +24,9 @@ export function resolvePresetDateRange(
     return { from: `${current.slice(0, 4)}-01-01`, to: current }
   if (period === 'lastMonth') {
     const firstOfThisMonth = new Date(`${current.slice(0, 7)}-01T00:00:00Z`)
-    const last = new Date(firstOfThisMonth)
-    last.setUTCDate(0)
-    return { from: `${isoDate(last).slice(0, 7)}-01`, to: isoDate(last) }
+    firstOfThisMonth.setUTCDate(0)
+    const last = isoDate(firstOfThisMonth)
+    return { from: `${last.slice(0, 7)}-01`, to: last }
   }
   const first = new Date(`${current}T00:00:00Z`)
   first.setUTCFullYear(first.getUTCFullYear() - 1)

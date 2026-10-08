@@ -1,4 +1,4 @@
-import { useAmountFormatters } from './lib/privacy'
+import { useAmountFormatters, usePrivacy } from './lib/privacy'
 import { useEffect, useMemo, useState } from 'react'
 import {
   Bar,
@@ -30,6 +30,7 @@ export function MonthlyTrendReport({
   t,
 }: MonthlyTrendReportProps) {
   const format = useAmountFormatters(language)
+  const { privacyMode } = usePrivacy()
   const reportKey = useMemo(() => ({ request, language }), [request, language])
   const [result, setResult] = useState<{
     key: typeof reportKey
@@ -139,7 +140,7 @@ export function MonthlyTrendReport({
       </div>
       <div className="overflow-x-auto">
         <div
-          className="h-80 w-full"
+          className={`h-80 w-full${privacyMode ? ' private-amount' : ''}`}
           style={{ minWidth: Math.max(600, report.months.length * 72) }}
           role="img"
           aria-label={t('reports.trend.chartLabel')}

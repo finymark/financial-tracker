@@ -21,6 +21,14 @@ function calendarDate(value: unknown): string | undefined {
     : undefined
 }
 
+function exceedsMaximumRange(from: string, to: string): boolean {
+  const yearDifference = Number(to.slice(0, 4)) - Number(from.slice(0, 4))
+  return (
+    yearDifference > 100 ||
+    (yearDifference === 100 && to.slice(4) > from.slice(4))
+  )
+}
+
 export function parseReportDateRangeInput(
   value: unknown,
 ): ReportDateRangeInput {
@@ -36,7 +44,12 @@ export function parseReportDateRangeInput(
   const from = calendarDate(input.from)
   const to = calendarDate(input.to)
   if (
-    (period === 'custom' && (!from || !to || from > to)) ||
+    (period === 'custom' &&
+      (!from ||
+        !to ||
+        from > to ||
+        from < '1900-01-01' ||
+        exceedsMaximumRange(from, to))) ||
     (period !== 'custom' &&
       (input.from !== undefined || input.to !== undefined))
   )

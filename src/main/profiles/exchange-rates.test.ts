@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, expect, test } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import type { ExchangeRateSource } from '../exchange-rates/exchange-rate-source'
 import {
   openProfileApplication,
@@ -14,7 +14,10 @@ const applications: ProfileApplication[] = []
 let now = new Date('2026-08-25T10:00:00.000Z')
 const clock = () => now
 
-async function setup(baseCurrency: 'HUF' | 'CHF' = 'HUF') {
+async function setup(
+  baseCurrency: 'HUF' | 'CHF' = 'HUF',
+  exchangeRateSource?: ExchangeRateSource,
+) {
   const directory = mkdtempSync(join(tmpdir(), 'financial-tracker-rates-'))
   directories.push(directory)
   const registry = new ProfileRegistry({ userDataDirectory: directory, clock })
@@ -23,6 +26,7 @@ async function setup(baseCurrency: 'HUF' | 'CHF' = 'HUF') {
     profile,
     paths: registry.getProfilePaths(profile.id),
     clock,
+    exchangeRateSource,
   })
   applications.push(application)
   application.commands.updateSettings({ baseCurrency })
@@ -68,13 +72,13 @@ test('refreshes only the needed range and converts with previous-published-day f
 
   expect(fake.calls).toEqual([
     {
-      startDate: '2026-08-14',
+      startDate: '2026-07-31',
       endDate: '2026-08-25',
       currencies: ['CHF'],
     },
   ])
   expect(application.queries.getRateStatus()).toEqual({
-    coverage: { startDate: '2026-08-14', endDate: '2026-08-25' },
+    coverage: { startDate: '2026-07-31', endDate: '2026-08-25' },
     lastRefresh: '2026-08-25T10:00:00.000Z',
     stale: false,
     missing: false,
@@ -99,6 +103,185 @@ test('refreshes only the needed range and converts with previous-published-day f
     endDate: '2026-08-26',
     currencies: ['CHF'],
   })
+})
+
+test('keeps today open until its rate is published and advances it on the next day', async () => {
+  const application = await setup()
+  application.commands.createAccount({
+    name: 'CHF cash',
+    currency: 'CHF',
+    openingBalance: 0,
+    openingDate: '2026-08-24',
+  })
+  let publishedToday = false
+  const calls: Parameters<ExchangeRateSource['fetchRates']>[0][] = []
+  const fake: ExchangeRateSource = {
+    async fetchRates(input) {
+      calls.push(input)
+      return [
+        {
+          date: '2026-08-24',
+          currency: 'CHF' as const,
+          rate: '400',
+          unit: 1,
+        },
+        ...(publishedToday
+          ? [
+              {
+                date: '2026-08-25',
+                currency: 'CHF' as const,
+                rate: '401',
+                unit: 1,
+              },
+            ]
+          : []),
+      ].filter(
+        (rate) => rate.date >= input.startDate && rate.date <= input.endDate,
+      )
+    },
+  }
+
+  await application.commands.refreshExchangeRates(fake)
+  expect(application.queries.getRateStatus()).toMatchObject({
+    coverage: { startDate: '2026-08-10', endDate: '2026-08-24' },
+    stale: false,
+  })
+
+  publishedToday = true
+  await application.commands.refreshExchangeRates(fake)
+  expect(calls.at(-1)).toMatchObject({
+    startDate: '2026-08-25',
+    endDate: '2026-08-25',
+  })
+  expect(application.queries.getRateStatus().coverage?.endDate).toBe(
+    '2026-08-25',
+  )
+  const requestCount = calls.length
+  await application.commands.refreshExchangeRates(fake)
+  expect(calls).toHaveLength(requestCount)
+
+  now = new Date('2026-08-26T10:00:00.000Z')
+  await application.commands.refreshExchangeRates(fake)
+  expect(calls.at(-1)).toMatchObject({
+    startDate: '2026-08-26',
+    endDate: '2026-08-26',
+  })
+  expect(application.queries.getRateStatus().coverage?.endDate).toBe(
+    '2026-08-25',
+  )
+})
+
+test('extends a backwards fetch so a Saturday opening date can use Friday rate', async () => {
+  const application = await setup()
+  application.commands.createAccount({
+    name: 'Weekend CHF',
+    currency: 'CHF',
+    openingBalance: 0,
+    openingDate: '2026-08-22',
+  })
+  const fake = source([
+    { date: '2026-08-21', currency: 'CHF', rate: '400', unit: 1 },
+  ])
+
+  await application.commands.refreshExchangeRates(fake.value)
+
+  expect(fake.calls[0]).toEqual({
+    startDate: '2026-08-08',
+    endDate: '2026-08-25',
+    currencies: ['CHF'],
+  })
+  expect(
+    application.queries.convertToBaseCurrency([
+      { date: '2026-08-22', currency: 'CHF', amountMinor: 100 },
+    ]),
+  ).toMatchObject({ roundedMinor: 40_000, unconverted: [], stale: false })
+})
+
+test('coalesces non-blocking refreshes after account, transaction, and transfer writes extend rate needs', async () => {
+  const calls: Parameters<ExchangeRateSource['fetchRates']>[0][] = []
+  let resolveFirst!: (
+    value: Awaited<ReturnType<ExchangeRateSource['fetchRates']>>,
+  ) => void
+  let first = true
+  const fake: ExchangeRateSource = {
+    fetchRates(input) {
+      calls.push(input)
+      if (first) {
+        first = false
+        return new Promise((resolve) => {
+          resolveFirst = resolve
+        })
+      }
+      return Promise.resolve([
+        { date: input.startDate, currency: 'CHF', rate: '400', unit: 1 },
+      ])
+    },
+  }
+  const application = await setup('HUF', fake)
+  const foreign = application.commands.createAccount({
+    name: 'Initially HUF',
+    currency: 'HUF',
+    openingBalance: 0,
+    openingDate: '2026-08-01',
+  })
+  expect(calls).toHaveLength(0)
+
+  application.commands.changeAccountCurrency({
+    id: foreign.id,
+    currency: 'CHF',
+  })
+  expect(calls).toHaveLength(1)
+  application.commands.createTransaction({
+    accountId: foreign.id,
+    kind: 'expense',
+    date: '2026-07-01',
+    totalMinor: 100,
+    payeeName: null,
+    categoryId: null,
+    note: '',
+  })
+  expect(calls).toHaveLength(1)
+  resolveFirst([{ date: '2026-08-01', currency: 'CHF', rate: '400', unit: 1 }])
+  await vi.waitFor(() => expect(calls).toHaveLength(3))
+  await vi.waitFor(() =>
+    expect(application.queries.getRateStatus().coverage?.startDate).toBe(
+      '2026-06-17',
+    ),
+  )
+
+  application.commands.createTransaction({
+    accountId: foreign.id,
+    kind: 'expense',
+    date: '2026-06-01',
+    totalMinor: 100,
+    payeeName: null,
+    categoryId: null,
+    note: '',
+  })
+  await vi.waitFor(() => expect(calls).toHaveLength(4))
+  await vi.waitFor(() =>
+    expect(application.queries.getRateStatus().coverage?.startDate).toBe(
+      '2026-05-18',
+    ),
+  )
+
+  const huf = application.commands.createAccount({
+    name: 'HUF',
+    currency: 'HUF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  application.commands.createTransfer({
+    fromAccountId: foreign.id,
+    fromAmountMinor: 100,
+    toAccountId: huf.id,
+    toAmountMinor: 40_000,
+    date: '2026-05-01',
+    note: '',
+    fee: { amountMinor: 10, categoryId: null, excluded: false },
+  })
+  await vi.waitFor(() => expect(calls).toHaveLength(5))
+  expect(calls[4].startDate).toBe('2026-04-17')
 })
 
 test('keeps missing amounts explicit and flags cached rates after coverage as stale', async () => {
@@ -133,6 +316,11 @@ test('keeps missing amounts explicit and flags cached rates after coverage as st
     stale: true,
     missing: true,
   })
+  expect(
+    application.queries.convertToBaseCurrency([
+      { date: '2026-08-20', currency: 'CHF', amountMinor: 100 },
+    ]),
+  ).toMatchObject({ roundedMinor: 40_000, stale: false, unconverted: [] })
   expect(
     application.queries.convertToBaseCurrency([
       { date: '2026-08-26', currency: 'CHF', amountMinor: 100 },

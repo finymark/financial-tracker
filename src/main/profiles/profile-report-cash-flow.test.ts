@@ -304,7 +304,7 @@ test('cash flow uses dated cached rates and weekend fallback, separates missing 
   expect(application.queries.getCashFlow({ period: 'thisMonth' })).toEqual({
     range: { from: '2026-03-01', to: '2026-03-14' },
     baseCurrency: 'HUF',
-    stale: false,
+    stale: true,
     unconverted: [{ currency: 'CHF', incomeMinor: 50, expenseMinor: 25 }],
     nodes: [
       { kind: 'income', categoryId: null, name: null, value: 45_000 },

@@ -7,8 +7,7 @@ import type {
   OverviewDashboard,
   OverviewTotals,
 } from '../../shared/report-overview'
-import type { ReportDateRange } from '../../shared/reports'
-import { convertToBaseCurrency } from './profile-exchange-rates'
+import { createBaseCurrencyConverter } from './profile-exchange-rates'
 import { resolvePresetDateRange } from './period-date-range'
 import { getCategoryBreakdown, reportLines } from './profile-reports'
 
@@ -26,17 +25,6 @@ function compareExact(
   return difference > 0n ? 1 : difference < 0n ? -1 : 0
 }
 
-function shareBasisPoints(
-  amount: ExactBaseCurrencyAmount,
-  total: ExactBaseCurrencyAmount,
-): number {
-  if (BigInt(total.numerator) === 0n) return 0
-  const numerator =
-    BigInt(amount.numerator) * BigInt(total.denominator) * 10000n
-  const denominator = BigInt(amount.denominator) * BigInt(total.numerator)
-  return Number((numerator + denominator / 2n) / denominator)
-}
-
 export function getOverviewDashboard(
   database: Database.Database,
   clock: () => Date,
@@ -46,24 +34,23 @@ export function getOverviewDashboard(
   const snapshotClock = () => now
   const thisRange = resolvePresetDateRange('thisMonth', snapshotClock)
   const lastRange = resolvePresetDateRange('lastMonth', snapshotClock)
+  const currentLines = reportLines(database, thisRange)
+  const previousLines = reportLines(database, lastRange)
   const currentBreakdown = getCategoryBreakdown(
     database,
     thisRange,
-    snapshotClock,
+    currentLines,
   )
-  const previousBreakdown = getCategoryBreakdown(
-    database,
-    lastRange,
-    snapshotClock,
-  )
-  const linesFor = (range: ReportDateRange) => ({
-    expenses: reportLines(database, range),
-    incomes: reportLines(database, range, 'income'),
+  const linesFor = (lines: ReturnType<typeof reportLines>) => ({
+    expenses: lines.filter((line) => line.kind === 'expense'),
+    incomes: lines.filter((line) => line.kind === 'income'),
   })
-  const current = linesFor(thisRange)
-  const previous = linesFor(lastRange)
-  const convert = (lines: readonly ConversionLine[]) =>
-    convertToBaseCurrency(database, lines, snapshotClock)
+  const current = linesFor(currentLines)
+  const previous = linesFor(previousLines)
+  const convert = createBaseCurrencyConverter(database, [
+    ...currentLines,
+    ...previousLines,
+  ])
   const totals = (lines: {
     expenses: readonly ConversionLine[]
     incomes: readonly ConversionLine[]
@@ -76,12 +63,10 @@ export function getOverviewDashboard(
     thisMonth: {
       range: thisRange,
       ...totals(current),
-      expenses: currentBreakdown.total,
     },
     lastMonth: {
       range: lastRange,
       ...totals(previous),
-      expenses: previousBreakdown.total,
     },
     change: totals({
       expenses: [...current.expenses, ...negate(previous.expenses)],
@@ -94,14 +79,11 @@ export function getOverviewDashboard(
           (left.categoryId ?? '').localeCompare(right.categoryId ?? ''),
       )
       .slice(0, 5)
-      .map(({ categoryId, name, total }) => ({
+      .map(({ categoryId, name, total, shareBasisPoints }) => ({
         categoryId,
         name,
         total,
-        shareBasisPoints: shareBasisPoints(
-          total.exactTotal,
-          currentBreakdown.total.exactTotal,
-        ),
+        shareBasisPoints,
       })),
   }
 }

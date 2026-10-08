@@ -164,6 +164,7 @@ import type {
 import {
   convertToBaseCurrency,
   getRateStatus,
+  needsExchangeRateRefresh,
   refreshExchangeRates as refreshProfileExchangeRates,
 } from './profile-exchange-rates'
 import type {
@@ -234,6 +235,9 @@ export interface OpenProfileApplicationOptions {
   migrations?: readonly SchemaMigration[]
   clock?: () => Date
   createStartupBackup?: boolean
+  exchangeRateSource?: ExchangeRateSource
+  onRateStatusChanged?: () => void
+  logger?: Pick<Console, 'error'>
 }
 
 export interface ProfileQueries {
@@ -946,6 +950,8 @@ class OpenProfileApplication implements ProfileApplication {
   readonly #profile: ProfileSummary
   readonly #clock: () => Date
   readonly #undoHistory = new UndoHistory()
+  #pendingRateRefresh: Promise<void> | null = null
+  #rateRefreshRequested = false
 
   constructor(
     database: Database.Database,
@@ -956,14 +962,7 @@ class OpenProfileApplication implements ProfileApplication {
     this.#options = options
     this.#clock = options.clock ?? (() => new Date())
     this.commands = {
-      refreshExchangeRates: (source) =>
-        refreshProfileExchangeRates(
-          this.#database,
-          source,
-          this.#clock,
-          () => this.#assertAvailable(),
-          (operation) => this.#executeBackgroundWrite(operation),
-        ),
+      refreshExchangeRates: (source) => this.#refreshExchangeRates(source),
       updateTemplate: (input) =>
         this.#executeUndoableCommand(
           updateTemplateUndoableCommand(this.#database, input, this.#clock),
@@ -985,7 +984,7 @@ class OpenProfileApplication implements ProfileApplication {
           createTemplateUndoableCommand(this.#database, input, this.#clock),
         ),
       duplicateTransaction: (id) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           duplicateTransactionUndoableCommand(this.#database, id, this.#clock),
         ),
       createCategorisationRule: (input) =>
@@ -1013,15 +1012,15 @@ class OpenProfileApplication implements ProfileApplication {
           deleteCategorisationRuleUndoableCommand(this.#database, id),
         ),
       createTransaction: (input) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           createTransactionUndoableCommand(this.#database, input, this.#clock),
         ),
       updateTransaction: (input) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           updateTransactionUndoableCommand(this.#database, input, this.#clock),
         ),
       deleteTransaction: (id) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           deleteTransactionUndoableCommand(this.#database, id),
         ),
       deleteTag: (id) =>
@@ -1033,15 +1032,15 @@ class OpenProfileApplication implements ProfileApplication {
           renameTagUndoableCommand(this.#database, input),
         ),
       createTransfer: (input) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           createTransferUndoableCommand(this.#database, input, this.#clock),
         ),
       updateTransfer: (input) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           updateTransferUndoableCommand(this.#database, input, this.#clock),
         ),
       deleteTransfer: (id) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           deleteTransferUndoableCommand(this.#database, id),
         ),
       addPayeeAlias: (input) =>
@@ -1135,7 +1134,7 @@ class OpenProfileApplication implements ProfileApplication {
       restoreBackup: (input) => this.#restoreBackup(input),
       ensureProfileIdentity: () => this.#ensureProfileIdentity(),
       createAccount: (input) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           createAccountUndoableCommand(this.#database, input, this.#clock),
         ),
       renameAccount: (input) =>
@@ -1143,7 +1142,7 @@ class OpenProfileApplication implements ProfileApplication {
           renameAccountUndoableCommand(this.#database, input),
         ),
       changeAccountCurrency: (input) =>
-        this.#executeUndoableCommand(
+        this.#executeAndRefreshRates(
           changeAccountCurrencyUndoableCommand(this.#database, input),
         ),
       archiveAccount: (id) =>
@@ -1168,7 +1167,7 @@ class OpenProfileApplication implements ProfileApplication {
           this.#clock,
         )
         return this.#database.transaction(() =>
-          getCashFlow(this.#database, range, this.#clock),
+          getCashFlow(this.#database, range),
         )()
       },
       getSpendingPace: () => {
@@ -1190,7 +1189,7 @@ class OpenProfileApplication implements ProfileApplication {
           this.#clock,
         )
         return this.#database.transaction(() =>
-          getMonthlyTrend(this.#database, range, this.#clock),
+          getMonthlyTrend(this.#database, range),
         )()
       },
       getCategoryBreakdown: (input) => {
@@ -1200,7 +1199,7 @@ class OpenProfileApplication implements ProfileApplication {
           this.#clock,
         )
         return this.#database.transaction(() =>
-          getCategoryBreakdown(this.#database, range, this.#clock),
+          getCategoryBreakdown(this.#database, range),
         )()
       },
       exportTransactionsCsv: (input) => {
@@ -1211,7 +1210,7 @@ class OpenProfileApplication implements ProfileApplication {
       },
       convertToBaseCurrency: (lines) => {
         this.#assertAvailable()
-        return convertToBaseCurrency(this.#database, lines, this.#clock)
+        return convertToBaseCurrency(this.#database, lines)
       },
       getRateStatus: () => {
         this.#assertAvailable()
@@ -1241,7 +1240,6 @@ class OpenProfileApplication implements ProfileApplication {
               amountMinor: total.expenseMinor,
             })),
           ),
-          this.#clock,
         )
         const income = convertToBaseCurrency(
           this.#database,
@@ -1252,7 +1250,6 @@ class OpenProfileApplication implements ProfileApplication {
               amountMinor: total.incomeMinor,
             })),
           ),
-          this.#clock,
         )
         const unconverted = new Map<
           (typeof expense.unconverted)[number]['currency'],
@@ -1490,11 +1487,56 @@ class OpenProfileApplication implements ProfileApplication {
     this.#database.transaction(operation)()
   }
 
+  #refreshExchangeRates(source: ExchangeRateSource): Promise<void> {
+    this.#assertAvailable()
+    if (this.#pendingRateRefresh) return this.#pendingRateRefresh
+    const pending = refreshProfileExchangeRates(
+      this.#database,
+      source,
+      this.#clock,
+      () => this.#assertAvailable(),
+      (operation) => this.#executeBackgroundWrite(operation),
+    ).finally(() => {
+      if (this.#pendingRateRefresh === pending) this.#pendingRateRefresh = null
+    })
+    this.#pendingRateRefresh = pending
+    return pending
+  }
+
+  #maybeRefreshExchangeRates(): void {
+    const source = this.#options.exchangeRateSource
+    if (!source || !needsExchangeRateRefresh(this.#database)) return
+    if (this.#pendingRateRefresh) {
+      this.#rateRefreshRequested = true
+      return
+    }
+    void this.#refreshExchangeRates(source)
+      .catch((error: unknown) => {
+        const logger = this.#options.logger ?? console
+        logger.error('Exchange-rate refresh failed', error)
+      })
+      .finally(() => {
+        this.#options.onRateStatusChanged?.()
+        if (this.#rateRefreshRequested) {
+          this.#rateRefreshRequested = false
+          this.#maybeRefreshExchangeRates()
+        }
+      })
+  }
+
   #executeUndoableCommand<BeforeImage, AfterImage, Result>(
     command: UndoableCommand<BeforeImage, AfterImage, Result>,
   ): Result {
     this.#assertAvailable()
     return this.#undoHistory.execute(this.#database, command)
+  }
+
+  #executeAndRefreshRates<BeforeImage, AfterImage, Result>(
+    command: UndoableCommand<BeforeImage, AfterImage, Result>,
+  ): Result {
+    const result = this.#executeUndoableCommand(command)
+    this.#maybeRefreshExchangeRates()
+    return result
   }
 
   #updateSettings(changes: ProfileSettingsChanges): ProfileSettings {

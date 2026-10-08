@@ -1,4 +1,4 @@
-import { useAmountFormatters } from './lib/privacy'
+import { useAmountFormatters, usePrivacy } from './lib/privacy'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   Bar,
@@ -41,18 +41,13 @@ const chartColors = Array.from(
   (_, index) => `var(--chart-${index + 1})`,
 )
 
-function displayPercentage(amount: number, total: number): number {
-  if (total <= 0) return 0
-  // Percentages are display-only. Integer basis points avoid float money math.
-  return Number((BigInt(amount) * 10_000n + BigInt(total) / 2n) / BigInt(total))
-}
-
 export function ReportsPage({
   language,
   t,
   onOpenTransactions,
 }: ReportsPageProps) {
   const format = useAmountFormatters(language)
+  const { privacyMode } = usePrivacy()
   const [tab, setTab] = useState<'category' | 'trend' | 'pace' | 'cashFlow'>(
     'category',
   )
@@ -130,6 +125,7 @@ export function ReportsPage({
       from: report.range.from,
       to: report.range.to,
       kind: 'expense',
+      exclusion: 'hideExcluded',
       ...(categoryId === null
         ? { uncategorized: true }
         : { categoryId, exactCategory }),
@@ -325,7 +321,7 @@ export function ReportsPage({
             </p>
           ) : (
             <div
-              className="h-80 w-full"
+              className={`h-80 w-full${privacyMode ? ' private-amount' : ''}`}
               role="img"
               aria-label={t('reports.chartLabel')}
             >
@@ -349,6 +345,7 @@ export function ReportsPage({
                         <Cell
                           key={entry.id}
                           fill={chartColors[index % chartColors.length]}
+                          stroke="var(--background)"
                         />
                       ))}
                     </Pie>
@@ -356,6 +353,12 @@ export function ReportsPage({
                       formatter={(value) =>
                         format.money(Number(value), report.total.baseCurrency)
                       }
+                      contentStyle={{
+                        background: 'var(--card)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--card-foreground)',
+                      }}
+                      itemStyle={{ color: 'var(--card-foreground)' }}
                     />
                   </PieChart>
                 ) : (
@@ -382,6 +385,12 @@ export function ReportsPage({
                       formatter={(value) =>
                         format.money(Number(value), report.total.baseCurrency)
                       }
+                      contentStyle={{
+                        background: 'var(--card)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--card-foreground)',
+                      }}
+                      itemStyle={{ color: 'var(--card-foreground)' }}
                     />
                     <Bar
                       dataKey="value"
@@ -441,13 +450,6 @@ export function ReportsPage({
                   {(selected ? selected.subcategories : report.categories).map(
                     (category) => {
                       const name = category.name ?? t('reports.uncategorized')
-                      const parentTotal = selected
-                        ? selected.total.roundedMinor
-                        : report.total.roundedMinor
-                      const basisPoints = displayPercentage(
-                        category.total.roundedMinor,
-                        parentTotal,
-                      )
                       return (
                         <tr key={category.categoryId ?? 'uncategorized'}>
                           <td className="border-t px-3 py-2">
@@ -485,7 +487,7 @@ export function ReportsPage({
                           </td>
                           <td className="border-t px-3 py-2 text-right tabular-nums">
                             {format.amountText(
-                              format.number(basisPoints / 100, {
+                              format.number(category.shareBasisPoints / 100, {
                                 minimumFractionDigits: 0,
                                 maximumFractionDigits: 2,
                               }),
