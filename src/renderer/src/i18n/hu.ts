@@ -637,7 +637,9 @@ export const hu = {
   'settings.error': 'A beállításokat nem sikerült menteni. Próbáld újra.',
   'watchedFolder.title': 'Figyelt mappa',
   'watchedFolder.hint':
-    'Bármely helyi mappa használható, például a Google Drive asztali alkalmazással vagy a OneDrive-val szinkronizált mappa. A teljesen átmásolt nyugtafotók a feldolgozott almappába kerülnek.',
+    'A Financial Tracker adatmappáján kívül bármely helyi mappa használható, például a Google Drive asztali alkalmazással vagy a OneDrive-val szinkronizált mappa. A teljesen átmásolt nyugtafotók a feldolgozott almappába kerülnek.',
+  'watchedFolder.error.userData':
+    'Válassz a Financial Tracker adatmappáján kívüli mappát.',
   'watchedFolder.current': 'Jelenlegi mappa',
   'watchedFolder.none': 'Nincs kiválasztott mappa',
   'watchedFolder.status': 'Állapot',

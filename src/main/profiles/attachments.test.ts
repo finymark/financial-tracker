@@ -8,9 +8,9 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import sharp from 'sharp'
-import { afterEach, expect, test } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import type { CreateTransactionInput } from '../../shared/transactions'
 import {
   openProfileApplication,
@@ -106,12 +106,12 @@ test('imports supported files by magic bytes, preserves small files, and rejects
   const stagedJpeg = await application.commands.importAttachment(jpegPath)
   const stagedWebp = await application.commands.importAttachment(webpPath)
   expect(stagedPng).toMatchObject({
-    originalFileName: 'receipt.txt',
+    originalFileName: 'receipt.png',
     mediaType: 'image/png',
     byteSize: png.length,
   })
   expect(stagedPdf).toMatchObject({
-    originalFileName: 'invoice.bin',
+    originalFileName: 'invoice.pdf',
     mediaType: 'application/pdf',
     byteSize: pdf.length,
   })
@@ -143,6 +143,46 @@ test('imports supported files by magic bytes, preserves small files, and rejects
   await expect(
     application.commands.importAttachment(largePath),
   ).rejects.toThrow('attachments.error.size')
+})
+
+test('forces detected extensions and makes unsafe Windows names harmless', async () => {
+  const { application, paths } = await setup()
+  const bytes = await sharp({
+    create: { width: 4, height: 3, channels: 3, background: '#c04020' },
+  })
+    .jpeg()
+    .toBuffer()
+
+  const names = ['x.hta', 'a.jpg:x', 'CON.png', 'name.']
+  const receipts = []
+  for (const name of names) {
+    receipts.push(
+      await application.commands.intakeReceipt({ bytes, name }, 'phone'),
+    )
+  }
+
+  expect(receipts.map(({ originalFileName }) => originalFileName)).toEqual([
+    'x.jpg',
+    'a.jpg',
+    'attachment.jpg',
+    'name.jpg',
+  ])
+  const temporary = join(paths.profileDirectory, 'open')
+  for (const receipt of receipts) {
+    const copy = application.commands.copyAttachmentForOpening(
+      {
+        attachment: {
+          originalFileName: receipt.originalFileName,
+          storedName: receipt.storedName,
+          mediaType: receipt.mediaType,
+          byteSize: receipt.byteSize,
+        },
+      },
+      temporary,
+    )
+    expect(basename(copy)).toMatch(/\.jpg$/)
+    expect(basename(copy)).not.toMatch(/[<>:"/\\|?*]/)
+  }
 })
 
 test('applies EXIF orientation, bounds large images, deduplicates, and never rewrites stored content', async () => {
@@ -341,4 +381,84 @@ test('startup backups incrementally pool content and restore missing referenced 
   expect(nextBackup.queries.listAttachments(transaction.id)).toEqual(
     transaction.attachments,
   )
+})
+
+test('a missing referenced attachment does not prevent startup backup or profile open', async () => {
+  const context = await setup()
+  const source = join(context.paths.profileDirectory, 'receipt.pdf')
+  writeFileSync(source, '%PDF-1.7\nmissing source\n%%EOF\n')
+  const staged = await context.application.commands.importAttachment(source)
+  context.application.commands.createTransaction({
+    ...context.input,
+    stagedAttachments: [staged],
+  })
+  context.application.close()
+  applications.splice(applications.indexOf(context.application), 1)
+  rmSync(join(context.paths.dataDirectory, 'attachments', staged.storedName))
+
+  const logger = { error: vi.fn() }
+  const reopened = await openProfileApplication({
+    profile: context.profile,
+    paths: context.paths,
+    clock,
+    logger,
+  })
+  applications.push(reopened)
+
+  expect(reopened.queries.listBackups()).toHaveLength(1)
+  expect(logger.error).toHaveBeenCalled()
+})
+
+test('a corrupt backup-pool file is repaired by backup and never restored', async () => {
+  const context = await setup()
+  const source = join(context.paths.profileDirectory, 'receipt.pdf')
+  writeFileSync(source, '%PDF-1.7\nverified pool bytes\n%%EOF\n')
+  const staged = await context.application.commands.importAttachment(source)
+  context.application.commands.createTransaction({
+    ...context.input,
+    stagedAttachments: [staged],
+  })
+  context.application.close()
+  applications.splice(applications.indexOf(context.application), 1)
+
+  const backedUp = await openProfileApplication({
+    profile: context.profile,
+    paths: context.paths,
+    clock,
+  })
+  applications.push(backedUp)
+  const backup = backedUp.queries.listBackups()[0]
+  const pool = join(
+    context.paths.backupDirectory,
+    'attachments',
+    staged.storedName,
+  )
+  writeFileSync(pool, 'truncated')
+  backedUp.close()
+  applications.splice(applications.indexOf(backedUp), 1)
+
+  const logger = { error: vi.fn() }
+  const repaired = await openProfileApplication({
+    profile: context.profile,
+    paths: context.paths,
+    clock,
+    logger,
+  })
+  applications.push(repaired)
+  expect(readFileSync(pool, 'utf8')).toContain('verified pool bytes')
+  logger.error.mockClear()
+
+  writeFileSync(pool, 'corrupt again')
+  const live = join(
+    context.paths.dataDirectory,
+    'attachments',
+    staged.storedName,
+  )
+  rmSync(live)
+  await repaired.commands.restoreBackup({
+    backupId: backup.id,
+    confirmed: true,
+  })
+  expect(existsSync(live)).toBe(false)
+  expect(logger.error).toHaveBeenCalled()
 })

@@ -1,25 +1,20 @@
 import type { IpcMain } from 'electron'
 import { IPC_CHANNELS, type AppBridge } from '../../shared/ipc'
-import type { ReceiptIntake } from '../../shared/receipts'
+import type { ReceiptPathIntake } from '../../shared/receipts'
 import { inputRecord, registerIpcHandler } from '../ipc'
 import type { ProfileController } from './profile-controller'
 import { validateReceiptId, validateReceiptSource } from './profile-receipts'
 import { transactionFields } from './transaction-ipc'
 
-function parseIntake(value: unknown): ReceiptIntake {
+function parseIntake(value: unknown): ReceiptPathIntake {
   const input = inputRecord(value)
-  if (typeof input.path === 'string') {
-    if (input.bytes !== undefined || input.name !== undefined)
-      throw new Error('receipts.error.path')
-    return { path: input.path }
-  }
   if (
-    !(input.bytes instanceof Uint8Array) ||
-    typeof input.name !== 'string' ||
-    input.path !== undefined
+    typeof input.path !== 'string' ||
+    input.bytes !== undefined ||
+    input.name !== undefined
   )
     throw new Error('receipts.error.path')
-  return { bytes: input.bytes, name: input.name }
+  return { path: input.path }
 }
 
 export function registerReceiptIpc(

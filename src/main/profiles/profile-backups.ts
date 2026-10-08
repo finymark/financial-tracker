@@ -1,10 +1,12 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import {
-  copyFileSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
+  writeFileSync,
 } from 'node:fs'
 import { join } from 'node:path'
 import type Database from 'better-sqlite3'
@@ -21,6 +23,42 @@ const BACKUP_FILE_PATTERN =
 
 interface BackupFile extends ProfileBackup {
   filename: string
+}
+
+type BackupLogger = Pick<Console, 'error'>
+
+function storedNameHash(storedName: string): string {
+  return storedName.slice(0, 64)
+}
+
+function readVerifiedAttachment(path: string, storedName: string): Buffer {
+  const bytes = readFileSync(path)
+  if (
+    createHash('sha256').update(bytes).digest('hex') !==
+    storedNameHash(storedName)
+  ) {
+    throw new Error('Attachment hash mismatch')
+  }
+  return bytes
+}
+
+function atomicWrite(path: string, bytes: Buffer): void {
+  const temporary = `${path}.${randomUUID()}.tmp`
+  try {
+    writeFileSync(temporary, bytes, { flag: 'wx' })
+    renameSync(temporary, path)
+  } finally {
+    rmSync(temporary, { force: true })
+  }
+}
+
+function logSkippedAttachment(
+  logger: BackupLogger,
+  operation: 'backup' | 'restore',
+  storedName: string,
+  error: unknown,
+): void {
+  logger.error(`Attachment ${operation} skipped for ${storedName}`, error)
 }
 
 export function listBackupFiles(directory: string): BackupFile[] {
@@ -56,6 +94,7 @@ export async function createStartupBackup(
   directory: string,
   clock: () => Date,
   attachmentStoreDirectory?: string,
+  logger: BackupLogger = console,
 ): Promise<void> {
   const existing = listBackupFiles(directory)
   const timestamp = formatBackupTimestamp(clock())
@@ -74,12 +113,24 @@ export async function createStartupBackup(
       const pool = join(directory, 'attachments')
       mkdirSync(pool, { recursive: true })
       for (const storedName of storedAttachmentNames(database)) {
-        const destination = join(pool, storedName)
-        if (!existsSync(destination))
-          copyFileSync(
+        const destination = attachmentStoredPath(pool, storedName)
+        try {
+          if (existsSync(destination)) {
+            try {
+              readVerifiedAttachment(destination, storedName)
+              continue
+            } catch {
+              // Replace incomplete/corrupt pool content from the live store.
+            }
+          }
+          const bytes = readVerifiedAttachment(
             attachmentStoredPath(attachmentStoreDirectory, storedName),
-            destination,
+            storedName,
           )
+          atomicWrite(destination, bytes)
+        } catch (error) {
+          logSkippedAttachment(logger, 'backup', storedName, error)
+        }
       }
     }
   } catch (error) {
@@ -97,6 +148,7 @@ export function restoreMissingAttachments(
   database: Database.Database,
   backupDirectory: string,
   attachmentStoreDirectory: string,
+  logger: BackupLogger = console,
 ): void {
   const pool = join(backupDirectory, 'attachments')
   mkdirSync(attachmentStoreDirectory, { recursive: true })
@@ -105,7 +157,18 @@ export function restoreMissingAttachments(
       attachmentStoreDirectory,
       storedName,
     )
-    if (!existsSync(destination))
-      copyFileSync(join(pool, storedName), destination)
+    if (!existsSync(destination)) {
+      try {
+        atomicWrite(
+          destination,
+          readVerifiedAttachment(
+            attachmentStoredPath(pool, storedName),
+            storedName,
+          ),
+        )
+      } catch (error) {
+        logSkippedAttachment(logger, 'restore', storedName, error)
+      }
+    }
   }
 }

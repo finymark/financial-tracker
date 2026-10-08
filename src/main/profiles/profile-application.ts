@@ -7,7 +7,7 @@ import {
   renameSync,
   rmSync,
 } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import Database from 'better-sqlite3'
 import type {
   ProfileBackup,
@@ -212,6 +212,7 @@ import type { OpenAttachmentInput } from '../../shared/attachments'
 import type { DeleteTransactionInput } from '../../shared/transactions'
 import {
   attachmentDirectory,
+  attachmentStoredPath,
   copyAttachments,
   copyAttachmentForOpening,
   importAttachment,
@@ -248,6 +249,7 @@ import {
 } from './receipt-undo'
 import type { OcrEngine } from '../ocr/ocr-engine'
 import { readReceipt } from '../ocr/read-receipt'
+import { ReceiptPreprocessor } from '../ocr/receipt-preprocessing'
 import { today } from '../../shared/date'
 
 const MIGRATION_TABLE_SQL = `
@@ -1249,6 +1251,7 @@ class OpenProfileApplication implements ProfileApplication {
   #receiptOcrQueue: string[] = []
   #receiptOcrQueued = new Set<string>()
   #receiptOcrRun: Promise<void> | null = null
+  readonly #receiptPreprocessor: ReceiptPreprocessor | null
 
   constructor(
     database: Database.Database,
@@ -1258,6 +1261,9 @@ class OpenProfileApplication implements ProfileApplication {
     this.#profile = { ...options.profile }
     this.#options = options
     this.#clock = options.clock ?? (() => new Date())
+    this.#receiptPreprocessor = options.ocrEngine
+      ? new ReceiptPreprocessor()
+      : null
     const attachmentsPath = attachmentDirectory(options.paths.dataDirectory)
     this.#attachmentsPath = attachmentsPath
     this.commands = {
@@ -1920,6 +1926,7 @@ class OpenProfileApplication implements ProfileApplication {
           this.#database,
           paths.backupDirectory,
           attachmentDirectory(paths.dataDirectory),
+          this.#options.logger,
         )
         recoveryNeeded = false
       } catch (error) {
@@ -1952,6 +1959,7 @@ class OpenProfileApplication implements ProfileApplication {
 
   async stopBackgroundWork(): Promise<void> {
     await this.#stopReceiptOcr()
+    await this.#receiptPreprocessor?.dispose()
   }
 
   #startReceiptOcr(): void {
@@ -2006,13 +2014,14 @@ class OpenProfileApplication implements ProfileApplication {
         )
         if (!receipt) continue
         const image = readFileSync(
-          join(this.#attachmentsPath, receipt.storedName),
+          attachmentStoredPath(this.#attachmentsPath, receipt.storedName),
         )
         result = await readReceipt(
           image,
           this.#getSettings().language,
           engine,
           today(this.#clock),
+          (input) => this.#receiptPreprocessor!.preprocess(input),
         )
       } catch {
         result = { confidence: 'low' as const, rawText: '' }
@@ -2046,6 +2055,7 @@ class OpenProfileApplication implements ProfileApplication {
     this.#receiptOcrGeneration += 1
     this.#receiptOcrQueue = []
     this.#receiptOcrQueued.clear()
+    void this.#receiptPreprocessor?.dispose()
     this.#undoHistory.clear()
     if (this.#database.open) this.#database.close()
   }
@@ -2133,7 +2143,10 @@ class OpenProfileApplication implements ProfileApplication {
 
   #updateSettings(changes: ProfileSettingsChanges): ProfileSettings {
     this.#assertAvailable()
-    const parsed = parseSettingsChanges(changes)
+    const parsed = parseSettingsChanges(
+      changes,
+      dirname(dirname(this.#options.paths.profileDirectory)),
+    )
     const update = () => {
       const settings = { ...this.#getSettings(), ...parsed }
       this.#database
@@ -2275,6 +2288,7 @@ export async function openProfileApplication(
         options.paths.backupDirectory,
         options.clock ?? (() => new Date()),
         attachmentDirectory(options.paths.dataDirectory),
+        options.logger,
       )
     }
     application.commands.generateRecurringTransactions()

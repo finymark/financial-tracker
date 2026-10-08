@@ -411,7 +411,7 @@ function Shell({
   const [collapsed, setCollapsed] = useState(false)
   const { language, theme, baseCurrency, watchedFolder } = active.settings
   const [savingSettings, setSavingSettings] = useState(false)
-  const [settingsError, setSettingsError] = useState(false)
+  const [settingsError, setSettingsError] = useState<MessageKey | null>(null)
   const [backupBusy, setBackupBusy] = useState(false)
   const [accountBusy, setAccountBusy] = useState(false)
   const [categoryBusy, setCategoryBusy] = useState(false)
@@ -433,11 +433,11 @@ function Shell({
   const togglePrivacy = useCallback(async () => {
     if (savingSettings || backupBusy) return
     setSavingSettings(true)
-    setSettingsError(false)
+    setSettingsError(null)
     try {
       await onSettingsChange({ privacyMode: !active.settings.privacyMode })
     } catch {
-      setSettingsError(true)
+      setSettingsError('settings.error')
     } finally {
       setSavingSettings(false)
     }
@@ -617,11 +617,15 @@ function Shell({
 
   async function saveSettings(changes: ProfileSettingsChanges) {
     setSavingSettings(true)
-    setSettingsError(false)
+    setSettingsError(null)
     try {
       await onSettingsChange(changes)
-    } catch {
-      setSettingsError(true)
+    } catch (error) {
+      setSettingsError(
+        String(error).includes('watchedFolder.error.userData')
+          ? 'watchedFolder.error.userData'
+          : 'settings.error',
+      )
     } finally {
       setSavingSettings(false)
     }
@@ -780,7 +784,7 @@ function Shell({
             </p>
             {settingsError && (
               <p role="alert" className="text-sm font-medium text-error">
-                {t('settings.error')}
+                {t(settingsError)}
               </p>
             )}
             {rateStatus && (
@@ -1007,7 +1011,7 @@ function Shell({
                   }
                   t={t}
                   onChange={saveSettings}
-                  onError={() => setSettingsError(true)}
+                  onError={() => setSettingsError('settings.error')}
                 />
                 <AutostartSettings t={t} />
                 <ShortcutSettings t={t} />
@@ -1202,19 +1206,18 @@ export default function App() {
     const hasFiles = (event: DragEvent) =>
       event.dataTransfer?.types.includes('Files') === true
     const enter = (event: DragEvent) => {
-      event.preventDefault()
-      if (!canIntake || !hasFiles(event)) return
-      depth += 1
-      setDropActive(true)
-    }
-    const attachmentEnter = (event: DragEvent) => {
       if (
         event.target instanceof Element &&
         event.target.closest('[data-transaction-attachment-drop-zone]')
       ) {
         depth = 0
         setDropActive(false)
+        return
       }
+      event.preventDefault()
+      if (!canIntake || !hasFiles(event)) return
+      depth += 1
+      setDropActive(true)
     }
     const over = (event: DragEvent) => {
       event.preventDefault()
@@ -1260,13 +1263,11 @@ export default function App() {
         setDropError(firstError)
       })().finally(() => setDropBusy(false))
     }
-    document.addEventListener('dragenter', attachmentEnter, true)
     document.addEventListener('dragenter', enter)
     document.addEventListener('dragover', over)
     document.addEventListener('dragleave', leave)
     document.addEventListener('drop', drop)
     return () => {
-      document.removeEventListener('dragenter', attachmentEnter, true)
       document.removeEventListener('dragenter', enter)
       document.removeEventListener('dragover', over)
       document.removeEventListener('dragleave', leave)

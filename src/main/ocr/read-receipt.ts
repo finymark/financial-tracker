@@ -12,9 +12,10 @@ export async function readReceipt(
   profileLanguage: Language,
   engine: OcrEngine,
   today?: string,
+  preprocess: (image: Buffer) => Promise<Buffer> = preprocessReceiptImage,
 ): Promise<ReadReceiptResult> {
   try {
-    const prepared = await preprocessReceiptImage(image)
+    const prepared = await preprocess(image)
     const { text } = await engine.recognize(
       prepared,
       ocrLanguagesForProfile(profileLanguage),

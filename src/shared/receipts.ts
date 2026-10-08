@@ -24,9 +24,10 @@ export interface Receipt {
 export type ReceiptIntake =
   | { path: string; bytes?: never; name?: never }
   | { path?: never; bytes: Uint8Array; name: string }
+export type ReceiptPathIntake = Extract<ReceiptIntake, { path: string }>
 
 export interface IntakeReceiptInput {
-  intake: ReceiptIntake
+  intake: ReceiptPathIntake
   source: ReceiptSource
 }
 

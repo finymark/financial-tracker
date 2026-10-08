@@ -1,154 +1,112 @@
-import sharp from 'sharp'
+import { existsSync } from 'node:fs'
+import { join, sep } from 'node:path'
+import { Worker } from 'node:worker_threads'
 
-const UPSCALE_BELOW = 1500
-const MAX_DESKEW_ANGLE = 10
-
-interface GrayImage {
-  data: Buffer
-  width: number
-  height: number
+interface WorkerResponse {
+  id: number
+  image?: Uint8Array
+  error?: string
 }
 
-function adaptiveBinarize(image: GrayImage): Buffer {
-  const { data, width, height } = image
-  const stride = width + 1
-  const integral = new Float64Array(stride * (height + 1))
-  for (let y = 0; y < height; y += 1) {
-    let rowSum = 0
-    for (let x = 0; x < width; x += 1) {
-      rowSum += data[y * width + x]
-      integral[(y + 1) * stride + x + 1] = integral[y * stride + x + 1] + rowSum
-    }
-  }
+interface PendingJob {
+  resolve(image: Buffer): void
+  reject(error: Error): void
+}
 
-  const radius = Math.max(
-    12,
-    Math.min(32, Math.round(Math.min(width, height) / 40)),
+function workerEntryPath(): string {
+  const javascript = join(
+    import.meta.dirname,
+    'receipt-preprocessing-worker.js',
   )
-  const binary = Buffer.allocUnsafe(width * height)
-  for (let y = 0; y < height; y += 1) {
-    const top = Math.max(0, y - radius)
-    const bottom = Math.min(height - 1, y + radius)
-    for (let x = 0; x < width; x += 1) {
-      const left = Math.max(0, x - radius)
-      const right = Math.min(width - 1, x + radius)
-      const sum =
-        integral[(bottom + 1) * stride + right + 1] -
-        integral[top * stride + right + 1] -
-        integral[(bottom + 1) * stride + left] +
-        integral[top * stride + left]
-      const mean = sum / ((right - left + 1) * (bottom - top + 1))
-      binary[y * width + x] = data[y * width + x] < mean - 10 ? 0 : 255
-    }
-  }
-  return binary
+  const unpacked = javascript.replace(
+    `${sep}app.asar${sep}`,
+    `${sep}app.asar.unpacked${sep}`,
+  )
+  if (unpacked !== javascript && existsSync(unpacked)) return unpacked
+  if (existsSync(javascript)) return javascript
+  return join(import.meta.dirname, 'receipt-preprocessing-worker.ts')
 }
 
-function blackPixels(image: GrayImage): { x: number; y: number }[] {
-  let count = 0
-  for (const value of image.data) if (value === 0) count += 1
-  const step = Math.max(1, Math.ceil(count / 200_000))
-  const pixels: { x: number; y: number }[] = []
-  let seen = 0
-  for (let y = 0; y < image.height; y += 1) {
-    for (let x = 0; x < image.width; x += 1) {
-      if (image.data[y * image.width + x] !== 0) continue
-      if (seen % step === 0) pixels.push({ x, y })
-      seen += 1
-    }
-  }
-  return pixels
-}
+export class ReceiptPreprocessor {
+  #worker: Worker | null = null
+  #nextId = 1
+  #pending = new Map<number, PendingJob>()
+  #tail: Promise<unknown> = Promise.resolve()
+  #disposed = false
+  #disposing: Promise<void> | null = null
 
-function projectionScore(
-  pixels: readonly { x: number; y: number }[],
-  angle: number,
-  diagonal: number,
-): number {
-  const radians = (angle * Math.PI) / 180
-  const sine = Math.sin(radians)
-  const cosine = Math.cos(radians)
-  const rows = new Uint32Array(diagonal * 2 + 3)
-  for (const { x, y } of pixels) {
-    const row = Math.round(x * sine + y * cosine) + diagonal
-    rows[row] += 1
+  preprocess(image: Buffer): Promise<Buffer> {
+    if (this.#disposed)
+      return Promise.reject(new Error('Preprocessor disposed'))
+    const result = this.#tail.then(() => this.#run(image))
+    this.#tail = result.catch(() => {})
+    return result
   }
-  let score = 0
-  for (const count of rows) score += count * count
-  return score
-}
 
-function estimateDeskewAngle(image: GrayImage): number {
-  const pixels = blackPixels(image)
-  if (pixels.length < 100) return 0
-  const diagonal = Math.ceil(Math.hypot(image.width, image.height))
-  const scoreAtZero = projectionScore(pixels, 0, diagonal)
-  let bestAngle = 0
-  let bestScore = scoreAtZero
-  for (let angle = -MAX_DESKEW_ANGLE; angle <= MAX_DESKEW_ANGLE; angle += 0.5) {
-    const score = projectionScore(pixels, angle, diagonal)
-    if (score > bestScore) {
-      bestAngle = angle
-      bestScore = score
-    }
+  async dispose(): Promise<void> {
+    if (this.#disposing) return this.#disposing
+    this.#disposed = true
+    this.#disposing = (async () => {
+      await this.#tail.catch(() => {})
+      const worker = this.#worker
+      this.#worker = null
+      if (worker) await worker.terminate()
+    })()
+    return this.#disposing
   }
-  const coarseAngle = bestAngle
-  for (
-    let angle = coarseAngle - 0.5;
-    angle <= coarseAngle + 0.5;
-    angle += 0.1
-  ) {
-    if (Math.abs(angle) > MAX_DESKEW_ANGLE) continue
-    const score = projectionScore(pixels, angle, diagonal)
-    if (score > bestScore) {
-      bestAngle = angle
-      bestScore = score
-    }
-  }
-  return bestScore > scoreAtZero * 1.02 && Math.abs(bestAngle) >= 0.2
-    ? bestAngle
-    : 0
-}
 
-async function rotateBinary(
-  image: GrayImage,
-  angle: number,
-): Promise<GrayImage> {
-  if (angle === 0) return image
-  const { data, info } = await sharp(image.data, {
-    raw: { width: image.width, height: image.height, channels: 1 },
-  })
-    .rotate(angle, { background: '#ffffff' })
-    .toColourspace('b-w')
-    .threshold(128)
-    .raw()
-    .toBuffer({ resolveWithObject: true })
-  return { data, width: info.width, height: info.height }
+  #run(image: Buffer): Promise<Buffer> {
+    const worker = this.#getWorker()
+    const id = this.#nextId
+    this.#nextId += 1
+    return new Promise((resolve, reject) => {
+      this.#pending.set(id, { resolve, reject })
+      worker.postMessage({ id, image })
+    })
+  }
+
+  #getWorker(): Worker {
+    if (this.#worker) return this.#worker
+    const worker = new Worker(workerEntryPath())
+    worker.on('message', (response: WorkerResponse) => {
+      const pending = this.#pending.get(response.id)
+      if (!pending) return
+      this.#pending.delete(response.id)
+      if (response.image) pending.resolve(Buffer.from(response.image))
+      else
+        pending.reject(
+          new Error(response.error ?? 'Receipt preprocessing failed'),
+        )
+    })
+    worker.on('error', (error) => this.#failWorker(worker, error))
+    worker.on('exit', (code) => {
+      if (this.#worker !== worker) return
+      this.#worker = null
+      if (code !== 0)
+        this.#rejectPending(
+          new Error(`Receipt preprocessing worker exited ${code}`),
+        )
+    })
+    this.#worker = worker
+    return worker
+  }
+
+  #failWorker(worker: Worker, error: Error): void {
+    if (this.#worker === worker) this.#worker = null
+    this.#rejectPending(error)
+  }
+
+  #rejectPending(error: Error): void {
+    for (const pending of this.#pending.values()) pending.reject(error)
+    this.#pending.clear()
+  }
 }
 
 export async function preprocessReceiptImage(image: Buffer): Promise<Buffer> {
-  const { data, info } = await sharp(image)
-    .rotate()
-    .grayscale()
-    .normalise()
-    .raw()
-    .toBuffer({ resolveWithObject: true })
-  if (info.width < 1 || info.height < 1)
-    throw new Error('Invalid receipt image')
-  let binary: GrayImage = {
-    data: adaptiveBinarize({ data, width: info.width, height: info.height }),
-    width: info.width,
-    height: info.height,
+  const preprocessor = new ReceiptPreprocessor()
+  try {
+    return await preprocessor.preprocess(image)
+  } finally {
+    await preprocessor.dispose()
   }
-  binary = await rotateBinary(binary, estimateDeskewAngle(binary))
-
-  let pipeline = sharp(binary.data, {
-    raw: { width: binary.width, height: binary.height, channels: 1 },
-  })
-  if (Math.max(binary.width, binary.height) < UPSCALE_BELOW) {
-    pipeline = pipeline.resize(binary.width * 2, binary.height * 2, {
-      kernel: sharp.kernel.nearest,
-    })
-  }
-  return pipeline.toColourspace('b-w').png().toBuffer()
 }

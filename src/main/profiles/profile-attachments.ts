@@ -14,6 +14,10 @@ import { basename, isAbsolute, join, parse } from 'node:path'
 import type Database from 'better-sqlite3'
 import sharp, { type Metadata } from 'sharp'
 import {
+  detectAttachmentFileType,
+  type DetectedAttachmentType,
+} from '../attachment-file-type'
+import {
   ATTACHMENT_MAX_SOURCE_BYTES,
   type Attachment,
   type AttachmentMediaType,
@@ -22,14 +26,9 @@ import {
 import type { ReceiptIntake } from '../../shared/receipts'
 import { validateTransactionId } from './transaction-validation'
 
-interface DetectedType {
-  mediaType: AttachmentMediaType
-  extension: 'jpg' | 'png' | 'webp' | 'pdf'
-}
-
 const STORED_NAME_PATTERN = /^([0-9a-f]{64})\.(jpg|png|webp|pdf)$/
 const mediaTypesByExtension: Record<
-  DetectedType['extension'],
+  DetectedAttachmentType['extension'],
   AttachmentMediaType
 > = {
   jpg: 'image/jpeg',
@@ -77,33 +76,15 @@ export function attachmentDirectory(dataDirectory: string): string {
   return join(dataDirectory, 'attachments')
 }
 
-function detectType(bytes: Buffer): DetectedType {
-  if (
-    bytes.length >= 3 &&
-    bytes[0] === 0xff &&
-    bytes[1] === 0xd8 &&
-    bytes[2] === 0xff
-  )
-    return { mediaType: 'image/jpeg', extension: 'jpg' }
-  if (
-    bytes.length >= 8 &&
-    bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
-  )
-    return { mediaType: 'image/png', extension: 'png' }
-  if (
-    bytes.length >= 12 &&
-    bytes.subarray(0, 4).toString('ascii') === 'RIFF' &&
-    bytes.subarray(8, 12).toString('ascii') === 'WEBP'
-  )
-    return { mediaType: 'image/webp', extension: 'webp' }
-  if (bytes.length >= 5 && bytes.subarray(0, 5).toString('ascii') === '%PDF-')
-    return { mediaType: 'application/pdf', extension: 'pdf' }
-  throw new Error('attachments.error.type')
+function detectType(bytes: Buffer): DetectedAttachmentType {
+  const type = detectAttachmentFileType(bytes)
+  if (!type) throw new Error('attachments.error.type')
+  return type
 }
 
 async function processImage(
   bytes: Buffer,
-  type: DetectedType,
+  type: DetectedAttachmentType,
 ): Promise<Buffer> {
   if (type.mediaType === 'application/pdf') return bytes
   let metadata: Metadata
@@ -196,17 +177,8 @@ async function importAttachmentBytes(
   name: string,
   directory: string,
 ): Promise<StagedAttachment> {
-  if (
-    !(value instanceof Uint8Array) ||
-    typeof name !== 'string' ||
-    name.length < 1 ||
-    name.length > 255 ||
-    name.includes('\0') ||
-    basename(name) !== name ||
-    name === '.' ||
-    name === '..'
-  )
-    throw new Error('attachments.error.path')
+  if (!(value instanceof Uint8Array)) throw new Error('attachments.error.path')
+  validateOriginalFileName(name, 'attachments.error.path')
   if (value.byteLength > ATTACHMENT_MAX_SOURCE_BYTES)
     throw new Error('attachments.error.size')
   const bytes = Buffer.from(value)
@@ -217,24 +189,20 @@ async function importAttachmentBytes(
 async function storeImportedAttachment(
   sourceBytes: Buffer,
   originalFileName: string,
-  type: DetectedType,
+  type: DetectedAttachmentType,
   directory: string,
 ): Promise<StagedAttachment> {
-  if (
-    originalFileName.length < 1 ||
-    originalFileName.length > 255 ||
-    originalFileName.includes('\0') ||
-    basename(originalFileName) !== originalFileName ||
-    originalFileName === '.' ||
-    originalFileName === '..'
+  validateOriginalFileName(originalFileName, 'attachments.error.path')
+  const safeOriginalFileName = safeAttachmentFileName(
+    originalFileName,
+    type.extension,
   )
-    throw new Error('attachments.error.path')
   const storedBytes = await processImage(sourceBytes, type)
   const hash = createHash('sha256').update(storedBytes).digest('hex')
   const storedName = `${hash}.${type.extension}`
   atomicStore(directory, storedName, storedBytes)
   return {
-    originalFileName,
+    originalFileName: safeOriginalFileName,
     storedName,
     mediaType: type.mediaType,
     byteSize: storedBytes.length,
@@ -275,15 +243,13 @@ export function validateStagedAttachment(
   const match =
     typeof storedName === 'string' ? STORED_NAME_PATTERN.exec(storedName) : null
   if (
-    typeof originalFileName !== 'string' ||
-    originalFileName.length < 1 ||
-    originalFileName.length > 255 ||
-    originalFileName.includes('\0') ||
-    basename(originalFileName) !== originalFileName ||
-    originalFileName === '.' ||
-    originalFileName === '..' ||
+    !isOriginalFileName(originalFileName) ||
     !match ||
-    mediaTypesByExtension[match[2] as DetectedType['extension']] !==
+    safeAttachmentFileName(
+      originalFileName,
+      match[2] as DetectedAttachmentType['extension'],
+    ) !== originalFileName ||
+    mediaTypesByExtension[match[2] as DetectedAttachmentType['extension']] !==
       mediaType ||
     !Number.isSafeInteger(byteSize) ||
     byteSize < 1
@@ -424,6 +390,50 @@ function availableCopyName(directory: string, original: string): string {
   }
 }
 
+const WINDOWS_RESERVED_NAME = /^(?:CON|PRN|AUX|NUL|CLOCK\$|COM[1-9]|LPT[1-9])$/i
+
+function isOriginalFileName(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= 255 &&
+    !value.includes('\0') &&
+    basename(value) === value &&
+    value !== '.' &&
+    value !== '..'
+  )
+}
+
+function validateOriginalFileName(value: unknown, errorKey: string): string {
+  if (!isOriginalFileName(value)) throw new Error(errorKey)
+  return value
+}
+
+function safeAttachmentFileName(
+  original: string,
+  extension: DetectedAttachmentType['extension'],
+): string {
+  const originalBase = parse(original).name
+  let base = originalBase
+    .replace(/[<>:"/\\|?*\0-\x1f\x7f]/g, '')
+    .replace(/[. ]+$/g, '')
+    .trim()
+  const maximumBaseLength = 255 - extension.length - 1
+  base = base.slice(0, maximumBaseLength).replace(/[. ]+$/g, '')
+  if (!base || WINDOWS_RESERVED_NAME.test(base.split('.')[0]))
+    base = 'attachment'
+  return `${base}.${extension}`
+}
+
+function attachmentCopyName(attachment: StagedAttachment): string {
+  const match = STORED_NAME_PATTERN.exec(attachment.storedName)
+  if (!match) throw new Error('attachments.error.staged')
+  return safeAttachmentFileName(
+    attachment.originalFileName,
+    match[2] as DetectedAttachmentType['extension'],
+  )
+}
+
 export function copyAttachments(
   attachments: readonly Attachment[],
   storeDirectory: string,
@@ -441,7 +451,7 @@ export function copyAttachments(
     for (const attachment of attachments) {
       const name = availableCopyName(
         destinationDirectory,
-        attachment.originalFileName,
+        attachmentCopyName(attachment),
       )
       copyFileSync(
         join(storeDirectory, attachment.storedName),
@@ -491,7 +501,7 @@ export function copyAttachmentForOpening(
       : validateStagedAttachment(value.attachment, storeDirectory)
   const targetDirectory = join(temporaryDirectory, randomUUID())
   mkdirSync(targetDirectory, { recursive: true })
-  const destination = join(targetDirectory, attachment.originalFileName)
+  const destination = join(targetDirectory, attachmentCopyName(attachment))
   copyFileSync(join(storeDirectory, attachment.storedName), destination)
   return destination
 }

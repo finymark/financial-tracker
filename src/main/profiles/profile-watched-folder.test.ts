@@ -1,4 +1,10 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
@@ -185,7 +191,7 @@ test('changing the setting stops the old folder and starts intake from the new f
         .getActiveApplication()
         .queries.listReceipts()
         .map((receipt) => receipt.originalFileName),
-    ).toEqual(['first.png', 'second.webp']),
+    ).toEqual(['first.png', 'second.png']),
   )
   expect(existsSync(ignoredPath)).toBe(true)
 })
@@ -231,4 +237,51 @@ test('switching profiles stops the old folder before the new profile watches its
   expect(
     controller.getActiveApplication().queries.listReceipts()[0],
   ).toMatchObject({ originalFileName: 'active-profile.png', source: 'folder' })
+})
+
+test('rejects a watched folder equal to or inside application user data', async () => {
+  const watched = controlledWatch()
+  const timers = new FakeTimers()
+  const userDataDirectory = temporaryDirectory(
+    'financial-tracker-watched-user-data-',
+  )
+  const clock = () => new Date('2026-01-15T10:00:00.000Z')
+  const controller = new ProfileController(
+    new ProfileRegistry({ userDataDirectory, clock }),
+    'en',
+    {
+      clock,
+      watchedFolderOptions: {
+        clock: () => timers.now,
+        timers,
+        fileSystem: { watch: watched.watch },
+      },
+    },
+  )
+  controllers.push(controller)
+  const profile = await controller.create('Safe watched folder')
+  await controller.open(profile.id)
+  const nested = join(userDataDirectory, 'nested')
+  mkdirSync(nested)
+
+  expect(() =>
+    controller.updateSettings({
+      id: profile.id,
+      settings: { watchedFolder: userDataDirectory },
+    }),
+  ).toThrow('watchedFolder.error.userData')
+  expect(() =>
+    controller.updateSettings({
+      id: profile.id,
+      settings: { watchedFolder: nested },
+    }),
+  ).toThrow('watchedFolder.error.userData')
+
+  const outside = temporaryDirectory('financial-tracker-watched-safe-')
+  await expect(
+    controller.updateSettings({
+      id: profile.id,
+      settings: { watchedFolder: outside },
+    }),
+  ).resolves.toMatchObject({ watchedFolder: outside })
 })

@@ -126,7 +126,7 @@ test('intakes receipt photos by path and bytes without touching undo history, an
   expect(context.application.queries.getReceiptInboxCount()).toBe(2)
   expect(first).toMatchObject({
     status: 'received',
-    originalFileName: 'first-photo.bin',
+    originalFileName: 'first-photo.jpg',
     mediaType: 'image/jpeg',
     source: 'drop',
     receivedAt: '2026-01-15T10:00:00.000Z',
@@ -669,7 +669,7 @@ test('EUR OCR migration preserves receipts created by the inbox schema', async (
   await expect(
     waitForReceipt(upgraded, receipt.id, 'read'),
   ).resolves.toMatchObject({
-    originalFileName: 'before-eur.png',
+    originalFileName: 'before-eur.jpg',
     ocrCurrency: 'EUR',
     ocrTotalMinor: 1_525,
   })

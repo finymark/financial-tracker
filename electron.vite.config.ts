@@ -1,9 +1,22 @@
 import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { resolve } from 'node:path'
 
 export default defineConfig(({ command }) => ({
-  main: {},
+  main: {
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/main/index.ts'),
+          'receipt-preprocessing-worker': resolve(
+            'src/main/ocr/receipt-preprocessing-worker.ts',
+          ),
+        },
+        output: { entryFileNames: '[name].js' },
+      },
+    },
+  },
   preload: {
     build: {
       rollupOptions: {
