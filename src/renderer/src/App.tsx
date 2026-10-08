@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import {
   ArrowLeftRight,
+  ChartPie,
   LayoutDashboard,
   PanelLeftClose,
   PanelLeftOpen,
@@ -42,10 +43,13 @@ import {
 } from '../../shared/settings'
 import { cn } from './lib/utils'
 import type { RateStatus } from '../../shared/exchange-rates'
+import { ReportsPage } from './ReportsPage'
+import type { TransactionListInput } from '../../shared/transactions'
 
 const pages = [
   { id: 'overview', icon: LayoutDashboard },
   { id: 'transactions', icon: ArrowLeftRight },
+  { id: 'reports', icon: ChartPie },
   { id: 'accounts', icon: Wallet },
   { id: 'settings', icon: Settings },
 ] as const
@@ -358,6 +362,8 @@ function Shell({
   onRestored,
 }: ShellProps) {
   const [page, setPage] = useState<Page>('overview')
+  const [reportTransactionFilter, setReportTransactionFilter] =
+    useState<TransactionListInput | null>(null)
   const [newTransactionRequested, setNewTransactionRequested] = useState(false)
   const [showShortcutHelp, setShowShortcutHelp] = useState(false)
   const transactionRequestHandled = useCallback(
@@ -447,6 +453,7 @@ function Shell({
         )
           return
         event.preventDefault()
+        setReportTransactionFilter(null)
         setNewTransactionRequested(true)
         setPage('transactions')
       } else if (action === 'help') {
@@ -550,7 +557,10 @@ function Shell({
                 payeeBusy ||
                 ruleBusy
               }
-              onClick={() => setPage(id)}
+              onClick={() => {
+                if (id === 'transactions') setReportTransactionFilter(null)
+                setPage(id)
+              }}
             >
               <Icon aria-hidden="true" />
               {!collapsed && t(`navigation.${id}`)}
@@ -645,7 +655,7 @@ function Shell({
             )}
             {page === 'transactions' && (
               <TransactionsPage
-                key={active.id}
+                key={`${active.id}:${JSON.stringify(reportTransactionFilter)}`}
                 baseCurrency={baseCurrency}
                 language={language}
                 t={t}
@@ -655,6 +665,17 @@ function Shell({
                 onTransactionChanged={() => {
                   setUndoError(false)
                   setUndoOffered(true)
+                }}
+                initialReportFilter={reportTransactionFilter}
+              />
+            )}
+            {page === 'reports' && (
+              <ReportsPage
+                language={language}
+                t={t}
+                onOpenTransactions={(input) => {
+                  setReportTransactionFilter(input)
+                  setPage('transactions')
                 }}
               />
             )}

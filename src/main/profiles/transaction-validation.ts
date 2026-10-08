@@ -145,6 +145,21 @@ export function parseTransactionListInput(
   const offset = input.offset === undefined ? 0 : input.offset
   const limit = input.limit === undefined ? 100 : input.limit
   if (
+    input.uncategorized !== undefined &&
+    typeof input.uncategorized !== 'boolean'
+  )
+    throw new Error('transactions.error.filters')
+  if (
+    input.exactCategory !== undefined &&
+    typeof input.exactCategory !== 'boolean'
+  )
+    throw new Error('transactions.error.filters')
+  const uncategorized = input.uncategorized === true
+  const exactCategory = input.exactCategory === true
+  const kind = input.kind
+  if (kind !== undefined && kind !== 'expense' && kind !== 'income')
+    throw new Error('transactions.error.filters')
+  if (
     !Number.isSafeInteger(offset) ||
     (offset as number) < 0 ||
     !Number.isSafeInteger(limit) ||
@@ -154,13 +169,19 @@ export function parseTransactionListInput(
       (typeof input.search !== 'string' || input.search.length > 1000))
   )
     throw new Error('transactions.error.filters')
+  const categoryId = id(input.categoryId)
+  if ((uncategorized && categoryId) || (exactCategory && !categoryId))
+    throw new Error('transactions.error.filters')
   return {
     period: period as TransactionPeriod,
     exclusion: exclusion as TransactionExclusionFilter,
     from,
     to,
     accountId: id(input.accountId),
-    categoryId: id(input.categoryId),
+    categoryId,
+    exactCategory,
+    uncategorized,
+    kind: kind as TransactionKind | undefined,
     payeeId: id(input.payeeId),
     tagId: id(input.tagId),
     search: (input.search as string | undefined)?.trim(),

@@ -2,8 +2,8 @@
 
 A local-first personal expense tracker for Windows, built with Electron, React,
 TypeScript, and SQLite. The app opens to a collapsible sidebar with Overview,
-Transactions, Accounts, and Settings pages. On start you pick or create a
-profile; each profile has its own SQLite database and data folder. Financial
+Transactions, Reports, Accounts, and Settings pages. On start you pick or create
+a profile; each profile has its own SQLite database and data folder. Financial
 data stays local. Accounts track opening balances, signed expense/income
 transactions, both legs of transfers, and target-based balance adjustments.
 Settings includes payee alias/merge management, ordered categorisation rules,
@@ -301,7 +301,8 @@ not off-device copies or backups of the separate data folder.
 - The profile area at the bottom of the sidebar shows the active profile and
   switches profiles. Accounts lists active and archived accounts with balances in
   their own currency. Transactions provides a filterable, virtualised table and a
-  right-side create/edit drawer; Overview remains a placeholder.
+  right-side create/edit drawer. Reports provides base-currency expense totals by
+  main category and subcategory; Overview remains a placeholder.
 
 ## Exchange rates and base-currency conversion
 
@@ -325,6 +326,20 @@ not off-device copies or backups of the separate data folder.
   last refresh date. Filtered transaction totals retain their per-currency values
   and additionally show a base-currency total, provisional state, and any
   unconverted currency bucket.
+
+## Reports
+
+- **Reports** defaults to this month and also offers last month, this year, the
+  rolling last 12 months, and an inclusive custom range.
+- The category breakdown uses ordinary expense transaction lines only. Income,
+  transfers, balance adjustments, and excluded transactions do not count; split
+  parts use their own categories and uncategorized lines remain explicit.
+- Converted category totals use the profile base currency and exact cached-rate
+  conversion, rounding once per displayed total. Missing rates remain in an
+  unconverted bucket per currency, and provisional cached rates are marked.
+- Switch between pie and bar charts. Choose a main category to see its direct
+  lines and subcategories, then open Transactions with that category and the
+  inclusive report range applied.
 
 ## Accounts
 
@@ -961,7 +976,7 @@ replacement validation, isolation, migration, and persistence.
 
 ### Manual shell check
 
-Run `npm run dev`, navigate all four pages, and collapse/expand the sidebar.
+Run `npm run dev`, navigate all five pages, and collapse/expand the sidebar.
 In Settings, select each language and verify labels and formatting change live.
 Select HUF and CHF as the base currency. Create a second profile with a different
 language, theme, and base currency; switch between the profiles and restart the

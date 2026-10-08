@@ -26,6 +26,7 @@ import {
   MnbExchangeRateSource,
 } from './exchange-rates/mnb-source'
 import { ExchangeRateScheduler } from './exchange-rates/exchange-rate-scheduler'
+import { registerReportIpc } from './profiles/report-ipc'
 
 const APP_ID = 'com.finymark.financial-tracker'
 const APP_NAME = 'Financial Tracker'
@@ -124,6 +125,7 @@ void app.whenReady().then(() => {
   registerCategorisationRuleIpc(ipcMain, profiles)
   registerTemplateIpc(ipcMain, profiles)
   registerExchangeRateIpc(ipcMain, profiles)
+  registerReportIpc(ipcMain, profiles)
 
   let shutdownPromise: Promise<void> | null = null
   let shutdownComplete = false
