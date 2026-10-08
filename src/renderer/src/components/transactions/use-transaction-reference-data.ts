@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { Account } from '../../../../shared/accounts'
+import type { Account, AccountOption } from '../../../../shared/accounts'
 import type { Category } from '../../../../shared/categories'
 import type { Payee, TransactionKind } from '../../../../shared/transactions'
 import type { Tag } from '../../../../shared/tags'
@@ -15,7 +15,7 @@ export function useTransactionReferenceData(
   const [data, setData] = useState({
     accounts: [] as Account[],
     categories: [] as Category[],
-    accountOptions: [] as Account[],
+    accountOptions: [] as AccountOption[],
     categoryOptions: { expense: [], income: [] } as Record<
       TransactionKind,
       Category[]

@@ -11,23 +11,51 @@ const autofill = {
 }
 
 test('rule autofill never overwrites category or tags the user already changed', () => {
-  const current = { categoryId: 'chosen-category', tagNames: ['Chosen'] }
+  const current = {
+    payeeName: '',
+    categoryId: 'chosen-category',
+    tagNames: ['Chosen'],
+  }
   expect(
-    mergeRuleAutofill(current, autofill, { category: true, tags: true }),
+    mergeRuleAutofill(current, autofill, {
+      payee: false,
+      category: true,
+      tags: true,
+    }),
   ).toEqual(current)
   expect(
-    mergeRuleAutofill(current, autofill, { category: true, tags: false }),
-  ).toEqual({ categoryId: 'chosen-category', tagNames: ['Suggested'] })
+    mergeRuleAutofill(current, autofill, {
+      payee: false,
+      category: true,
+      tags: false,
+    }),
+  ).toEqual({
+    payeeName: '',
+    categoryId: 'chosen-category',
+    tagNames: ['Suggested'],
+  })
   expect(
-    mergeRuleAutofill(current, autofill, { category: false, tags: true }),
-  ).toEqual({ categoryId: 'suggested-category', tagNames: ['Chosen'] })
+    mergeRuleAutofill(current, autofill, {
+      payee: false,
+      category: false,
+      tags: true,
+    }),
+  ).toEqual({
+    payeeName: '',
+    categoryId: 'suggested-category',
+    tagNames: ['Chosen'],
+  })
 })
 
 test('template category and tags are protected like user-entered values during rule reevaluation', () => {
-  const template = { categoryId: 'template-category', tagNames: ['Template'] }
+  const template = {
+    payeeName: '',
+    categoryId: 'template-category',
+    tagNames: ['Template'],
+  }
   const current = { ...template, note: 'Prefilled' }
   const protectedFields = templateAutofillProtection(template)
-  expect(protectedFields).toEqual({ category: true, tags: true })
+  expect(protectedFields).toEqual({ payee: false, category: true, tags: true })
   expect(mergeRuleAutofill(current, autofill, protectedFields)).toEqual(current)
   expect(
     mergeRuleAutofill(
@@ -40,26 +68,28 @@ test('template category and tags are protected like user-entered values during r
 
 test.each([
   [
-    { categoryId: 'template-category', tagNames: [] },
-    { category: true, tags: false },
+    { payeeName: '', categoryId: 'template-category', tagNames: [] },
+    { payee: false, category: true, tags: false },
   ],
   [
-    { categoryId: null, tagNames: ['Template'] },
-    { category: false, tags: true },
+    { payeeName: null, categoryId: null, tagNames: ['Template'] },
+    { payee: false, category: false, tags: true },
   ],
   [
-    { categoryId: null, tagNames: [] },
-    { category: false, tags: false },
+    { payeeName: null, categoryId: null, tagNames: [] },
+    { payee: false, category: false, tags: false },
   ],
 ])(
   'only omitted template fields remain eligible for rule autofill: %j',
   (template, protection) => {
     expect(templateAutofillProtection(template)).toEqual(protection)
     const current = {
+      payeeName: template.payeeName ?? '',
       categoryId: template.categoryId ?? '',
       tagNames: template.tagNames,
     }
     expect(mergeRuleAutofill(current, autofill, protection)).toEqual({
+      payeeName: current.payeeName,
       categoryId: protection.category
         ? current.categoryId
         : autofill.categoryId,
@@ -67,3 +97,45 @@ test.each([
     })
   },
 )
+
+test('a rule payee action fills only an empty untouched payee', () => {
+  const action = { ...autofill, payeeName: 'Rule payee' }
+  const protection = { payee: false, category: false, tags: false }
+  expect(
+    mergeRuleAutofill(
+      { payeeName: '', categoryId: '', tagNames: [] },
+      action,
+      protection,
+    ).payeeName,
+  ).toBe('Rule payee')
+  expect(
+    mergeRuleAutofill(
+      { payeeName: 'Typed', categoryId: '', tagNames: [] },
+      action,
+      protection,
+    ).payeeName,
+  ).toBe('Typed')
+  expect(
+    mergeRuleAutofill({ payeeName: '', categoryId: '', tagNames: [] }, action, {
+      ...protection,
+      payee: true,
+    }).payeeName,
+  ).toBe('')
+  expect(
+    mergeRuleAutofill(
+      { payeeName: '', categoryId: '', tagNames: [] },
+      { ...action, source: 'lastUsed' },
+      protection,
+    ).payeeName,
+  ).toBe('')
+})
+
+test('a template payee is protected from later rule payee actions', () => {
+  expect(
+    templateAutofillProtection({
+      payeeName: 'Template',
+      categoryId: null,
+      tagNames: [],
+    }).payee,
+  ).toBe(true)
+})

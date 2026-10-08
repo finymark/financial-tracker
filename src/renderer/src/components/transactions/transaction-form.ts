@@ -7,6 +7,7 @@ import type { BalanceAdjustment } from '../../../../shared/adjustments'
 import { today } from '../../../../shared/date'
 import { amountInput } from '../../lib/amount-input-value'
 import type { MessageKey } from '../../i18n'
+import { ruleError } from '../rule-editor'
 
 interface CommonForm {
   id: string | null
@@ -78,6 +79,7 @@ const errorKeys = [
 ] as const satisfies readonly MessageKey[]
 
 export function transactionError(error: unknown): MessageKey {
+  if (String(error).includes('rules.error')) return ruleError(error)
   return (
     errorKeys.find((key) => String(error).includes(key)) ?? 'transactions.error'
   )
@@ -205,8 +207,4 @@ export function movementForm(
                 )
               : null,
         }
-}
-
-export function tagKey(value: string) {
-  return value.normalize('NFC').toLocaleLowerCase('und').normalize('NFC')
 }

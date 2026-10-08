@@ -587,6 +587,7 @@ function Shell({
             {page === 'transactions' && (
               <TransactionsPage
                 key={active.id}
+                baseCurrency={baseCurrency}
                 language={language}
                 t={t}
                 undoRevision={undoRevision}

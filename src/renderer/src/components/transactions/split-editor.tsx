@@ -1,3 +1,4 @@
+import { tagKey } from '../../../../shared/text-keys'
 import type { Account } from '../../../../shared/accounts'
 import type { Category } from '../../../../shared/categories'
 import type { Tag } from '../../../../shared/tags'
@@ -8,8 +9,9 @@ import { AmountInput } from '../amount-input'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { NativeSelect } from '../ui/native-select'
-import { splitLine, tagKey, type TransactionForm } from './transaction-form'
+import { splitLine, type TransactionForm } from './transaction-form'
 import type { RefObject } from 'react'
+import type { ProtectedAutofillFields } from '../../lib/rule-autofill'
 
 interface SplitEditorProps {
   form: TransactionForm
@@ -20,7 +22,7 @@ interface SplitEditorProps {
   busy: boolean
   language: Language
   t(key: MessageKey): string
-  autofillProtectedRef: RefObject<{ category: boolean; tags: boolean }>
+  autofillProtectedRef: RefObject<ProtectedAutofillFields>
 }
 
 export function SplitEditor({
@@ -89,6 +91,7 @@ export function SplitEditor({
             disabled={busy}
             onClick={() => {
               autofillProtectedRef.current = {
+                ...autofillProtectedRef.current,
                 category: true,
                 tags: true,
               }
@@ -115,6 +118,7 @@ export function SplitEditor({
               disabled={busy}
               onClick={() => {
                 autofillProtectedRef.current = {
+                  ...autofillProtectedRef.current,
                   category: true,
                   tags: true,
                 }

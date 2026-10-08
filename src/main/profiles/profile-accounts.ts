@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type Database from 'better-sqlite3'
 import type {
   Account,
+  AccountOption,
   ChangeAccountCurrencyInput,
   CreateAccountInput,
   RenameAccountInput,
@@ -88,19 +89,21 @@ export function listAccounts(database: Database.Database): Account[] {
   return accounts.map((account) => accountView(database, account))
 }
 
-export function listAccountOptions(database: Database.Database): Account[] {
+export function listAccountOptions(
+  database: Database.Database,
+): AccountOption[] {
   const accounts = database
     .prepare(
       `SELECT id, name, currency, archived FROM accounts
        WHERE archived = 0 ORDER BY created_at, rowid`,
     )
-    .all() as (Pick<Account, 'id' | 'name' | 'currency'> & {
+    .all() as (Omit<AccountOption, 'archived'> & {
     archived: number
   })[]
   return accounts.map((account) => ({
     ...account,
     archived: Boolean(account.archived),
-  })) as Account[]
+  }))
 }
 
 export function createAccount(
