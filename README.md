@@ -884,6 +884,54 @@ turn: the transaction remains one list row while filtered and daily totals show
 only the matching part. Mark the transaction Excluded and verify every part is
 omitted from totals. Edit/delete/undo and repeat in HU/EN/DE.
 
+### Privacy mode
+
+The shell header's **Privacy mode** eye/eye-off button, or **Ctrl+Shift+H**, hides
+all monetary values. The shortcut also works while typing and inside dialogs;
+plain H, Ctrl+H, text Undo, and other editing keys are unchanged. The translated
+keyboard cheat sheet lists it. The choice is saved independently in each
+profile (append-only migration 18), survives reopening, and is presentation-only:
+toggling it neither creates an Undo entry nor clears existing Undo history.
+Other settings changes, including a write mixed with privacy, still clear history.
+A failed toggle shows the translated settings error and keeps the saved state.
+
+Read-only values use the shared amount component: CSS blur, no text selection,
+and an accessible **Hidden amount** replacement instead of exposing the value
+to screen readers. Chart ticks, tooltips, SVG titles and other string-only
+previews use **•••**, not SVG blur. Percentages and transfer exchange rates are
+hidden too. Amount inputs (including calculator expressions, rule bounds and
+template amounts) are readable **only while focused** so editing remains usable;
+unfocused inputs are blurred password fields, and result previews stay hidden.
+Privacy is a screen-sharing aid, not encryption: underlying data and CSV exports
+are unchanged. Text written in notes/names is not scanned for amounts; chart
+shapes, category names, dates and transaction counts remain visible.
+
+### Manual Privacy mode check
+
+Run `npm run dev` with synthetic HUF and CHF accounts, income/expenses, splits,
+transfers, adjustments, templates and amount-bound rules, including cached and
+missing exchange rates. Turn privacy on with the button and Ctrl+Shift+H: verify
+**no readable amount anywhere** across Overview, Accounts, Transactions, Settings,
+and every Reports view (breakdown pie/bar, monthly trend, spending pace and
+cash-flow). Check filtered/day/base-currency totals and unconverted parts,
+opening/current balances, split parts/remainder, transfer rates, drawer previews,
+rule bounds, template fields, CSV-dialog decimal preview, and toasts. Hover chart
+points/bars/pie slices/Sankey nodes and check tooltips, axis ticks, SVG titles,
+labels and table hover titles. Check keyboard chart navigation as well. Verify
+screen readers announce Hidden amount (never a read-only value), selecting or
+copying blurred values is blocked, and hovering never reveals them.
+
+Focus an amount field: only that editable value becomes readable; Tab away and
+verify it hides immediately while its calculator preview stays hidden. Try the
+shortcut in amount/payee/note/search inputs, every drawer/dialog and shortcut
+help; it must not alter the draft or steal text Undo. Toggle after a ledger write
+and verify the Undo toast and Ctrl+Z still undo that write. Switch profiles,
+restart and restore a backup to verify each profile's saved state; toggle off
+and check exact original formatting. Repeat **every page/report in HU/EN/DE,
+light/dark**. This is a visual/accessibility check, not a data-security guarantee.
+Automated API tests cover persistence, isolation, reopen, validation and Undo;
+pure tests cover private formatting and shortcut matching.
+
 ### Keyboard-first transaction entry
 
 With a profile open and at least one active account, **N** or **Ctrl+N** opens a

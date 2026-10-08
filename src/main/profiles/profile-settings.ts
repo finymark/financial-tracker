@@ -12,6 +12,12 @@ export function parseSettingsChanges(value: unknown): ProfileSettingsChanges {
   const changes: ProfileSettingsChanges = {}
   for (const [key, setting] of Object.entries(value)) {
     switch (key) {
+      case 'privacyMode': {
+        if (typeof setting !== 'boolean')
+          throw new TypeError('Invalid privacy mode')
+        changes.privacyMode = setting
+        break
+      }
       case 'language': {
         const language = languages.find((item) => item === setting)
         if (!language) throw new TypeError('Invalid profile language')

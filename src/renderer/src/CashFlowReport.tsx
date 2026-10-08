@@ -1,3 +1,4 @@
+import { useAmountFormatters } from './lib/privacy'
 import { useEffect, useMemo, useState } from 'react'
 import {
   ResponsiveContainer,
@@ -10,7 +11,7 @@ import type {
   CashFlowReport as CashFlowData,
 } from '../../shared/report-cash-flow'
 import type { ReportDateRangeInput } from '../../shared/reports'
-import { createFormatters, type Language, type MessageKey } from './i18n'
+import { type Language, type MessageKey } from './i18n'
 
 interface CashFlowReportProps {
   request: ReportDateRangeInput
@@ -27,7 +28,7 @@ const nodeColors: Record<CashFlowNode['kind'], string> = {
 }
 
 export function CashFlowReport({ request, language, t }: CashFlowReportProps) {
-  const format = createFormatters(language)
+  const format = useAmountFormatters(language)
   const reportKey = useMemo(() => ({ request, language }), [request, language])
   const [result, setResult] = useState<{
     key: typeof reportKey
@@ -140,11 +141,11 @@ export function CashFlowReport({ request, language, t }: CashFlowReportProps) {
             <div key={item.currency} className="tabular-nums">
               <p>
                 {t('reports.cashFlow.income')}:{' '}
-                {format.money(item.incomeMinor, item.currency)}
+                {format.amount(item.incomeMinor, item.currency)}
               </p>
               <p>
                 {t('reports.cashFlow.expense')}:{' '}
-                {format.money(item.expenseMinor, item.currency)}
+                {format.amount(item.expenseMinor, item.currency)}
               </p>
             </div>
           ))}
@@ -208,7 +209,7 @@ export function CashFlowReport({ request, language, t }: CashFlowReportProps) {
                   <tr key={index}>
                     <td className="border-t px-3 py-2">{node.name}</td>
                     <td className="border-t px-3 py-2 text-right tabular-nums">
-                      {format.money(node.value, report.baseCurrency)}
+                      {format.amount(node.value, report.baseCurrency)}
                     </td>
                   </tr>
                 ))}

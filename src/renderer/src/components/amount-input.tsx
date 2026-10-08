@@ -4,7 +4,8 @@ import {
   MAX_AMOUNT_EXPRESSION_LENGTH,
   parseAmountExpression,
 } from '../../../shared/amount-expression'
-import { createFormatters, type Language, type MessageKey } from '../i18n'
+import { type Language, type MessageKey } from '../i18n'
+import { useAmountFormatters, usePrivacy } from '../lib/privacy'
 import { Input } from './ui/input'
 
 interface AmountInputProps {
@@ -40,6 +41,9 @@ export function AmountInput({
   required = true,
   placeholder = '0.00',
 }: AmountInputProps) {
+  const { privacyMode } = usePrivacy()
+  const format = useAmountFormatters(language)
+  const [focused, setFocused] = useState(false)
   const [evaluated, setEvaluated] = useState<{
     input: string
     currency: Currency
@@ -73,6 +77,11 @@ export function AmountInput({
         ref={ref}
         id={id}
         inputMode="decimal"
+        data-amount-input=""
+        type={!privacyMode || focused ? 'text' : 'password'}
+        autoComplete="off"
+        className={privacyMode && !focused ? 'private-amount' : undefined}
+        onFocus={() => setFocused(true)}
         value={value}
         placeholder={placeholder}
         maxLength={MAX_AMOUNT_EXPRESSION_LENGTH}
@@ -81,7 +90,10 @@ export function AmountInput({
         aria-describedby={`${id}-hint ${id}-result`}
         aria-invalid={preview?.minor === null || undefined}
         onChange={(event) => onChange(event.target.value)}
-        onBlur={evaluate}
+        onBlur={() => {
+          setFocused(false)
+          evaluate()
+        }}
         onKeyDown={(event) => {
           if (
             event.key === 'Enter' &&
@@ -106,9 +118,13 @@ export function AmountInput({
         }
       >
         {preview &&
-          (preview.minor === null
-            ? t(errorKey)
-            : `${t('amount.result')}: ${createFormatters(language).money(preview.minor, currency)}`)}
+          (preview.minor === null ? (
+            t(errorKey)
+          ) : (
+            <>
+              {t('amount.result')}: {format.amount(preview.minor, currency)}
+            </>
+          ))}
       </p>
     </>
   )

@@ -1,3 +1,4 @@
+import { useAmountFormatters } from './lib/privacy'
 import { useEffect, useMemo, useState } from 'react'
 import {
   Bar,
@@ -15,7 +16,7 @@ import type {
   MonthlyTrendReport as TrendReport,
   ReportDateRangeInput,
 } from '../../shared/reports'
-import { createFormatters, type Language, type MessageKey } from './i18n'
+import { type Language, type MessageKey } from './i18n'
 
 interface MonthlyTrendReportProps {
   request: ReportDateRangeInput
@@ -28,7 +29,7 @@ export function MonthlyTrendReport({
   language,
   t,
 }: MonthlyTrendReportProps) {
-  const format = createFormatters(language)
+  const format = useAmountFormatters(language)
   const reportKey = useMemo(() => ({ request, language }), [request, language])
   const [result, setResult] = useState<{
     key: typeof reportKey
@@ -65,7 +66,7 @@ export function MonthlyTrendReport({
   function totalCell(total: BaseCurrencyConversion) {
     return (
       <>
-        {format.money(total.roundedMinor, total.baseCurrency)}
+        {format.amount(total.roundedMinor, total.baseCurrency)}
         {total.stale && (
           <span className="block text-xs text-muted-foreground">
             {t('reports.provisional')}
@@ -77,7 +78,7 @@ export function MonthlyTrendReport({
             className="block text-xs text-muted-foreground"
           >
             {t('reports.unconverted')}:{' '}
-            {format.money(item.amountMinor, item.currency)}
+            {format.amount(item.amountMinor, item.currency)}
           </span>
         ))}
       </>

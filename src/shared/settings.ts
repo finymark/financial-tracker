@@ -10,6 +10,7 @@ export type BaseCurrency = (typeof baseCurrencies)[number]
 export interface ProfileSettings {
   language: Language
   theme: ThemeMode
+  privacyMode: boolean
   baseCurrency: BaseCurrency
 }
 
@@ -17,6 +18,7 @@ export type ProfileSettingsChanges = Partial<ProfileSettings>
 
 // Keep these defaults aligned with the profile-settings schema migration.
 export const DEFAULT_PROFILE_SETTINGS: Readonly<ProfileSettings> = {
+  privacyMode: false,
   language: 'en',
   theme: 'system',
   baseCurrency: 'HUF',

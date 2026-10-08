@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import {
+  Eye,
+  EyeOff,
   ArrowLeftRight,
   ChartPie,
   LayoutDashboard,
@@ -15,7 +17,8 @@ import type {
   ProfileRegistrySnapshot,
 } from '../../shared/profiles'
 import { ShortcutHelp } from './components/shortcut-help'
-import { matchShortcut } from './lib/shortcuts'
+import { matchShortcut, shortcuts } from './lib/shortcuts'
+import { PrivacyProvider } from './lib/privacy'
 import { shortcutTargetContext } from './lib/shortcut-context'
 import { UpdateNotice } from './components/update-notice'
 import { BackupSettings } from './components/backup-settings'
@@ -387,6 +390,26 @@ function Shell({
   const [undoError, setUndoError] = useState(false)
   const [rateStatus, setRateStatus] = useState<RateStatus | null>(null)
   const format = createFormatters(language)
+  const privacyShortcut = shortcuts.find(
+    (item) => item.action === 'privacy',
+  )!.label
+  const togglePrivacy = useCallback(async () => {
+    if (savingSettings || backupBusy) return
+    setSavingSettings(true)
+    setSettingsError(false)
+    try {
+      await onSettingsChange({ privacyMode: !active.settings.privacyMode })
+    } catch {
+      setSettingsError(true)
+    } finally {
+      setSavingSettings(false)
+    }
+  }, [
+    savingSettings,
+    backupBusy,
+    onSettingsChange,
+    active.settings.privacyMode,
+  ])
 
   useEffect(() => {
     let ignore = false
@@ -439,6 +462,11 @@ function Shell({
         scope: 'app',
         ...shortcutTargetContext(event.target),
       })
+      if (action === 'privacy') {
+        event.preventDefault()
+        void togglePrivacy()
+        return
+      }
       if (!action || showShortcutHelp) return
       // Do not open a second drawer or undo the ledger beneath a modal.
       if (action !== 'help' && document.querySelector('[role="dialog"]')) return
@@ -486,6 +514,7 @@ function Shell({
     payeeBusy,
     ruleBusy,
     showShortcutHelp,
+    togglePrivacy,
   ])
 
   async function saveSettings(changes: ProfileSettingsChanges) {
@@ -605,6 +634,21 @@ function Shell({
             <Button
               className="float-right"
               variant="ghost"
+              aria-pressed={active.settings.privacyMode}
+              title={`${t('privacy.toggle')} (${privacyShortcut})`}
+              disabled={savingSettings || backupBusy}
+              onClick={() => void togglePrivacy()}
+            >
+              {active.settings.privacyMode ? (
+                <EyeOff aria-hidden="true" />
+              ) : (
+                <Eye aria-hidden="true" />
+              )}
+              {t('privacy.toggle')}
+            </Button>
+            <Button
+              className="float-right"
+              variant="ghost"
               onClick={() => setShowShortcutHelp(true)}
             >
               {t('shortcuts.help')}
@@ -612,6 +656,11 @@ function Shell({
             <p className="mb-2 text-sm text-muted-foreground">
               {t('app.tagline')}
             </p>
+            {settingsError && (
+              <p role="alert" className="text-sm font-medium text-error">
+                {t('settings.error')}
+              </p>
+            )}
             {rateStatus && (
               <p className="mb-2 text-xs text-muted-foreground" role="status">
                 {t(
@@ -794,11 +843,6 @@ function Shell({
                     </NativeSelect>
                   </div>
                 </div>
-                {settingsError && (
-                  <p role="alert" className="text-sm font-medium text-error">
-                    {t('settings.error')}
-                  </p>
-                )}
                 <p className="text-sm text-muted-foreground">
                   {t('settings.version')}: {version}
                 </p>
@@ -982,25 +1026,30 @@ export default function App() {
     )
   } else {
     content = (
-      <Shell
-        key={active.id}
-        active={active}
-        version={version}
-        t={t}
-        onSettingsChange={async (settings) => {
-          const saved = await window.app.profiles.updateSettings({
-            id: active.id,
-            settings,
-          })
-          setActive((current) =>
-            current?.id === active.id
-              ? { ...current, settings: saved }
-              : current,
-          )
-        }}
-        onRestored={setActive}
-        onSwitchProfile={() => setShowPicker(true)}
-      />
+      <PrivacyProvider
+        privacyMode={active.settings.privacyMode}
+        language={language}
+      >
+        <Shell
+          key={active.id}
+          active={active}
+          version={version}
+          t={t}
+          onSettingsChange={async (settings) => {
+            const saved = await window.app.profiles.updateSettings({
+              id: active.id,
+              settings,
+            })
+            setActive((current) =>
+              current?.id === active.id
+                ? { ...current, settings: saved }
+                : current,
+            )
+          }}
+          onRestored={setActive}
+          onSwitchProfile={() => setShowPicker(true)}
+        />
+      </PrivacyProvider>
     )
   }
   return (

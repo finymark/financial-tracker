@@ -70,7 +70,7 @@ export function ShortcutHelp({ t, onClose }: ShortcutHelpProps) {
           ))}
         </dl>
         <p className="mt-4 text-sm text-muted-foreground">
-          {t('shortcuts.navigation')}
+          {t('shortcuts.navigation')} {t('privacy.shortcutScope')}
         </p>
       </section>
     </div>

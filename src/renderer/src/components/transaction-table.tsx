@@ -1,3 +1,4 @@
+import { useAmountFormatters } from '../lib/privacy'
 import { useState } from 'react'
 import {
   ArrowDownLeft,
@@ -21,7 +22,7 @@ import type {
 import type { Transfer } from '../../../shared/transfers'
 import type { BalanceAdjustment } from '../../../shared/adjustments'
 import type { BaseCurrencyTransactionTotals } from '../../../shared/exchange-rates'
-import { createFormatters, type Language, type MessageKey } from '../i18n'
+import { type Language, type MessageKey } from '../i18n'
 import { Button } from './ui/button'
 
 interface Props {
@@ -41,7 +42,7 @@ export function Totals({
   language,
   t,
 }: Pick<Props, 'language' | 't'> & { totals: TransactionTotals[] }) {
-  const format = createFormatters(language)
+  const format = useAmountFormatters(language)
   return (
     <span className="inline-flex flex-wrap gap-x-4 gap-y-1 tabular-nums">
       {totals.map((total) => (
@@ -51,10 +52,10 @@ export function Totals({
         >
           <ArrowUpRight aria-hidden="true" className="size-3" />
           <span className="sr-only">{t('transactions.expense')}</span>−
-          {format.money(total.expenseMinor, total.currency)}
+          {format.amount(total.expenseMinor, total.currency)}
           <ArrowDownLeft aria-hidden="true" className="ml-2 size-3" />
           <span className="sr-only">{t('transactions.income')}</span>+
-          {format.money(total.incomeMinor, total.currency)}
+          {format.amount(total.incomeMinor, total.currency)}
         </span>
       ))}
     </span>
@@ -112,7 +113,7 @@ export function TransactionTable({
 }: Props) {
   const [scrollTop, setScrollTop] = useState(0)
   const [expandedSplits, setExpandedSplits] = useState<Set<string>>(new Set())
-  const format = createFormatters(language)
+  const format = useAmountFormatters(language)
   const items: (
     | { day: string }
     | { transaction: Transaction | Transfer | BalanceAdjustment }
@@ -239,7 +240,7 @@ export function TransactionTable({
                     {item.part.note}
                   </td>
                   <td className="truncate px-3 text-right font-medium tabular-nums">
-                    {format.money(
+                    {format.amount(
                       item.part.amountMinor,
                       account?.currency ?? 'HUF',
                     )}
@@ -258,7 +259,7 @@ export function TransactionTable({
               )
               const rate = transaction.actualRate
               const rateText = rate
-                ? `${t('transactions.actualRate')}: 1 ${rate.fromCurrency} = ${formatRate(rate.numerator, rate.denominator, language)} ${rate.toCurrency}`
+                ? `${t('transactions.actualRate')}: ${format.privateText(`1 ${rate.fromCurrency} = ${formatRate(rate.numerator, rate.denominator, language)} ${rate.toCurrency}`)}`
                 : ''
               return (
                 <tr
@@ -290,12 +291,12 @@ export function TransactionTable({
                   <td className="truncate px-3 text-right font-medium tabular-nums">
                     <span className="whitespace-nowrap">
                       −
-                      {format.money(
+                      {format.amount(
                         transaction.fromAmountMinor,
                         from?.currency ?? 'HUF',
                       )}
                       {' → '}+
-                      {format.money(
+                      {format.amount(
                         transaction.toAmountMinor,
                         to?.currency ?? 'HUF',
                       )}
@@ -359,7 +360,7 @@ export function TransactionTable({
                   >
                     <span className="whitespace-nowrap">
                       {sign}
-                      {format.money(
+                      {format.amount(
                         absoluteDifference,
                         account?.currency ?? 'HUF',
                       )}
@@ -480,8 +481,8 @@ export function TransactionTable({
                     </span>
                     {transaction.kind === 'expense' ? '−' : '+'}
                     {account
-                      ? format.money(transaction.totalMinor, account.currency)
-                      : format.money(transaction.totalMinor, 'HUF')}
+                      ? format.amount(transaction.totalMinor, account.currency)
+                      : format.amount(transaction.totalMinor, 'HUF')}
                   </span>
                 </td>
                 <td className="px-1">

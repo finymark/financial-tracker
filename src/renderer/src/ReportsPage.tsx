@@ -1,3 +1,4 @@
+import { useAmountFormatters } from './lib/privacy'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   Bar,
@@ -24,7 +25,7 @@ import { Button } from './components/ui/button'
 import { CardContent } from './components/ui/card'
 import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
-import { createFormatters, type Language, type MessageKey } from './i18n'
+import { type Language, type MessageKey } from './i18n'
 import { MonthlyTrendReport } from './MonthlyTrendReport'
 
 interface ReportsPageProps {
@@ -51,7 +52,7 @@ export function ReportsPage({
   t,
   onOpenTransactions,
 }: ReportsPageProps) {
-  const format = createFormatters(language)
+  const format = useAmountFormatters(language)
   const [tab, setTab] = useState<'category' | 'trend' | 'pace' | 'cashFlow'>(
     'category',
   )
@@ -276,7 +277,7 @@ export function ReportsPage({
                   {t('reports.total')}
                 </h3>
                 <p className="text-2xl font-semibold tabular-nums">
-                  {format.money(
+                  {format.amount(
                     report.total.roundedMinor,
                     report.total.baseCurrency,
                   )}
@@ -311,7 +312,7 @@ export function ReportsPage({
                 <p className="font-medium">{t('reports.unconverted')}</p>
                 {report.total.unconverted.map((item) => (
                   <p key={item.currency} className="tabular-nums">
-                    {format.money(item.amountMinor, item.currency)}
+                    {format.amount(item.amountMinor, item.currency)}
                   </p>
                 ))}
               </div>
@@ -468,7 +469,7 @@ export function ReportsPage({
                             </button>
                           </td>
                           <td className="border-t px-3 py-2 text-right tabular-nums">
-                            {format.money(
+                            {format.amount(
                               category.total.roundedMinor,
                               category.total.baseCurrency,
                             )}
@@ -478,15 +479,17 @@ export function ReportsPage({
                                 className="block text-xs text-muted-foreground"
                               >
                                 {t('reports.unconverted')}:{' '}
-                                {format.money(item.amountMinor, item.currency)}
+                                {format.amount(item.amountMinor, item.currency)}
                               </span>
                             ))}
                           </td>
                           <td className="border-t px-3 py-2 text-right tabular-nums">
-                            {format.number(basisPoints / 100, {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 2,
-                            })}
+                            {format.amountText(
+                              format.number(basisPoints / 100, {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 2,
+                              }),
+                            )}
                             %
                           </td>
                         </tr>

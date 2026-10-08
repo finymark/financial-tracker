@@ -3,6 +3,11 @@ import { categoryNames } from '../../../shared/category-translations'
 import type { MessageCatalog } from './en'
 
 export const de = {
+  'privacy.toggle': 'Privatmodus',
+  'privacy.hiddenAmount': 'Verborgener Betrag',
+  'privacy.shortcutScope':
+    'Der Privatmodus funktioniert überall, auch beim Tippen (Ctrl+Shift+H).',
+
   'shortcuts.closeHelp': 'Tastaturhilfe schließen',
   'transactions.saveAndAddAnother': 'Speichern und weitere hinzufügen',
   'shortcuts.scope':

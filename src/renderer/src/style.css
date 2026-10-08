@@ -12,3 +12,9 @@
     @apply m-0 bg-background font-sans text-foreground antialiased;
   }
 }
+
+/* No reveal-on-hover, animation or selection: privacy remains on until toggled. */
+.private-amount {
+  filter: blur(8px);
+  user-select: none;
+}
