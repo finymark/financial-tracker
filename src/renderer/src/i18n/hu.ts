@@ -46,6 +46,10 @@ export const hu = {
   'categories.error.transactionIntegration':
     'A tranzakciók átsorolása ebben a verzióban még nem érhető el. A kategória nem lett törölve.',
 
+  'updates.ready':
+    'A frissítés letöltődött. A telepítéshez indítsa újra az alkalmazást.',
+  'updates.restart': 'Újraindítás és frissítés',
+  'updates.error': 'Nem sikerült újraindítani a frissítéshez. Próbálja újra.',
   'app.name': 'Financial Tracker',
   'app.tagline': 'Pénzügyeid a saját számítógépeden.',
   'navigation.label': 'Fő navigáció',

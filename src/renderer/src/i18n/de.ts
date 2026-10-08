@@ -48,6 +48,11 @@ export const de = {
   'categories.error.transactionIntegration':
     'Die Neuzuordnung von Transaktionen ist in dieser Version noch nicht verfügbar. Die Kategorie wurde nicht gelöscht.',
 
+  'updates.ready':
+    'Ein Update wurde heruntergeladen. Starten Sie zur Installation neu.',
+  'updates.restart': 'Neustarten und aktualisieren',
+  'updates.error':
+    'Neustart für das Update fehlgeschlagen. Bitte versuchen Sie es erneut.',
   'app.name': 'Financial Tracker',
   'app.tagline': 'Deine Finanzen auf deinem PC.',
   'navigation.label': 'Hauptnavigation',

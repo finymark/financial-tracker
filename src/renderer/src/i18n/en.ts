@@ -45,6 +45,9 @@ export const en = {
   'categories.error.transactionIntegration':
     'Transaction reassignment is not available in this version. The category was not deleted.',
 
+  'updates.ready': 'An update is downloaded. Restart to install it.',
+  'updates.restart': 'Restart and update',
+  'updates.error': 'Could not restart for the update. Please try again.',
   'app.name': 'Financial Tracker',
   'app.tagline': 'Your finances, on your PC.',
   'navigation.label': 'Main navigation',

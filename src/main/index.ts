@@ -1,5 +1,8 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'node:path'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { registerUpdates } from './updates'
 import { openDatabase, pingDatabase } from './db'
 import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 import { ProfileController } from './profiles/profile-controller'
@@ -11,7 +14,7 @@ import { ProfileRegistry } from './profiles/profile-registry'
 const APP_ID = 'com.finymark.financial-tracker'
 const APP_NAME = 'Financial Tracker'
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 900,
     height: 600,
@@ -32,9 +35,39 @@ function createWindow(): void {
   } else {
     void window.loadFile(join(import.meta.dirname, '../renderer/index.html'))
   }
+  return window
 }
 
+function smokeTest(): void {
+  const directory = mkdtempSync(join(tmpdir(), 'financial-tracker-smoke-'))
+  let exitCode = 1
+  try {
+    const database = openDatabase(join(directory, 'smoke.sqlite'))
+    try {
+      if (pingDatabase(database) !== 'ok') throw new Error('SQLite ping failed')
+      console.log('SQLite smoke test OK')
+      exitCode = 0
+    } finally {
+      database.close()
+    }
+  } catch {
+    console.error('SQLite smoke test FAILED')
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+    app.exit(exitCode)
+  }
+}
+
+// Keep the existing dev profile location even when packaging changes app metadata.
+app.setName(APP_NAME)
+app.setPath('userData', join(app.getPath('appData'), APP_NAME))
+app.setAppUserModelId(APP_ID)
+
 void app.whenReady().then(() => {
+  if (process.argv.includes('--smoke-test')) {
+    smokeTest()
+    return
+  }
   const database = openDatabase(':memory:')
   const profiles = new ProfileController(
     new ProfileRegistry({ userDataDirectory: app.getPath('userData') }),
@@ -52,23 +85,22 @@ void app.whenReady().then(() => {
   registerAccountIpc(ipcMain, profiles)
   registerCategoryIpc(ipcMain, profiles)
 
-  let shutdownStarted = false
+  let shutdownPromise: Promise<void> | null = null
   let shutdownComplete = false
+  function shutdown(): Promise<void> {
+    shutdownPromise ??= profiles.shutdown().then(() => {
+      database.close()
+      shutdownComplete = true
+    })
+    return shutdownPromise
+  }
   app.on('before-quit', (event) => {
     if (shutdownComplete) return
     event.preventDefault()
-    if (shutdownStarted) return
-    shutdownStarted = true
-    void profiles.shutdown().then(() => {
-      database.close()
-      shutdownComplete = true
-      app.quit()
-    })
+    void shutdown().then(() => app.quit())
   })
-  createWindow()
+  const window = createWindow()
+  registerUpdates(ipcMain, window, app.isPackaged, shutdown)
 })
-
-app.setName(APP_NAME)
-app.setAppUserModelId(APP_ID)
 
 app.on('window-all-closed', () => app.quit())

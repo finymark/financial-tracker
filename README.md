@@ -9,7 +9,7 @@ implemented yet. Settings includes two-level expense/income category management.
 
 ## Requirements
 
-- Windows (x64 or ARM64)
+- Windows (x64 installer; development also supports ARM64)
 - Node.js 24.x (the development machine runs 24.15.0); see `.nvmrc`
 - npm 12.2.0 or newer (upgrade Node's bundled npm with
   `npm install --global npm@12.2.0`)
@@ -17,7 +17,7 @@ implemented yet. Settings includes two-level expense/income category management.
 ## Setup
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
@@ -32,9 +32,12 @@ npm loses SQLite's `gypfile: false` metadata in lockfiles and incorrectly invoke
 node-gyp during clean installation. Previously `ignore-scripts=true` avoided that
 bug but also prevented Husky's `prepare` script from installing Git hooks.
 Instead, npm 12's `allowScripts` policy in `package.json` explicitly denies
-dependency scripts for SQLite, Electron, and esbuild, while allowing the root
+dependency scripts for SQLite, Electron, esbuild, and electron-winstaller, while
+allowing the root
 `prepare` script to install hooks automatically on `npm install` and `npm ci`.
-SQLite includes its native binary, Electron 44 downloads its executable on first
+electron-winstaller is an unused Squirrel packaging dependency of electron-builder;
+its 7-Zip selection script is not needed for NSIS. SQLite includes its native binary,
+Electron 44 downloads its executable on first
 `dev` or `test`, and esbuild uses its platform-specific optional dependency.
 `strict-allow-scripts=true` rejects unreviewed dependency scripts; review this
 policy whenever dependencies change. Do not restore `ignore-scripts=true` or
@@ -46,6 +49,7 @@ install with `--ignore-scripts`: either would skip hook installation. Run
 | Command                       | Purpose                                                                           |
 | ----------------------------- | --------------------------------------------------------------------------------- |
 | `npm run dev`                 | Start the desktop app with renderer hot reload.                                   |
+| `npm run dist:win`            | Build an unsigned Windows x64 NSIS installer into `release/` without publishing.  |
 | `npm run build`               | Typecheck and build main, preload, and renderer into `out/`.                      |
 | `npm test`                    | Run SQLite, translation completeness, and formatting tests under Electron's Node. |
 | `npm run lint`                | Run ESLint.                                                                       |
@@ -116,13 +120,13 @@ net, not a substitute for review or CI: Git's `--no-verify` and `HUSKY=0` can by
 them, and pattern matching cannot detect every possible form of sensitive data.
 
 The renderer has no Node access; a sandboxed, isolated preload exposes only the
-typed app, profile (including settings), account, category, and backup commands/queries.
+typed app, update, profile (including settings), account, category, and backup commands/queries.
 Every IPC input is validated
 in the main process. Account and category writes use the profile application API, with each
 command executed in one SQLite transaction. SQLite is used only in the main
 process. Profiles are listed in `profiles.json` under the app's user-data folder; each
 profile lives in `profiles/<id>/` (database, data folder, and backups). Migrations are forward-only and run after a verified backup; a
-database with a newer schema is refused. Installer packaging is not included yet.
+database with a newer schema is refused.
 
 ## Continuous integration
 
@@ -133,6 +137,97 @@ lint, formatting checks, typechecking, tests, and the build. If a diff base is
 unavailable (including the first push), the guard scans all tracked files instead.
 New PR runs cancel older runs for the same PR. The stable required check name
 for the `main` ruleset is `checks`.
+
+## Releases and updates
+
+The application identity is fixed: appId `com.finymark.financial-tracker` and
+productName `Financial Tracker`. A runtime check of the existing development app
+confirmed that Electron uses `Financial Tracker` as its user-data folder name.
+Both development and packaged builds explicitly keep
+`%APPDATA%\Financial Tracker` (Electron's `appData` directory plus that name),
+so installing a release does not orphan existing development profiles. Do not
+rename this folder or change the appId. Uninstalling keeps profile data.
+
+`electron-builder.yml` produces a per-user, one-click **unsigned NSIS x64**
+installer. Windows may show an unknown-publisher/SmartScreen warning; code
+signing is not configured. Executable resource editing is disabled, so the
+installer/app currently use Electron's default icon. Native SQLite binaries are
+explicitly unpacked from asar, and native dependency rebuilding is disabled:
+`better-sqlite3` 13 already ships the compatible Node-API binary.
+
+### Validate without publishing
+
+Locally, run:
+
+```sh
+npm ci
+npm run lint
+npm run format:check
+npm run typecheck
+npm test
+npm run dist:win
+```
+
+Or, after building the app with `npm run build`, run the builder directly:
+`npx electron-builder --win nsis --publish never`. Outputs are under `release/`
+and are ignored by Git. Corporate proxies can block electron-builder's Electron,
+NSIS, or signing-tool downloads; report the failing URL/error rather than
+working around certificate verification or committing downloaded binaries.
+
+Check the packaged native module from PowerShell:
+
+```powershell
+$exe = Join-Path $PWD 'release/win-unpacked/Financial Tracker.exe'
+$log = Join-Path $env:TEMP 'financial-tracker-smoke.log'
+$process = Start-Process -FilePath $exe -ArgumentList '--smoke-test' -Wait -PassThru -RedirectStandardOutput $log
+Get-Content $log
+$process.ExitCode
+```
+
+It must print `SQLite smoke test OK` and exit 0. The flag opens a temporary
+file-backed database, runs a query, closes it, deletes it, and exits without
+opening a window or reading profiles. For an installed-artifact check, silently
+install `Financial Tracker Setup <version>.exe` with `/S /D=<temporary-directory>`
+(the directory argument must be last), then run the installed executable with
+`--smoke-test`. Uninstall that temporary installation afterwards. Do not use this
+check to replace an existing installation.
+
+In GitHub Actions, select **Release → Run workflow** and choose the branch to
+validate. GitHub requires the workflow to exist on the default branch before
+manual dispatch is available. The `workflow_dispatch` path runs all quality
+gates, builds the installer, smoke-tests the unpacked app, and uploads
+`financial-tracker-windows-x64` (installer, blockmap, and update metadata) for
+14 days. It uses `--publish never` and cannot run the publishing step, even when
+dispatched on a tag. It creates neither a tag nor a GitHub Release.
+
+### Publish only on the owners' signal
+
+1. Update `package.json` and `package-lock.json` to the intended version (for
+   example, `npm version <version> --no-git-tag-version`), commit the change, and
+   merge through the normal green-CI PR process.
+2. Validate the build-only workflow and the installed artifact first.
+3. **Only when the owners explicitly authorize a release**, tag the approved
+   commit `v<version>` and push that tag. Do not push a release tag during testing.
+4. `.github/workflows/release.yml` runs on `v*.*.*` tags on `windows-latest`,
+   requires the tag to equal `v` plus `package.json`'s version, installs npm
+   12.2.0, runs `npm ci` and all acceptance gates, builds without publishing,
+   and smoke-tests the packaged app. Only then it builds/publishes a GitHub
+   Release using `electron-builder --publish always` and `GH_TOKEN` from the
+   workflow's `GITHUB_TOKEN` (`contents: write`). Actions are SHA-pinned.
+5. Confirm the public Release includes the installer, its `.blockmap`, and
+   `latest.yml`; electron-updater needs these assets. Check a previously
+   installed version detects and installs the new version on restart.
+
+Packaged builds check the public GitHub Releases feed once on startup and
+automatically download available updates. Development builds do neither.
+Offline/failed checks do not block startup and retry on the next startup.
+After download, a small Hungarian/English/German notice offers **Restart and
+update**, using the active profile's language (English before profile selection).
+Installation is explicit, not automatic on ordinary quit. Restart waits for
+ongoing profile operations and closes SQLite before starting the installer.
+Database migrations retain the existing verified-backup protections. End-to-end
+update/restart behavior must be checked manually with two authorized releases;
+the build-only artifact is not an update feed.
 
 ## Backup and restore
 
