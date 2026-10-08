@@ -575,6 +575,17 @@ describe('profile application API', () => {
       expect(() => application.commands.ensureProfileIdentity()).toThrow(
         'restore is in progress',
       )
+      expect(() =>
+        application.commands.createTransaction({
+          accountId: '00000000-0000-4000-8000-000000000001',
+          kind: 'expense',
+          date: '2026-01-15',
+          totalMinor: 100,
+          payeeName: null,
+          categoryId: null,
+          note: '',
+        }),
+      ).toThrow('restore is in progress')
       expect(() => application.close()).toThrow('restore is in progress')
       await expect(
         application.commands.restoreBackup({
@@ -696,6 +707,39 @@ describe('profile application API', () => {
       firstApplication.close()
       secondApplication.close()
     }
+  })
+
+  test('switching profiles clears transaction undo history', async () => {
+    const { registry } = setup()
+    const first = registry.createProfile('First undo profile')
+    const second = registry.createProfile('Second undo profile')
+    const controller = new ProfileController(registry)
+    await controller.open(first.id)
+    const firstApplication = controller.getActiveApplication()
+    const account = firstApplication.commands.createAccount({
+      name: 'Cash',
+      currency: 'HUF',
+      openingBalance: 0,
+      openingDate: '2026-01-01',
+    })
+    const transaction = firstApplication.commands.createTransaction({
+      accountId: account.id,
+      kind: 'expense',
+      date: '2026-01-15',
+      totalMinor: 100,
+      payeeName: null,
+      categoryId: null,
+      note: '',
+    })
+
+    await controller.open(second.id)
+    expect(controller.getActiveApplication().commands.undoLast()).toBe(false)
+    await controller.open(first.id)
+    expect(controller.getActiveApplication().commands.undoLast()).toBe(false)
+    expect(
+      controller.getActiveApplication().queries.listTransactions().rows,
+    ).toEqual([transaction])
+    controller.close()
   })
 
   test('upgrades from every earlier schema version', async () => {

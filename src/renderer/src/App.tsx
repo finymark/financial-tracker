@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import {
   ArrowLeftRight,
   LayoutDashboard,
@@ -45,6 +45,13 @@ const pages = [
 ] as const
 type Page = (typeof pages)[number]['id']
 type Translate = (key: MessageKey) => string
+
+function isEditingText(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest('input, textarea, select, [contenteditable="true"]') !== null
+  )
+}
 
 const emptySnapshot: ProfileRegistrySnapshot = {
   profiles: [],
@@ -359,7 +366,49 @@ function Shell({
   const [backupBusy, setBackupBusy] = useState(false)
   const [categoryBusy, setCategoryBusy] = useState(false)
   const [categoryRevision, setCategoryRevision] = useState(0)
+  const [undoRevision, setUndoRevision] = useState(0)
+  const [undoOffered, setUndoOffered] = useState(false)
+  const [undoBusy, setUndoBusy] = useState(false)
+  const [undoError, setUndoError] = useState(false)
   const format = createFormatters(language)
+
+  const undoLast = useCallback(async () => {
+    if (undoBusy) return
+    setUndoBusy(true)
+    setUndoError(false)
+    try {
+      const undone = await window.app.undo.last()
+      setUndoOffered(false)
+      if (undone) {
+        setUndoRevision((revision) => revision + 1)
+        setCategoryRevision((revision) => revision + 1)
+      }
+    } catch {
+      setUndoError(true)
+      setUndoOffered(true)
+    } finally {
+      setUndoBusy(false)
+    }
+  }, [undoBusy])
+
+  useEffect(() => {
+    const handleUndoShortcut = (event: KeyboardEvent) => {
+      if (
+        event.key.toLowerCase() !== 'z' ||
+        !event.ctrlKey ||
+        event.altKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        isEditingText(event.target)
+      ) {
+        return
+      }
+      event.preventDefault()
+      void undoLast()
+    }
+    window.addEventListener('keydown', handleUndoShortcut)
+    return () => window.removeEventListener('keydown', handleUndoShortcut)
+  }, [undoLast])
 
   async function saveSettings(changes: ProfileSettingsChanges) {
     setSavingSettings(true)
@@ -480,10 +529,23 @@ function Shell({
               <CardDescription>{t(`${page}.description`)}</CardDescription>
             </CardHeader>
             {page === 'accounts' && (
-              <AccountsPage key={active.id} language={language} t={t} />
+              <AccountsPage
+                key={`${active.id}:${undoRevision}`}
+                language={language}
+                t={t}
+              />
             )}
             {page === 'transactions' && (
-              <TransactionsPage key={active.id} language={language} t={t} />
+              <TransactionsPage
+                key={active.id}
+                language={language}
+                t={t}
+                undoRevision={undoRevision}
+                onTransactionChanged={() => {
+                  setUndoError(false)
+                  setUndoOffered(true)
+                }}
+              />
             )}
             {page === 'settings' && (
               <CardContent className="space-y-6">
@@ -600,7 +662,7 @@ function Shell({
           </Card>
           {page === 'settings' && (
             <CategorySettings
-              key={`${active.id}:${categoryRevision}`}
+              key={`${active.id}:${categoryRevision}:${undoRevision}`}
               t={t}
               disabled={savingSettings || backupBusy}
               onBusyChange={setCategoryBusy}
@@ -621,6 +683,19 @@ function Shell({
           )}
         </div>
       </main>
+      {undoOffered && (
+        <aside
+          role="status"
+          className="fixed right-4 bottom-4 z-50 flex max-w-sm items-center gap-3 rounded-lg border bg-card p-4 text-card-foreground shadow-lg"
+        >
+          <p className="text-sm">
+            {t(undoError ? 'undo.error' : 'undo.available')}
+          </p>
+          <Button variant="ghost" disabled={undoBusy} onClick={undoLast}>
+            {t('undo.action')}
+          </Button>
+        </aside>
+      )}
     </div>
   )
 }

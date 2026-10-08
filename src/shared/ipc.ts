@@ -71,6 +71,7 @@ export const IPC_CHANNELS = {
   transactionsCreate: 'transactions:create',
   transactionsUpdate: 'transactions:update',
   transactionsDelete: 'transactions:delete',
+  undoLast: 'undo:last',
   payeesList: 'payees:list',
 } as const
 
@@ -86,6 +87,9 @@ export interface AppBridge {
     create(input: CreateTransactionInput): Promise<Transaction>
     update(input: UpdateTransactionInput): Promise<Transaction>
     delete(input: TransactionIdInput): Promise<void>
+  }
+  undo: {
+    last(): Promise<boolean>
   }
   payees: {
     list(): Promise<Payee[]>

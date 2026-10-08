@@ -272,6 +272,122 @@ test('editing and deleting transactions updates signed account balances and acco
   expect(application.queries.listTransactions().rows).toHaveLength(1)
 })
 
+test('undoes transaction delete, edit, and create in reverse order with exact aggregate images', async () => {
+  let now = new Date('2026-01-15T10:00:00.000Z')
+  const application = await setup({ profileClock: () => now })
+  const firstAccount = application.commands.createAccount({
+    name: 'Cash',
+    currency: 'HUF',
+    openingBalance: 1000,
+    openingDate: '2026-01-01',
+  })
+  const secondAccount = application.commands.createAccount({
+    name: 'Bank',
+    currency: 'CHF',
+    openingBalance: 2000,
+    openingDate: '2026-01-01',
+  })
+  const expenseCategory = application.queries.listCategoryOptions('expense')[0]
+  const incomeCategory = application.queries.listCategoryOptions('income')[0]
+  const created = application.commands.createTransaction({
+    accountId: firstAccount.id,
+    kind: 'expense',
+    date: '2026-01-14',
+    totalMinor: 250,
+    payeeName: 'Original payee',
+    categoryId: expenseCategory.id,
+    note: 'Original note',
+  })
+  now = new Date('2026-01-15T11:00:00.000Z')
+  const edited = application.commands.updateTransaction({
+    id: created.id,
+    accountId: secondAccount.id,
+    kind: 'income',
+    date: '2026-01-13',
+    totalMinor: 475,
+    payeeName: 'Edited payee',
+    categoryId: incomeCategory.id,
+    note: 'Edited note',
+  })
+  application.commands.deleteTransaction(edited.id)
+
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toEqual([edited])
+  expect(application.queries.getAccountBalance(secondAccount.id)).toBe(2475)
+
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toEqual([created])
+  expect(application.queries.listPayees()).toEqual([
+    {
+      id: created.payeeId,
+      name: 'Original payee',
+      createdAt: created.createdAt,
+    },
+  ])
+  expect(application.queries.getAccountBalance(firstAccount.id)).toBe(750)
+  expect(application.queries.getAccountBalance(secondAccount.id)).toBe(2000)
+
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toEqual([])
+  expect(application.queries.listPayees()).toEqual([])
+  expect(application.queries.getAccountBalance(firstAccount.id)).toBe(1000)
+  expect(application.commands.undoLast()).toBe(false)
+})
+
+test('a successful non-undoable write clears transaction undo history', async () => {
+  const application = await setup()
+  const account = application.commands.createAccount({
+    name: 'Before rename',
+    currency: 'HUF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  const transaction = application.commands.createTransaction({
+    accountId: account.id,
+    kind: 'expense',
+    date: '2026-01-15',
+    totalMinor: 100,
+    payeeName: null,
+    categoryId: null,
+    note: '',
+  })
+
+  application.commands.renameAccount({ id: account.id, name: 'After rename' })
+
+  expect(application.commands.undoLast()).toBe(false)
+  expect(application.queries.listTransactions().rows).toEqual([transaction])
+})
+
+test('a failed transaction command preserves the preceding undo entry', async () => {
+  const application = await setup()
+  const account = application.commands.createAccount({
+    name: 'Cash',
+    currency: 'HUF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  const transaction = application.commands.createTransaction({
+    accountId: account.id,
+    kind: 'expense',
+    date: '2026-01-15',
+    totalMinor: 100,
+    payeeName: null,
+    categoryId: null,
+    note: '',
+  })
+  expect(() =>
+    application.commands.updateTransaction({
+      ...transaction,
+      date: '2026-01-16',
+      payeeName: null,
+      categoryId: null,
+    }),
+  ).toThrow('transactions.error.futureDate')
+
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toEqual([])
+})
+
 test('edits other fields while keeping archived account and category references unchanged', async () => {
   const application = await setup()
   const account = application.commands.createAccount({

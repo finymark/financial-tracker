@@ -175,6 +175,9 @@ export const hu = {
     'A tranzakció nem található. Frissítsd a listát.',
   'transactions.error.lines':
     'A tranzakció sorainak összege nem egyezik a végösszeggel.',
+  'undo.available': 'A tranzakció módosult.',
+  'undo.action': 'Visszavonás',
+  'undo.error': 'A módosítást nem sikerült visszavonni.',
   'accounts.title': 'Minden számlának saját hely',
   'accounts.description':
     'Minden egyenleg a nyitó egyenleget, valamint a számla pénznemében rögzített bevételeket és kiadásokat összesíti.',
