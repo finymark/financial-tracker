@@ -10,6 +10,14 @@ export function registerReportIpc(
 ): void {
   registerIpcHandler(
     ipcMain,
+    IPC_CHANNELS.reportsCashFlow,
+    (_event, value): Awaited<ReturnType<AppBridge['reports']['cashFlow']>> =>
+      controller
+        .getActiveApplication()
+        .queries.getCashFlow(parseReportDateRangeInput(value)),
+  )
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.reportsSpendingPace,
     (): Awaited<ReturnType<AppBridge['reports']['spendingPace']>> =>
       controller.getActiveApplication().queries.getSpendingPace(),

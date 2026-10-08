@@ -242,6 +242,23 @@ export const en = {
   'reports.title': 'Expenses by category',
   'reports.description':
     'Compare category totals in your base currency and drill down to the transactions behind them.',
+  'reports.heading': 'Reports in your base currency',
+  'reports.introduction':
+    'Explore categories, monthly trends and cash flow for your chosen range, or compare this month’s spending pace.',
+  'reports.view': 'Report view',
+  'reports.cashFlow.title': 'Cash flow',
+  'reports.cashFlow.income': 'Income',
+  'reports.cashFlow.expense': 'Expenses',
+  'reports.cashFlow.uncategorizedIncome': 'Uncategorized income',
+  'reports.cashFlow.uncategorizedExpense': 'Uncategorized expenses',
+  'reports.cashFlow.deficit': 'From savings / deficit',
+  'reports.cashFlow.surplus': 'Saved / surplus',
+  'reports.cashFlow.empty':
+    'No converted income or expenses in this date range.',
+  'reports.cashFlow.description':
+    'Income categories flow through Income to expense categories. Savings balance the converted flows; unconverted amounts stay separate.',
+  'reports.cashFlow.rounding':
+    'Flows use rounded category totals; their sum can differ slightly from a whole-period total rounded once.',
   'reports.dateRange': 'Report date range',
   'reports.period.thisMonth': 'This month',
   'reports.period.lastMonth': 'Last month',

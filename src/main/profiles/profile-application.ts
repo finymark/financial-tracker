@@ -177,6 +177,8 @@ import {
   resolveReportDateRange,
 } from './report-validation'
 import { getCategoryBreakdown } from './profile-reports'
+import type { CashFlowReport } from '../../shared/report-cash-flow'
+import { getCashFlow } from './profile-report-cash-flow'
 import { getSpendingPace } from './profile-report-pace'
 import { getOverviewDashboard } from './profile-report-overview'
 import type { OverviewDashboard } from '../../shared/report-overview'
@@ -235,6 +237,7 @@ export interface OpenProfileApplicationOptions {
 }
 
 export interface ProfileQueries {
+  getCashFlow(input: ReportDateRangeInput): CashFlowReport
   getSpendingPace(): SpendingPaceReport
   getOverviewDashboard(): OverviewDashboard
   getMonthlyTrend(input: ReportDateRangeInput): MonthlyTrendReport
@@ -1150,6 +1153,16 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      getCashFlow: (input) => {
+        this.#assertAvailable()
+        const range = resolveReportDateRange(
+          parseReportDateRangeInput(input),
+          this.#clock,
+        )
+        return this.#database.transaction(() =>
+          getCashFlow(this.#database, range, this.#clock),
+        )()
+      },
       getSpendingPace: () => {
         this.#assertAvailable()
         return this.#database.transaction(() =>

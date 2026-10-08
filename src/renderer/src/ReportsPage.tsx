@@ -18,6 +18,7 @@ import type {
   ReportDateRangeInput,
   ReportPeriod,
 } from '../../shared/reports'
+import { CashFlowReport } from './CashFlowReport'
 import { SpendingPaceSection } from './SpendingPaceSection'
 import { Button } from './components/ui/button'
 import { CardContent } from './components/ui/card'
@@ -51,7 +52,9 @@ export function ReportsPage({
   onOpenTransactions,
 }: ReportsPageProps) {
   const format = createFormatters(language)
-  const [tab, setTab] = useState<'category' | 'trend' | 'pace'>('category')
+  const [tab, setTab] = useState<'category' | 'trend' | 'pace' | 'cashFlow'>(
+    'category',
+  )
   const [filters, setFilters] = useState({
     period: 'thisMonth' as ReportPeriod,
     from: '',
@@ -148,7 +151,7 @@ export function ReportsPage({
       <div
         className="flex flex-wrap gap-2"
         role="group"
-        aria-label={t('navigation.reports')}
+        aria-label={t('reports.view')}
       >
         <Button
           type="button"
@@ -173,6 +176,14 @@ export function ReportsPage({
           onClick={() => setTab('pace')}
         >
           {t('reports.pace.title')}
+        </Button>
+        <Button
+          type="button"
+          variant={tab === 'cashFlow' ? 'default' : 'ghost'}
+          aria-pressed={tab === 'cashFlow'}
+          onClick={() => setTab('cashFlow')}
+        >
+          {t('reports.cashFlow.title')}
         </Button>
       </div>
       {tab !== 'pace' && (
@@ -240,6 +251,9 @@ export function ReportsPage({
         </form>
       )}
 
+      {tab === 'cashFlow' && (
+        <CashFlowReport request={request} language={language} t={t} />
+      )}
       {tab === 'trend' && (
         <MonthlyTrendReport request={request} language={language} t={t} />
       )}

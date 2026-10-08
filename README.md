@@ -302,8 +302,9 @@ not off-device copies or backups of the separate data folder.
   switches profiles. Accounts lists active and archived accounts with balances in
   their own currency. Transactions provides a filterable, virtualised table and a
   right-side create/edit drawer. Reports provides base-currency expense totals by
-  main category and subcategory plus spending pace; Overview shows this month's expenses, income,
-  net, and top five expense categories compared with the full last month.
+  main category and subcategory, monthly trends, spending pace, and cash flow.
+  Overview shows this month's expenses, income, net, and top five expense
+  categories compared with the full last month.
 
 ## Exchange rates and base-currency conversion
 
@@ -382,6 +383,11 @@ rollover.
 
 ## Reports
 
+Use the shared view selector for **Expenses by category**, **Monthly trend**,
+**Spending pace**, and **Cash flow**. Breakdown, trend, and cash flow retain the
+same applied date range when switching views. Pace uses its fixed month-to-date
+comparison and hides the date-range controls.
+
 - **Reports** defaults to this month and also offers last month, this year, the
   rolling last 12 months, and an inclusive custom range.
 - The category breakdown uses ordinary expense transaction lines only. Income,
@@ -418,7 +424,17 @@ rollover.
   Net is converted and rounded independently from exact income minus expense
   lines, not calculated by subtracting rounded display totals.
 
-### Manual Reports and charts check
+- Choose **Cash flow** to draw income main categories (including uncategorized
+  income) through **Income** to expense main categories. A **From savings / deficit**
+  source or **Saved / surplus** sink balances unequal flows. These are balancing
+  amounts for the selected range, not account balances or actual savings transfers.
+- Cash-flow data comes from the profile application query. Each category converts
+  exactly and rounds once to base-currency hundredths; links reuse that value.
+  The central node and balancing amount sum those rounded flows, so they can differ
+  slightly from a whole-period aggregate rounded once. Unconverted income and
+  expenses remain separate by currency and never enter the diagram.
+
+### Manual Spending pace chart check
 
 Run `npm run dev` with synthetic HUF/CHF expenses across this month and the prior
 three months. In Reports, check pie/bar category drill-down and custom ranges,
@@ -438,7 +454,7 @@ remain manual checks; temporary SQLite profile-application tests cover the pace
 query, injected clock, leap/non-leap clamping, grouping/exclusions, and exact
 conversion/rounding.
 
-### Manual Reports chart check
+### Manual Monthly trend chart check
 
 Run `npm run dev` with synthetic HUF/CHF expenses and income over several months,
 including an empty month, split categories, uncategorized lines, excluded
@@ -455,6 +471,34 @@ and light/dark themes; confirm localized month/money labels, themed axes/series/
 tooltips, horizontal scrolling for long ranges, keyboard range/tab controls, and
 loading/error states. Chart rendering remains a manual check; application-API
 SQLite tests cover the aggregation and translation completeness is automated.
+
+### Manual Cash-flow chart check
+
+Run `npm run dev` with synthetic HUF and CHF accounts, income and expense main
+categories/subcategories, split parts, uncategorized lines, excluded transactions,
+transfers (with and without ordinary fees), and balance adjustments. Repeat in
+HU/EN/DE and light/dark themes. Apply every preset and an inclusive custom range;
+verify the category pie/bar charts, drill-down and Transactions link still work.
+Switch to **Cash flow** and verify the same applied range is retained. Check equal
+income/expense, surplus, deficit, income-only, expense-only, empty and missing-rate-only
+ranges: categories flow through Income and the balancing source/sink appears only
+when needed. Check both kinds of uncategorized group, split parts grouped by their
+own main category, archived category history, and exclusions. Only ordinary transfer
+fees count, never transfer legs or balance adjustments.
+
+Hover nodes and links and check locale-formatted base-currency tooltips, translated
+seeded/balancing labels, preserved custom names, readable theme colors, and the
+text table (including full long names). Resize the window and check horizontal
+scrolling without clipped chart controls. Change base currency and verify dated
+conversion and previous-published-day fallback. With missing or stale cached rates,
+verify separate unconverted income/expense amounts and the provisional indicator;
+neither bucket enters the diagram. Use small fractional conversions to check links
+match rounded category values and central inflow equals outflow; the rounding note
+explains differences from whole-period totals. Check loading/error/empty messages,
+keyboard navigation of view/range controls, and switching views/languages while a
+query is pending. Charts remain manual checks; temporary SQLite application-API
+tests cover cash-flow values, balancing, exclusions, splits, cached conversion,
+missing buckets, staleness, range validation and empty data.
 
 ## Accounts
 

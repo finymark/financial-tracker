@@ -258,6 +258,23 @@ export const de = {
   'reports.title': 'Ausgaben nach Kategorie',
   'reports.description':
     'Vergleichen Sie Kategoriesummen in Ihrer Basiswährung und öffnen Sie die zugehörigen Transaktionen.',
+  'reports.heading': 'Berichte in Ihrer Basiswährung',
+  'reports.introduction':
+    'Kategorien, monatliche Trends und Geldflüsse für den gewählten Zeitraum erkunden oder das Ausgabentempo dieses Monats vergleichen.',
+  'reports.view': 'Berichtsansicht',
+  'reports.cashFlow.title': 'Geldfluss',
+  'reports.cashFlow.income': 'Einnahmen',
+  'reports.cashFlow.expense': 'Ausgaben',
+  'reports.cashFlow.uncategorizedIncome': 'Nicht kategorisierte Einnahmen',
+  'reports.cashFlow.uncategorizedExpense': 'Nicht kategorisierte Ausgaben',
+  'reports.cashFlow.deficit': 'Aus Ersparnissen / Defizit',
+  'reports.cashFlow.surplus': 'Gespart / Überschuss',
+  'reports.cashFlow.empty':
+    'Keine umgerechneten Einnahmen oder Ausgaben in diesem Zeitraum.',
+  'reports.cashFlow.description':
+    'Einnahmenkategorien fließen über Einnahmen zu Ausgabenkategorien. Ersparnisse gleichen die umgerechneten Flüsse aus; nicht umgerechnete Beträge bleiben separat.',
+  'reports.cashFlow.rounding':
+    'Die Flüsse verwenden gerundete Kategoriesummen; ihre Summe kann leicht vom einmal gerundeten Gesamtbetrag des Zeitraums abweichen.',
   'reports.dateRange': 'Berichtszeitraum',
   'reports.period.thisMonth': 'Dieser Monat',
   'reports.period.lastMonth': 'Letzter Monat',
