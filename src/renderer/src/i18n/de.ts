@@ -24,6 +24,8 @@ export const de = {
     'Regeln werden der Reihe nach geprüft. Die erste passende Regel gewinnt und kann Zahlungspartner, Kategorie und Tags vor den zuletzt verwendeten Werten ausfüllen.',
   'rules.loading': 'Regeln werden geladen…',
   'rules.empty': 'Noch keine Kategorisierungsregeln.',
+  'rules.offer': 'Eine Regel für diese Kategorisierung erstellen?',
+  'rules.offerDismiss': 'Verwerfen',
   'rules.create': 'Regel erstellen',
   'rules.edit': 'Bearbeiten',
   'rules.delete': 'Löschen',

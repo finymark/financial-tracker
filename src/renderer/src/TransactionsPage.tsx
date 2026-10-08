@@ -1,3 +1,6 @@
+import type { Currency } from '../../shared/accounts'
+import type { CreateCategorisationRuleInput } from '../../shared/rules'
+import { CreateRuleDialog } from './components/create-rule-dialog'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import type {
   Transaction,
@@ -26,6 +29,7 @@ import {
 import { useTransactionReferenceData } from './components/transactions/use-transaction-reference-data'
 interface TransactionsPageProps {
   language: Language
+  baseCurrency: Currency
   t(key: MessageKey): string
   undoRevision: number
   newTransactionRequested: boolean
@@ -35,6 +39,7 @@ interface TransactionsPageProps {
 
 export function TransactionsPage({
   language,
+  baseCurrency,
   t,
   undoRevision,
   newTransactionRequested,
@@ -87,6 +92,16 @@ export function TransactionsPage({
     setError(null)
   }
   const error = commandError ?? references.error
+  const [ruleOffer, setRuleOffer] =
+    useState<CreateCategorisationRuleInput | null>(null)
+  const [editingRule, setEditingRule] =
+    useState<CreateCategorisationRuleInput | null>(null)
+  const [previousUndoRevision, setPreviousUndoRevision] = useState(undoRevision)
+  if (previousUndoRevision !== undoRevision) {
+    setPreviousUndoRevision(undoRevision)
+    setRuleOffer(null)
+    setEditingRule(null)
+  }
   const [form, setForm] = useState<DrawerForm | null>(null)
   const createRef = useRef<HTMLButtonElement>(null)
   const [deleting, setDeleting] = useState<
@@ -157,12 +172,14 @@ export function TransactionsPage({
   ) {
     setBusy(true)
     setError(null)
+    setRuleOffer(null)
     try {
       await action()
       if (offerUndo) onTransactionChanged()
       setRequest((current) => ({ ...current, offset: 0 }))
       setRevision((current) => current + 1)
       setForm(nextForm)
+      setEditingRule(null)
       setDeleting(null)
     } catch (error) {
       setError(transactionError(error))
@@ -522,7 +539,55 @@ export function TransactionsPage({
           clearError={() => setError(null)}
           run={run}
           onClose={() => setForm(null)}
+          onRuleOffer={setRuleOffer}
           createRef={createRef}
+        />
+      )}
+      {ruleOffer && (
+        <aside
+          role="status"
+          className="fixed right-4 bottom-24 z-40 max-w-sm space-y-2 rounded-lg border bg-card p-4 shadow-lg"
+        >
+          <p className="text-sm">{t('rules.offer')}</p>
+          <div className="flex gap-2">
+            <Button
+              disabled={busy || loading}
+              onClick={() => {
+                setEditingRule(ruleOffer)
+                setRuleOffer(null)
+                setForm(null)
+                setError(null)
+              }}
+            >
+              {t('rules.create')}
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() => setRuleOffer(null)}
+            >
+              {t('rules.offerDismiss')}
+            </Button>
+          </div>
+        </aside>
+      )}
+      {editingRule && (
+        <CreateRuleDialog
+          prefill={editingRule}
+          references={references}
+          baseCurrency={baseCurrency}
+          language={language}
+          t={t}
+          busy={busy}
+          error={error}
+          createRef={createRef}
+          onClose={() => {
+            setEditingRule(null)
+            setError(null)
+          }}
+          onSave={(input) =>
+            void run(() => window.app.rules.create(input), true)
+          }
         />
       )}
     </CardContent>

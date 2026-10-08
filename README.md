@@ -424,6 +424,16 @@ not off-device copies or backups of the separate data folder.
   reevaluation. A category or nonempty tag list supplied by a transaction template
   is treated like user-entered values and is also protected; omitted fields may
   still receive rule or last-used prefill. All values remain editable before save.
+- A rule's payee action fills only an empty, untouched payee field. A typed,
+  cleared, or template-provided payee is never overwritten.
+- After saving an unsplit expense/income with category or tags changed by hand,
+  a follow-up toast offers **Create rule**, alongside the existing Undo toast.
+  It opens the same editor as Settings, prefilled with the saved canonical payee
+  condition (including alias resolution), or note-contains if there is no payee,
+  and the saved category/tag actions. Rule creation is undoable. Unchanged
+  template/duplicate values and autofill alone do not trigger the offer; neither
+  do saves with no usable condition or no category/tag action. Split categories
+  cannot be represented by a single rule action, so split saves do not offer one.
 - Categorisation rules use migration 15 for their original schema. Appended
   migration 16 adds payee actions, currency-aware amount conditions, and the
   broader condition constraint without changing migrations 1–15.
@@ -440,6 +450,24 @@ category-only, and tag-only actions. With no matching rule, verify the latest
 unsplit category and tags for that payee are used; with no payee history, verify
 both stay empty. Change category/tags by hand, then alter amount, account, payee,
 or note and verify asynchronous reevaluation never overwrites those changes.
+Check a note-only rule with a payee action: an empty untouched payee fills;
+changing the note/amount/account never replaces a typed payee. Clear it by hand
+and verify it stays empty after reevaluation. A template payee also stays intact.
+
+Manually choose a different category, add an inline tag, and save an expense;
+verify **Create rule** appears in the follow-up toast while Undo remains available.
+Open it, verify the canonical payee condition (also try an alias), category and
+newly persisted tag selections, edit the prefill, and save. Verify it is listed in
+Settings and prefills a later matching draft; undo rule creation, then undo the
+transaction. Repeat with income, tags only, and no payee but a nonempty note
+(note-contains prefill). Cancel/Esc from the editor and dismiss the offer. Check
+keyboard focus trapping/restoration and a failed rule save that leaves the editor
+open with a translated error. Verify no offer after autofill alone, unchanged
+category/tags from a template or duplicate, reverting manual category/tag changes,
+a split, or a save with neither payee nor note. Change template/duplicate values
+by hand and verify the offer does appear. Save and add another, then close the
+next drawer to access the offer; the next draft must not inherit manual-edit
+tracking. Undo the transaction before accepting an offer and verify it disappears.
 Also undo create, edit, reorder, enable/disable, and delete. Repeat in HU/EN/DE
 and light/dark themes.
 
@@ -552,7 +580,11 @@ create a name-only template, one with every optional field, and one without an
 amount; cancel another new template and verify no payees/tags or transactions
 were created. Save an existing transaction as a template and check unsaved edits
 are not included. Include an excluded source/template and verify the flag is
-copied into the draft. Rename and delete a referenced tag, verify every template
+copied into the draft and saved transaction (balance still changes; totals do not).
+Apply a non-excluded template afterward and verify it clears the draft flag.
+Saving unchanged template category/tags must not offer Create rule; changing them
+by hand must. An unchanged duplicate offers no rule, while manually recategorizing
+the copy does. Rename and delete a referenced tag, verify every template
 updates, then undo the deletion. Edit and clear individual template fields, confirm/cancel
 its deletion, and undo each template operation. With a matching categorisation
 rule, use a template with a different category and tags; change payee, note,

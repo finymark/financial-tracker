@@ -42,6 +42,7 @@ import {
 } from './profile-backups'
 import type {
   Account,
+  AccountOption,
   CreateAccountInput,
   RenameAccountInput,
   ChangeAccountCurrencyInput,
@@ -221,7 +222,7 @@ export interface ProfileQueries {
   listBackups(): ProfileBackup[]
   getProfileInfo(): ProfileInfo
   listAccounts(): Account[]
-  listAccountOptions(): Account[]
+  listAccountOptions(): AccountOption[]
   getAccountBalance(id: string): number
   hasAccountTransactions(id: string): boolean
   getSettings(): ProfileSettings

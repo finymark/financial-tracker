@@ -2,20 +2,23 @@ import type { CategorisationAutofill } from '../../../shared/rules'
 import type { TransactionTemplate } from '../../../shared/templates'
 
 interface AutofillFields {
+  payeeName: string
   categoryId: string
   tagNames: string[]
 }
 
-interface ProtectedAutofillFields {
+export interface ProtectedAutofillFields {
+  payee: boolean
   category: boolean
   tags: boolean
 }
 
 export function templateAutofillProtection(
-  template: Pick<TransactionTemplate, 'categoryId' | 'tagNames'>,
+  template: Pick<TransactionTemplate, 'categoryId' | 'tagNames' | 'payeeName'>,
 ): ProtectedAutofillFields {
   // Saved values are explicit choices, just like fields entered by the user.
   return {
+    payee: Boolean(template.payeeName),
     category: template.categoryId !== null,
     tags: template.tagNames.length > 0,
   }
@@ -28,6 +31,10 @@ export function mergeRuleAutofill<Current extends AutofillFields>(
 ): Current {
   return {
     ...current,
+    payeeName:
+      !protectedFields.payee && !current.payeeName && autofill.source === 'rule'
+        ? (autofill.payeeName ?? '')
+        : current.payeeName,
     categoryId: protectedFields.category
       ? current.categoryId
       : (autofill.categoryId ?? ''),

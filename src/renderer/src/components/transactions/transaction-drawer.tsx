@@ -1,3 +1,4 @@
+import { tagKey } from '../../../../shared/text-keys'
 import {
   useEffect,
   useRef,
@@ -15,6 +16,8 @@ import type { Account } from '../../../../shared/accounts'
 import type { TransactionTemplate } from '../../../../shared/templates'
 import type { PayeeSuggestion } from '../../../../shared/payees'
 import { amountInput } from '../../lib/amount-input-value'
+import type { CreateCategorisationRuleInput } from '../../../../shared/rules'
+import { ruleOfferPrefill } from '../../lib/rule-offer'
 import { TemplateEditor } from '../template-editor'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -30,7 +33,6 @@ import { templateAutofillProtection } from '../../lib/rule-autofill'
 import {
   emptyForm,
   emptyTransferForm,
-  tagKey,
   type DrawerForm,
   type TransactionForm,
   type TransferForm,
@@ -51,6 +53,7 @@ interface TransactionDrawerProps {
   clearError(): void
   run: RunCommand
   onClose(): void
+  onRuleOffer(prefill: CreateCategorisationRuleInput): void
   createRef: RefObject<HTMLButtonElement | null>
 }
 function commonFields(form: DrawerForm) {
@@ -74,6 +77,7 @@ export function TransactionDrawer({
   clearError,
   run,
   onClose,
+  onRuleOffer,
   createRef,
 }: TransactionDrawerProps) {
   const {
@@ -94,9 +98,29 @@ export function TransactionDrawer({
   >(null)
   const [pickerRevision, setPickerRevision] = useState(0)
   const autofillProtected = useRef({
+    payee:
+      Boolean(draft.id) ||
+      Boolean(
+        (draft.kind === 'expense' || draft.kind === 'income') &&
+        draft.payeeName,
+      ),
     category: Boolean(draft.id),
     tags: Boolean(draft.id),
   })
+  const manualCategorisation = useRef({ category: false, tags: false })
+  const categorisationBaseline = useRef({
+    categoryId: '',
+    tagNames: [] as string[],
+  })
+  function markManual(field: 'category' | 'tags') {
+    if (!form || (form.kind !== 'expense' && form.kind !== 'income')) return
+    if (!manualCategorisation.current[field]) {
+      if (field === 'category')
+        categorisationBaseline.current.categoryId = form.categoryId
+      else categorisationBaseline.current.tagNames = [...form.tagNames]
+    }
+    manualCategorisation.current[field] = true
+  }
   // Keep the inactive kind's draft so switching types does not discard entered fields.
   const transactionDraft = useRef<TransactionForm>(
     draft.kind === 'expense' || draft.kind === 'income' ? draft : emptyForm(),
@@ -119,7 +143,14 @@ export function TransactionDrawer({
     setPickerRevision(pickerRevision + 1)
   }
   useEffect(() => {
+    manualCategorisation.current = { category: false, tags: false }
     autofillProtected.current = {
+      payee:
+        Boolean(draft.id) ||
+        Boolean(
+          (draft.kind === 'expense' || draft.kind === 'income') &&
+          draft.payeeName,
+        ),
       category: Boolean(draft.id),
       tags: Boolean(draft.id),
     }
@@ -161,7 +192,7 @@ export function TransactionDrawer({
     }
   }, [payeeQuery])
 
-  const autofillRequest = useRuleAutofill(
+  const autofillRequestRef = useRuleAutofill(
     form,
     setForm,
     accounts,
@@ -169,7 +200,7 @@ export function TransactionDrawer({
     focusRevision,
   )
   function closeDrawer() {
-    autofillRequest.current += 1
+    autofillRequestRef.current += 1
     onClose()
   }
   function submit(event: FormEvent) {
@@ -232,7 +263,7 @@ export function TransactionDrawer({
         : null
     batchDraft.current = nextForm
     void run(
-      () => {
+      async () => {
         if (form.kind === 'adjustment') {
           const input = {
             accountId: form.accountId,
@@ -317,9 +348,16 @@ export function TransactionDrawer({
               }
             : {}),
         }
-        return form.id
+        const saved = await (form.id
           ? window.app.transactions.update({ id: form.id, ...input })
-          : window.app.transactions.create(input)
+          : window.app.transactions.create(input))
+        const prefill = ruleOfferPrefill(
+          saved,
+          categorisationBaseline.current,
+          manualCategorisation.current,
+        )
+        if (prefill) onRuleOffer(prefill)
+        return saved
       },
       true,
       nextForm,
@@ -327,7 +365,8 @@ export function TransactionDrawer({
   }
 
   function applyTemplate(template: TransactionTemplate) {
-    autofillRequest.current += 1
+    autofillRequestRef.current += 1
+    manualCategorisation.current = { category: false, tags: false }
     autofillProtected.current = templateAutofillProtection(template)
     const kind =
       template.kind ??
@@ -346,6 +385,7 @@ export function TransactionDrawer({
       payeeName: template.payeeName ?? '',
       note: template.note ?? '',
       tagNames: template.tagNames,
+      excluded: template.excluded,
     })
     setTemplateEditor(null)
     clearError()
@@ -360,6 +400,7 @@ export function TransactionDrawer({
     )
       return
     const name = form.pendingTagName.trim()
+    markManual('tags')
     autofillProtected.current.tags = true
     setForm({
       ...form,
@@ -757,9 +798,10 @@ export function TransactionDrawer({
                       value={form.payeeName}
                       maxLength={100}
                       disabled={busy}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        autofillProtected.current.payee = true
                         setForm({ ...form, payeeName: event.target.value })
-                      }
+                      }}
                     />
                     <datalist id="transaction-payees">
                       {payeeSuggestions.map((payee) => (
@@ -786,6 +828,7 @@ export function TransactionDrawer({
                         value={form.categoryId}
                         disabled={busy}
                         onChange={(event) => {
+                          markManual('category')
                           autofillProtected.current.category = true
                           setForm({
                             ...form,
@@ -900,6 +943,7 @@ export function TransactionDrawer({
                           maxLength={100}
                           disabled={busy}
                           onChange={(event) => {
+                            markManual('tags')
                             autofillProtected.current.tags = true
                             setForm({
                               ...form,
@@ -942,6 +986,7 @@ export function TransactionDrawer({
                               disabled={busy}
                               aria-label={`${t('tags.remove')}: ${name}`}
                               onClick={() => {
+                                markManual('tags')
                                 autofillProtected.current.tags = true
                                 setForm({
                                   ...form,

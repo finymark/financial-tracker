@@ -23,6 +23,8 @@ export const hu = {
     'A szabályokat sorrendben ellenőrizzük. Az első egyező szabály nyer, és a kedvezményezettet, a kategóriát, valamint a címkéket az utoljára használt értékek előtt töltheti ki.',
   'rules.loading': 'Szabályok betöltése…',
   'rules.empty': 'Még nincs kategorizálási szabály.',
+  'rules.offer': 'Létrehozol egy szabályt ehhez a besoroláshoz?',
+  'rules.offerDismiss': 'Elvetés',
   'rules.create': 'Szabály létrehozása',
   'rules.edit': 'Szerkesztés',
   'rules.delete': 'Törlés',

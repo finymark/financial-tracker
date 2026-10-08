@@ -7,14 +7,17 @@ import {
 } from 'react'
 import type { Account } from '../../../../shared/accounts'
 import { parseAmountExpression } from '../../../../shared/amount-expression'
-import { mergeRuleAutofill } from '../../lib/rule-autofill'
+import {
+  mergeRuleAutofill,
+  type ProtectedAutofillFields,
+} from '../../lib/rule-autofill'
 import type { DrawerForm } from './transaction-form'
 
 export function useRuleAutofill(
   form: DrawerForm | null,
   setForm: Dispatch<SetStateAction<DrawerForm | null>>,
   accounts: Account[],
-  autofillProtected: RefObject<{ category: boolean; tags: boolean }>,
+  autofillProtected: RefObject<ProtectedAutofillFields>,
   focusRevision: number,
 ) {
   const autofillRequest = useRef(0)

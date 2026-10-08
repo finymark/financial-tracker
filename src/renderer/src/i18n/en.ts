@@ -21,6 +21,8 @@ export const en = {
     'Rules are checked in order. The first matching rule wins and can prefill payee, category, and tags before last-used payee values.',
   'rules.loading': 'Loading rules…',
   'rules.empty': 'No categorisation rules yet.',
+  'rules.offer': 'Create a rule for this categorisation?',
+  'rules.offerDismiss': 'Dismiss',
   'rules.create': 'Create rule',
   'rules.edit': 'Edit',
   'rules.delete': 'Delete',
