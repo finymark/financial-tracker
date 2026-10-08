@@ -1,6 +1,31 @@
 import { categoryNames } from '../../../shared/category-translations'
 export const en = {
   ...categoryNames.en,
+  'payees.title': 'Payees',
+  'payees.description':
+    'Aliases map raw names to one payee. Matching ignores case and diacritics. Merging moves transactions and aliases to the chosen survivor.',
+  'payees.loading': 'Loading payees…',
+  'payees.empty': 'Payees appear here after you record a transaction.',
+  'payees.aliases': 'Aliases',
+  'payees.noAliases': 'No aliases.',
+  'payees.aliasName': 'Raw payee name',
+  'payees.addAlias': 'Add alias',
+  'payees.removeAlias': 'Remove',
+  'payees.mergeInto': 'Merge this payee into',
+  'payees.chooseSurvivor': 'Choose the surviving payee',
+  'payees.merge': 'Merge payees',
+  'payees.mergeHint':
+    'All transactions and aliases move to the surviving payee. You can undo this change.',
+  'payees.refresh': 'Refresh',
+  'payees.error': 'The payee operation could not be completed. Try again.',
+  'payees.error.notFound': 'The payee could not be found. Refresh the list.',
+  'payees.error.aliasNotFound':
+    'The alias could not be found. Refresh the list.',
+  'payees.error.aliasName': 'Enter an alias between 1 and 100 characters.',
+  'payees.error.aliasConflict':
+    'That raw name already belongs to a payee or alias.',
+  'payees.error.samePayee': 'Choose a different surviving payee.',
+  'payees.error.query': 'The payee search is invalid.',
   'categories.title': 'Categories',
   'categories.description':
     'Expense and income categories have at most two levels. Default names follow your language; custom names stay unchanged. Archiving a main category also hides its subcategories from pickers.',
@@ -196,7 +221,7 @@ export const en = {
   'transfers.error.notFound':
     'The transfer could not be found. Refresh the list.',
   'transfers.error.linkedFee': 'Edit or delete this fee through its transfer.',
-  'undo.available': 'Transaction changed.',
+  'undo.available': 'Change saved.',
   'undo.action': 'Undo',
   'undo.error': 'The change could not be undone.',
   'accounts.title': 'A place for each account',

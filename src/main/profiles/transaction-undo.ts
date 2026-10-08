@@ -4,7 +4,7 @@ import type {
   Transaction,
   UpdateTransactionInput,
 } from '../../shared/transactions'
-import { normalizePayeeKey } from '../db'
+import { normalizePayeeAliasKey, normalizePayeeKey } from '../db'
 import {
   createTransaction,
   deleteTransaction,
@@ -59,6 +59,21 @@ function findExistingPayeeId(
   if (typeof value !== 'string') return null
   const name = value.trim()
   if (name.length === 0 || name.length > 100) return null
+  const aliasesAvailable = Boolean(
+    database
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'payee_aliases'",
+      )
+      .get(),
+  )
+  if (aliasesAvailable) {
+    const alias = database
+      .prepare(
+        'SELECT payee_id AS id FROM payee_aliases WHERE normalized_name = ?',
+      )
+      .get(normalizePayeeAliasKey(name)) as { id: string } | undefined
+    if (alias) return alias.id
+  }
   const row = (
     hasNormalizedPayeeNames(database)
       ? database

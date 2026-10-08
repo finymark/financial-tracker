@@ -3,6 +3,35 @@ import type { MessageCatalog } from './en'
 
 export const de = {
   ...categoryNames.de,
+  'payees.title': 'Zahlungspartner',
+  'payees.description':
+    'Aliasse ordnen Rohbezeichnungen einem Zahlungspartner zu. Groß-/Kleinschreibung und Akzente werden beim Abgleich ignoriert. Beim Zusammenführen wechseln Transaktionen und Aliasse zum ausgewählten verbleibenden Zahlungspartner.',
+  'payees.loading': 'Zahlungspartner werden geladen…',
+  'payees.empty':
+    'Zahlungspartner erscheinen hier nach dem Erfassen einer Transaktion.',
+  'payees.aliases': 'Aliasse',
+  'payees.noAliases': 'Keine Aliasse.',
+  'payees.aliasName': 'Rohe Zahlungspartnerbezeichnung',
+  'payees.addAlias': 'Alias hinzufügen',
+  'payees.removeAlias': 'Entfernen',
+  'payees.mergeInto': 'Diesen Zahlungspartner zusammenführen mit',
+  'payees.chooseSurvivor': 'Verbleibenden Zahlungspartner auswählen',
+  'payees.merge': 'Zahlungspartner zusammenführen',
+  'payees.mergeHint':
+    'Alle Transaktionen und Aliasse wechseln zum verbleibenden Zahlungspartner. Diese Änderung kann rückgängig gemacht werden.',
+  'payees.refresh': 'Aktualisieren',
+  'payees.error':
+    'Der Zahlungspartnervorgang konnte nicht abgeschlossen werden. Versuche es erneut.',
+  'payees.error.notFound':
+    'Der Zahlungspartner wurde nicht gefunden. Aktualisiere die Liste.',
+  'payees.error.aliasNotFound':
+    'Der Alias wurde nicht gefunden. Aktualisiere die Liste.',
+  'payees.error.aliasName': 'Gib einen Alias mit 1 bis 100 Zeichen ein.',
+  'payees.error.aliasConflict':
+    'Diese Rohbezeichnung gehört bereits zu einem Zahlungspartner oder Alias.',
+  'payees.error.samePayee':
+    'Wähle einen anderen verbleibenden Zahlungspartner.',
+  'payees.error.query': 'Die Zahlungspartnersuche ist ungültig.',
   'categories.title': 'Kategorien',
   'categories.description':
     'Ausgaben- und Einnahmenkategorien haben höchstens zwei Ebenen. Standardnamen folgen der Sprache; eigene Namen bleiben unverändert. Das Archivieren einer Hauptkategorie blendet auch ihre Unterkategorien in Auswahllisten aus.',
@@ -207,7 +236,7 @@ export const de = {
     'Die Umbuchung wurde nicht gefunden. Aktualisiere die Liste.',
   'transfers.error.linkedFee':
     'Bearbeite oder lösche diese Gebühr über die zugehörige Umbuchung.',
-  'undo.available': 'Transaktion geändert.',
+  'undo.available': 'Änderung gespeichert.',
   'undo.action': 'Rückgängig',
   'undo.error': 'Die Änderung konnte nicht rückgängig gemacht werden.',
   'accounts.title': 'Ein Platz für jedes Konto',

@@ -1,14 +1,9 @@
 import type { CategoryKind } from './categories'
 import type { Currency } from './accounts'
 import type { Transfer } from './transfers'
+export type { Payee } from './payees'
 
 export type TransactionKind = CategoryKind
-
-export interface Payee {
-  id: string
-  name: string
-  createdAt: string
-}
 
 export interface TransactionLine {
   id: string

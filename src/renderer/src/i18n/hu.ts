@@ -3,6 +3,32 @@ import type { MessageCatalog } from './en'
 
 export const hu = {
   ...categoryNames.hu,
+  'payees.title': 'Kedvezményezettek',
+  'payees.description':
+    'Az álnevek a nyers neveket egy kedvezményezetthez rendelik. Az egyezés nem tesz különbséget kis- és nagybetűk, illetve ékezetek között. Az összevonás a tranzakciókat és álneveket a megmaradó kedvezményezetthez helyezi át.',
+  'payees.loading': 'Kedvezményezettek betöltése…',
+  'payees.empty':
+    'A kedvezményezettek egy tranzakció rögzítése után jelennek meg itt.',
+  'payees.aliases': 'Álnevek',
+  'payees.noAliases': 'Nincs álnév.',
+  'payees.aliasName': 'Nyers kedvezményezettnév',
+  'payees.addAlias': 'Álnév hozzáadása',
+  'payees.removeAlias': 'Eltávolítás',
+  'payees.mergeInto': 'Kedvezményezett összevonása ezzel:',
+  'payees.chooseSurvivor': 'Válaszd ki a megmaradó kedvezményezettet',
+  'payees.merge': 'Kedvezményezettek összevonása',
+  'payees.mergeHint':
+    'Minden tranzakció és álnév a megmaradó kedvezményezetthez kerül. A módosítás visszavonható.',
+  'payees.refresh': 'Frissítés',
+  'payees.error': 'A kedvezményezettművelet nem sikerült. Próbáld újra.',
+  'payees.error.notFound':
+    'A kedvezményezett nem található. Frissítsd a listát.',
+  'payees.error.aliasNotFound': 'Az álnév nem található. Frissítsd a listát.',
+  'payees.error.aliasName': 'Adj meg egy 1–100 karakter hosszú álnevet.',
+  'payees.error.aliasConflict':
+    'Ez a nyers név már egy kedvezményezetthez vagy álnévhez tartozik.',
+  'payees.error.samePayee': 'Válassz másik megmaradó kedvezményezettet.',
+  'payees.error.query': 'A kedvezményezett keresése érvénytelen.',
   'categories.title': 'Kategóriák',
   'categories.description':
     'A kiadási és bevételi kategóriák legfeljebb kétszintűek. Az alapértelmezett nevek követik a nyelvet; az egyéni nevek változatlanok maradnak. A főkategória archiválása az alkategóriáit is elrejti a választókból.',
@@ -199,7 +225,7 @@ export const hu = {
   'transfers.error.notFound': 'Az átvezetés nem található. Frissítsd a listát.',
   'transfers.error.linkedFee':
     'Ezt a díjat a hozzá tartozó átvezetésen keresztül módosítsd vagy töröld.',
-  'undo.available': 'A tranzakció módosult.',
+  'undo.available': 'A módosítás mentve.',
   'undo.action': 'Visszavonás',
   'undo.error': 'A módosítást nem sikerült visszavonni.',
   'accounts.title': 'Minden számlának saját hely',

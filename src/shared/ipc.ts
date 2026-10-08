@@ -29,7 +29,6 @@ import type {
 import type { ProfileSettings } from './settings'
 import type {
   CreateTransactionInput,
-  Payee,
   TransactionListInput,
   TransactionPage,
   Transaction,
@@ -42,6 +41,16 @@ import type {
   TransferIdInput,
   UpdateTransferInput,
 } from './transfers'
+import type {
+  AddPayeeAliasInput,
+  MergePayeesInput,
+  Payee,
+  PayeeAlias,
+  PayeeAliasIdInput,
+  PayeeAliasesInput,
+  PayeeSuggestion,
+  PayeeSuggestionInput,
+} from './payees'
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
@@ -82,6 +91,11 @@ export const IPC_CHANNELS = {
   transfersDelete: 'transfers:delete',
   undoLast: 'undo:last',
   payeesList: 'payees:list',
+  payeesSuggest: 'payees:suggest',
+  payeeAliasesList: 'payee-aliases:list',
+  payeeAliasesAdd: 'payee-aliases:add',
+  payeeAliasesRemove: 'payee-aliases:remove',
+  payeesMerge: 'payees:merge',
 } as const
 
 export interface AppBridge {
@@ -107,6 +121,11 @@ export interface AppBridge {
   }
   payees: {
     list(): Promise<Payee[]>
+    suggest(input: PayeeSuggestionInput): Promise<PayeeSuggestion[]>
+    listAliases(input: PayeeAliasesInput): Promise<PayeeAlias[]>
+    addAlias(input: AddPayeeAliasInput): Promise<PayeeAlias>
+    removeAlias(input: PayeeAliasIdInput): Promise<void>
+    merge(input: MergePayeesInput): Promise<Payee>
   }
   backups: {
     list(): Promise<ProfileBackup[]>

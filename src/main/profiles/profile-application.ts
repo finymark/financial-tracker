@@ -54,18 +54,31 @@ import type { ProfilePaths } from './profile-registry'
 import { parseSettingsChanges } from './profile-settings'
 import type {
   CreateTransactionInput,
-  Payee,
   TransactionListInput,
   TransactionPage,
   Transaction,
   UpdateTransactionInput,
 } from '../../shared/transactions'
 import type {
+  AddPayeeAliasInput,
+  Payee,
+  PayeeAlias,
+  PayeeSuggestion,
+  PayeeSuggestionInput,
+  MergePayeesInput,
+} from '../../shared/payees'
+import type {
   CreateTransferInput,
   Transfer,
   UpdateTransferInput,
 } from '../../shared/transfers'
-import { listPayees, listTransactions } from './profile-transactions'
+import { listTransactions } from './profile-transactions'
+import { listPayeeAliases, listPayees, suggestPayees } from './profile-payees'
+import {
+  addPayeeAliasUndoableCommand,
+  mergePayeesUndoableCommand,
+  removePayeeAliasUndoableCommand,
+} from './payee-undo'
 import {
   createTransactionUndoableCommand,
   deleteTransactionUndoableCommand,
@@ -144,6 +157,8 @@ export interface OpenProfileApplicationOptions {
 export interface ProfileQueries {
   listTransactions(input?: TransactionListInput): TransactionPage
   listPayees(): Payee[]
+  listPayeeAliases(payeeId: string): PayeeAlias[]
+  suggestPayees(input: PayeeSuggestionInput): PayeeSuggestion[]
   hasCategoryTransactions(id: string): boolean
   listCategories(): Category[]
   listCategoryOptions(kind: CategoryKind): Category[]
@@ -163,6 +178,9 @@ export interface ProfileCommands {
   createTransfer(input: CreateTransferInput): Transfer
   updateTransfer(input: UpdateTransferInput): Transfer
   deleteTransfer(id: string): void
+  addPayeeAlias(input: AddPayeeAliasInput): PayeeAlias
+  removePayeeAlias(id: string): void
+  mergePayees(input: MergePayeesInput): Payee
   undoLast(): boolean
   createCategory(input: CreateCategoryInput): Category
   renameCategory(input: RenameCategoryInput): Category
@@ -375,6 +393,30 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
       ON transfers(to_account_id, date DESC, created_at DESC, id DESC);
   `,
   ),
+  defineSqlMigration(
+    10,
+    'payee aliases',
+    `
+    CREATE TABLE payee_aliases (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      payee_id TEXT NOT NULL REFERENCES payees(id) ON DELETE CASCADE,
+      name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 100),
+      normalized_name TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX payee_aliases_normalized_name
+      ON payee_aliases(normalized_name);
+    CREATE INDEX payee_aliases_payee_id ON payee_aliases(payee_id);
+    CREATE TRIGGER payee_aliases_normalized_name_insert
+    BEFORE INSERT ON payee_aliases
+    WHEN NEW.normalized_name <> payee_alias_key(NEW.name)
+      BEGIN SELECT RAISE(ABORT, 'Invalid normalized payee alias'); END;
+    CREATE TRIGGER payee_aliases_normalized_name_update
+    BEFORE UPDATE OF name, normalized_name ON payee_aliases
+    WHEN NEW.normalized_name <> payee_alias_key(NEW.name)
+      BEGIN SELECT RAISE(ABORT, 'Invalid normalized payee alias'); END;
+  `,
+  ),
 ]
 
 function validateMigrations(
@@ -539,6 +581,18 @@ class OpenProfileApplication implements ProfileApplication {
         this.#executeUndoableCommand(
           deleteTransferUndoableCommand(this.#database, id),
         ),
+      addPayeeAlias: (input) =>
+        this.#executeUndoableCommand(
+          addPayeeAliasUndoableCommand(this.#database, input, this.#clock),
+        ),
+      removePayeeAlias: (id) =>
+        this.#executeUndoableCommand(
+          removePayeeAliasUndoableCommand(this.#database, id),
+        ),
+      mergePayees: (input) =>
+        this.#executeUndoableCommand(
+          mergePayeesUndoableCommand(this.#database, input, this.#clock),
+        ),
       undoLast: () => {
         this.#assertAvailable()
         return this.#undoHistory.undoLast(this.#database)
@@ -591,6 +645,14 @@ class OpenProfileApplication implements ProfileApplication {
       listPayees: () => {
         this.#assertAvailable()
         return listPayees(this.#database)
+      },
+      listPayeeAliases: (payeeId) => {
+        this.#assertAvailable()
+        return listPayeeAliases(this.#database, payeeId)
+      },
+      suggestPayees: (input) => {
+        this.#assertAvailable()
+        return suggestPayees(this.#database, input)
       },
       hasCategoryTransactions: (id) => {
         this.#assertAvailable()

@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import type Database from 'better-sqlite3'
 import type {
   CreateTransactionInput,
-  Payee,
   TransactionListInput,
   TransactionPage,
   TransactionTotals,
@@ -23,8 +22,8 @@ import {
   validateTransactionExcluded,
 } from './transaction-validation'
 import { today } from '../../shared/date'
-import { normalizePayeeKey } from '../db'
 import { getTransfer } from './profile-transfers'
+import { resolvePayee } from './profile-payees'
 
 interface StoredTransaction {
   id: string
@@ -97,48 +96,6 @@ export function getTransaction(
       .prepare(`${TRANSACTION_SELECT} WHERE transactions.id = ?`)
       .get(id) as StoredTransaction | undefined,
   )
-}
-
-export function listPayees(database: Database.Database): Payee[] {
-  return database
-    .prepare(
-      'SELECT id, name, created_at AS createdAt FROM payees ORDER BY name COLLATE NOCASE, rowid',
-    )
-    .all() as Payee[]
-}
-
-function resolvePayee(
-  database: Database.Database,
-  name: string | null,
-  timestamp: string,
-): string | null {
-  if (name === null) return null
-  const hasNormalizedName = (
-    database.pragma('table_info(payees)') as { name: string }[]
-  ).some((column) => column.name === 'normalized_name')
-  const existing = (
-    hasNormalizedName
-      ? database
-          .prepare('SELECT id FROM payees WHERE normalized_name = ?')
-          .get(normalizePayeeKey(name))
-      : database
-          .prepare('SELECT id FROM payees WHERE name = ? COLLATE NOCASE')
-          .get(name)
-  ) as { id: string } | undefined
-  if (existing) return existing.id
-  const id = randomUUID()
-  if (hasNormalizedName) {
-    database
-      .prepare(
-        'INSERT INTO payees (id, name, normalized_name, created_at) VALUES (?, ?, ?, ?)',
-      )
-      .run(id, name, normalizePayeeKey(name), timestamp)
-  } else {
-    database
-      .prepare('INSERT INTO payees (id, name, created_at) VALUES (?, ?, ?)')
-      .run(id, name, timestamp)
-  }
-  return id
 }
 
 function validateReferences(

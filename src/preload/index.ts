@@ -32,6 +32,14 @@ const bridge: AppBridge = {
   },
   payees: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.payeesList),
+    suggest: (input) => ipcRenderer.invoke(IPC_CHANNELS.payeesSuggest, input),
+    listAliases: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.payeeAliasesList, input),
+    addAlias: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.payeeAliasesAdd, input),
+    removeAlias: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.payeeAliasesRemove, input),
+    merge: (input) => ipcRenderer.invoke(IPC_CHANNELS.payeesMerge, input),
   },
   backups: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.backupsList),
