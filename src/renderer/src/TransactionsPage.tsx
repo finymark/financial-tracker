@@ -16,7 +16,8 @@ import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
 import { type Language, type MessageKey } from './i18n'
 import { TransactionTable, Totals } from './components/transaction-table'
-import { parseAmountInput } from './lib/amount-input'
+import { parseAmountExpression } from '../../shared/amount-expression'
+import { AmountInput } from './components/amount-input'
 import { today } from '../../shared/date'
 
 const errorKeys = [
@@ -197,7 +198,11 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
         accountId: form.accountId,
         kind: form.kind,
         date: form.date,
-        totalMinor: parseAmountInput(form.amount, 'transactions.error.amount'),
+        totalMinor: parseAmountExpression(
+          form.amount,
+          selectedAccount?.currency ?? 'HUF',
+          'transactions.error.amount',
+        ),
         payeeName: form.payeeName,
         categoryId: form.categoryId || null,
         note: form.note,
@@ -559,21 +564,17 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
                   >
                     {t('transactions.amount')}
                   </label>
-                  <Input
+                  <AmountInput
                     id="transaction-amount"
-                    inputMode="decimal"
                     value={form.amount}
-                    placeholder="0.00"
-                    maxLength={20}
-                    required
+                    currency={selectedAccount?.currency ?? 'HUF'}
+                    language={language}
+                    t={t}
+                    errorKey="transactions.error.amount"
+                    hintKey="transactions.amountHint"
                     disabled={busy}
-                    onChange={(event) =>
-                      setForm({ ...form, amount: event.target.value })
-                    }
+                    onChange={(amount) => setForm({ ...form, amount })}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    {t('transactions.amountHint')}
-                  </p>
                 </div>
               </div>
               <div className="space-y-2">

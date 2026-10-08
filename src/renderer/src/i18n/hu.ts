@@ -145,8 +145,9 @@ export const hu = {
   'transactions.income': 'Bevétel',
   'transactions.date': 'Dátum',
   'transactions.amount': 'Összeg',
+  'amount.result': 'Kiszámított összeg',
   'transactions.amountHint':
-    'Adj meg pozitív összeget ponttal vagy vesszővel és legfeljebb két tizedesjeggyel.',
+    'Használhatsz + - * / műveleteket, zárójeleket, pontot vagy vesszőt tizedesjelként és ezres tagolást (pl. 1 234,50). A mező elhagyása vagy Enter kiszámítja a századokra kerekített végeredményt.',
   'transactions.account': 'Számla',
   'transactions.chooseAccount': 'Válassz aktív számlát',
   'transactions.payee': 'Kedvezményezett',
@@ -164,7 +165,7 @@ export const hu = {
   'transactions.error.date': 'Adj meg érvényes naptári dátumot.',
   'transactions.error.futureDate': 'A tranzakció dátuma nem lehet jövőbeli.',
   'transactions.error.amount':
-    'Adj meg pozitív összeget legfeljebb két tizedesjeggyel.',
+    'Adj meg érvényes kifejezést, amely pozitív összeget ad, legfeljebb 90 071 992 547 409,91 értékig. Nullával nem lehet osztani.',
   'transactions.error.payee':
     'Adj meg legfeljebb 100 karakter hosszú kedvezményezettnevet.',
   'transactions.error.category':
@@ -185,7 +186,7 @@ export const hu = {
   'accounts.openingDate': 'Nyitás dátuma',
   'accounts.balance': 'Egyenleg',
   'accounts.balanceHint':
-    'Pontot vagy vesszőt és legfeljebb két tizedesjegyet használj, ezres tagolás nélkül. Negatív egyenleg is megadható.',
+    'Használhatsz + - * / műveleteket, zárójeleket, pontot vagy vesszőt tizedesjelként és ezres tagolást. A mező elhagyása vagy Enter századokra kerekíti a végeredményt. Negatív és nulla egyenleg is megadható.',
   'accounts.empty': 'Hozz létre egy számlát az egyenleg követéséhez.',
   'accounts.loading': 'Számlák betöltése…',
   'accounts.rename': 'Átnevezés',
@@ -205,7 +206,7 @@ export const hu = {
   'accounts.error.name': 'Adj meg egy 1–100 karakter hosszú számlanevet.',
   'accounts.error.currency': 'Válaszd a HUF vagy CHF pénznemet.',
   'accounts.error.balance':
-    'Adj meg érvényes egyenleget legfeljebb két tizedesjeggyel, tagolás nélkül, ±90 071 992 547 409,91 határon belül.',
+    'Adj meg érvényes kifejezést, amely ±90 071 992 547 409,91 határon belüli egyenleget ad. Nullával nem lehet osztani.',
   'accounts.error.date': 'Adj meg érvényes nyitási dátumot.',
   'accounts.error.notFound': 'A számla nem található. Frissítsd a listát.',
   'accounts.error.currencyLocked':

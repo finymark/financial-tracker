@@ -298,8 +298,9 @@ not off-device copies or backups of the separate data folder.
 ## Accounts
 
 - Create an account with a name, HUF or CHF currency, an opening balance, and a
-  valid calendar opening date. Amount entry accepts a dot or comma with up to two
-  decimal places, no thousands separators, and allows negative opening balances.
+  valid calendar opening date. The shared calculator amount field accepts dot or
+  comma decimals and thousands grouping, and allows negative or zero opening
+  balances. See **Amount calculator** below.
 - Money is stored as exact integer hundredths for both currencies. CHF displays
   two decimal places; HUF displays no decimals (rounded for display only).
 - Rename accounts or change their currency while they have no transactions.
@@ -345,9 +346,9 @@ not off-device copies or backups of the separate data folder.
 - **Transactions → Record transaction** opens a right-side drawer for an expense
   or income. Choose a non-archived account, a calendar date no later than today,
   a positive amount, an optional payee and category, and a note.
-- Amount entry accepts a dot or comma with up to two decimal places and no
-  thousands separators. Amounts are persisted as exact integer hundredths. HUF
-  is displayed without decimals; CHF is displayed with two decimals.
+- Amount entry uses the same calculator field as Accounts, with a positive
+  result required. Amounts are persisted as exact integer hundredths. HUF is
+  displayed without decimals; CHF is displayed with two decimals.
 - Typing a new payee creates it in the active profile. An existing payee with the
   same Unicode-normalized name ignoring case is reused. Category choices are limited to active
   expense or income categories matching the transaction kind and preserve the
@@ -382,11 +383,58 @@ not off-device copies or backups of the separate data folder.
   bound, arranging the 20 000 transactions through application commands in one
   fixture transaction (outside the measured query).
 
+### Amount calculator
+
+Accounts opening balances and transaction amounts use one pure parser in
+`src/shared/amount-expression.ts`, without `eval` or binary floating-point
+arithmetic. Expressions accept `+ - * /`, ordinary precedence, parentheses, and
+signed operands, up to 200 characters. Examples: `12000/2` → `6000`, `4490*3` →
+`13470`, and `100+250-30` → `320`.
+
+Both currencies have two-place **storage** precision (ADR 0002). Dot or comma
+can be a decimal separator; spaces (including non-breaking spaces), dots, and
+commas can group thousands. Groups must contain three digits. With both dot and
+comma, the last separator is decimal: `1.234,5`, `1,234.5`, and `1 234,50` all
+mean `1234.50`. A valid thousands grouping wins when the final group has more
+than two digits: `1.234` means `1234` in both currencies; `1,5` means `1.50`.
+For a single punctuation separator, a zero-leading input is treated as a
+decimal, so `0.005` is a decimal.
+
+Calculation uses exact BigInt rationals, with no intermediate rounding. The
+**final** result is rounded once to the nearest hundredth, ties away from zero:
+`1/3` → `0.33`, `2/3` → `0.67`, `0.005` → `0.01`, and `1/3*3` → `1.00`.
+Division by zero, malformed expressions, unsafe integer-hundredth results, and
+non-positive transaction results are rejected. Opening balances may be negative
+or zero.
+
+Leaving the field or pressing Enter evaluates it and shows a translated result
+preview before save. Enter in the amount field evaluates only; it does not save
+the form. The original expression stays editable. Changing it or the currency
+hides the previous preview until reevaluation. Previews use the existing money
+formatter: CHF shows two decimals, while HUF rounds to whole units for display
+only; the stored result still retains hundredths.
+
+### Manual Amount calculator check
+
+Run `npm run dev`. In Accounts and in the transaction create/edit drawer, enter
+`12000/2`, `4490*3`, `100+250-30`, `1,5`, `1.234`, `1 234,50`, `1.234,5`, and
+`1,234.5` for HUF and CHF. Blur or press Enter: verify the preview appears and
+Enter does not save. Check `1/3`, `2/3`, and `1/3*3` for final-only rounding
+(CHF previews `0.33`, `0.67`, and `1.00`). Change the expression or currency and
+verify the old preview disappears. Try `1+`, `1/0`, and `90071992547409.92`:
+check the inline validation and that saving does not create a record. Verify
+`100-250` is rejected for transactions but accepted as an opening balance, and
+that zero is accepted only for opening balances. Save valid results and reopen
+an edited transaction to check the stored amount. Repeat in HU/EN/DE and with
+keyboard navigation and light/dark themes. These renderer checks remain manual;
+the automated pure-parser tests cover arithmetic, ambiguous inputs, rounding,
+invalid expressions, sign constraints, and safe-integer bounds.
+
 ### Manual Transactions check
 
 Run `npm run dev`, open a profile with active HUF and CHF accounts, and navigate
-to Transactions. Record expenses and income using dot and comma decimals, a new
-payee, and main/subcategories; verify the list and account balances update and
+to Transactions. Record expenses and income using calculator expressions and dot
+and comma decimals, a new payee, and main/subcategories; verify the list and account balances update and
 HUF is shown without decimals. Reuse the payee with different casing and confirm
 it appears with its original spelling. Try tomorrow's date and mismatched category
 kinds, then edit the date, account, kind, amount, payee, category, and note. Delete

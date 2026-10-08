@@ -144,8 +144,9 @@ export const en = {
   'transactions.income': 'Income',
   'transactions.date': 'Date',
   'transactions.amount': 'Amount',
+  'amount.result': 'Calculated amount',
   'transactions.amountHint':
-    'Enter a positive amount with a dot or comma and up to two decimal places.',
+    'Use + - * /, parentheses, dot or comma decimals, and thousands grouping (e.g. 1 234,50). Blur or Enter calculates; the final result is rounded to hundredths.',
   'transactions.account': 'Account',
   'transactions.chooseAccount': 'Choose an active account',
   'transactions.payee': 'Payee',
@@ -164,7 +165,7 @@ export const en = {
   'transactions.error.futureDate':
     'The transaction date cannot be in the future.',
   'transactions.error.amount':
-    'Enter a positive amount with up to two decimal places.',
+    'Enter a valid expression yielding a positive amount within 90,071,992,547,409.91. Division by zero is not allowed.',
   'transactions.error.payee': 'Enter a payee name of at most 100 characters.',
   'transactions.error.category':
     'Choose an active category matching expense or income.',
@@ -182,7 +183,7 @@ export const en = {
   'accounts.openingDate': 'Opening date',
   'accounts.balance': 'Balance',
   'accounts.balanceHint':
-    'Use a dot or comma and up to two decimal places, without thousands separators. Negative balances are allowed.',
+    'Use + - * /, parentheses, dot or comma decimals, and thousands grouping. Blur or Enter calculates, rounding the final result to hundredths. Negative and zero balances are allowed.',
   'accounts.empty': 'Create an account to start tracking its balance.',
   'accounts.loading': 'Loading accounts…',
   'accounts.rename': 'Rename',
@@ -202,7 +203,7 @@ export const en = {
   'accounts.error.name': 'Enter an account name between 1 and 100 characters.',
   'accounts.error.currency': 'Choose HUF or CHF.',
   'accounts.error.balance':
-    'Enter a valid balance with up to two decimal places, no grouping, and within ±90,071,992,547,409.91.',
+    'Enter a valid expression yielding a balance within ±90,071,992,547,409.91. Division by zero is not allowed.',
   'accounts.error.date': 'Enter a valid opening date.',
   'accounts.error.notFound':
     'The account could not be found. Refresh the list.',
