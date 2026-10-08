@@ -311,9 +311,10 @@ not off-device copies or backups of the separate data folder.
 - Profiles with an account outside their base currency fetch official CHF rates
   from the MNB SOAP service after the profile opens and every hour while the app
   runs. Creating a non-base-currency account, changing an account's currency, or
-  writing a transaction/transfer also starts a coalesced background refresh when
-  it extends the needed history. Requests use Electron's system-proxy-aware
-  network stack and never block the renderer. MNB serves this SOAP endpoint only
+  writing a transaction/transfer or undoing a change also starts a coalesced
+  background refresh when it extends the needed history, restores a missing
+  left-edge rate, or the cached coverage ends before yesterday. Requests use
+  Electron's system-proxy-aware network stack and never block the renderer. MNB serves this SOAP endpoint only
   over plain HTTP; ADR 0005 records the accepted integrity risk. Failures are
   logged and leave the visible rate status stale or missing.
 - Migration 17 stores each quoted decimal string and unit by publication date,
@@ -385,8 +386,14 @@ Check the overview bar chart and Reports pie/bar charts use theme-token colors,
 readable labels, and locale-formatted money tooltips. Check top-five table links,
 expense/income card links, and View reports using keyboard navigation; category
 links must preserve the inclusive dates, include subcategories, handle
-uncategorized, and hide excluded transactions. Chart rendering/tooltips and
-navigation remain manual checks. Temporary SQLite application-API tests cover
+uncategorized, and hide excluded transactions. In Transactions, the report chip
+must describe the applied category and kind, including “without subcategories”
+for direct-category lines. Editing the category without Apply must not change
+that chip. Apply a category to an uncategorized report filter, then change or
+clear an exact category: both must load without validation errors. Choose
+**Show all kinds and subcategories** and verify the chip disappears while the
+visible period and exclusion filters remain unchanged, including in CSV export.
+Chart rendering/tooltips and navigation remain manual checks. Temporary SQLite application-API tests cover
 dashboard/breakdown agreement, splits, exclusions, exact net/change rounding,
 date-based conversion, missing/stale rates, top-five shares, and calendar
 rollover.
@@ -915,9 +922,10 @@ hidden too. Amount inputs (including calculator expressions, rule bounds and
 template amounts) are readable **only while focused** so editing remains usable;
 unfocused inputs are blurred password fields, and result previews stay hidden.
 Privacy is a screen-sharing aid, not encryption: underlying data and CSV exports
-are unchanged. Text written in notes/names is not scanned for amounts; category
-names, dates and transaction counts remain visible, while chart areas are blurred
-so bar lengths, slice sizes and Sankey widths cannot be read.
+are unchanged. Text written in notes/names is not scanned for amounts. Category
+names, dates and transaction counts outside charts remain visible. Entire chart
+areas, including their category labels, are blurred so bar lengths, slice sizes
+and Sankey widths cannot be read.
 
 ### Manual Privacy mode check
 

@@ -1,3 +1,4 @@
+import { reportError } from './lib/report-error'
 import { useAmountFormatters, usePrivacy } from './lib/privacy'
 import { useEffect, useMemo, useState } from 'react'
 import {
@@ -35,7 +36,7 @@ export function MonthlyTrendReport({
   const [result, setResult] = useState<{
     key: typeof reportKey
     report: TrendReport | null
-    error: boolean
+    error: MessageKey | null
   } | null>(null)
   const currentResult = result?.key === reportKey ? result : null
   const report = currentResult?.report ?? null
@@ -45,10 +46,11 @@ export function MonthlyTrendReport({
     void window.app.reports
       .monthlyTrend(request)
       .then((value) => {
-        if (!ignore) setResult({ key: reportKey, report: value, error: false })
+        if (!ignore) setResult({ key: reportKey, report: value, error: null })
       })
-      .catch(() => {
-        if (!ignore) setResult({ key: reportKey, report: null, error: true })
+      .catch((error: unknown) => {
+        if (!ignore)
+          setResult({ key: reportKey, report: null, error: reportError(error) })
       })
     return () => {
       ignore = true
@@ -95,7 +97,7 @@ export function MonthlyTrendReport({
   if (currentResult.error || !report)
     return (
       <p role="alert" className="text-sm font-medium text-error">
-        {t('reports.error')}
+        {t(currentResult.error ?? 'reports.error')}
       </p>
     )
 

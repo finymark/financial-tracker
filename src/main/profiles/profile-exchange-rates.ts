@@ -97,10 +97,36 @@ function earliestNeededDate(
   return result.date
 }
 
-export function needsExchangeRateRefresh(database: Database.Database): boolean {
+function hasRateWithinCoverage(
+  database: Database.Database,
+  stored: StoredCoverage,
+  date: string,
+): boolean {
+  if (!stored.startDate || !stored.endDate) return false
+  return Boolean(
+    database
+      .prepare(
+        `SELECT 1 FROM exchange_rates
+       WHERE currency = 'CHF' AND date >= ? AND date <= ? LIMIT 1`,
+      )
+      .get(stored.startDate, date < stored.endDate ? date : stored.endDate),
+  )
+}
+
+export function needsExchangeRateRefresh(
+  database: Database.Database,
+  clock: () => Date,
+): boolean {
   const earliest = earliestNeededDate(database, baseCurrency(database))
   const stored = coverage(database)
-  return Boolean(earliest && (!stored.startDate || earliest < stored.startDate))
+  return Boolean(
+    earliest &&
+    (!stored.startDate ||
+      earliest < stored.startDate ||
+      !stored.endDate ||
+      stored.endDate < moveDate(today(clock), -1) ||
+      !hasRateWithinCoverage(database, stored, earliest)),
+  )
 }
 
 function loadRates(
@@ -188,6 +214,12 @@ export async function refreshExchangeRates(
         startDate: moveDate(earliest, -14),
         endDate: moveDate(stored.startDate, -1),
       })
+    }
+    if (
+      earliest >= stored.startDate &&
+      !hasRateWithinCoverage(database, stored, earliest)
+    ) {
+      spans.push({ startDate: moveDate(earliest, -14), endDate: earliest })
     }
     if (stored.endDate < current) {
       spans.push({ startDate: moveDate(stored.endDate, 1), endDate: current })

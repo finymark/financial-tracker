@@ -1,3 +1,4 @@
+import { reportError } from './lib/report-error'
 import { useAmountFormatters, usePrivacy } from './lib/privacy'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
@@ -63,12 +64,12 @@ export function ReportsPage({
   const [result, setResult] = useState<{
     key: typeof reportKey
     report: CategoryBreakdownReport | null
-    error: boolean
+    error: MessageKey | null
   } | null>(null)
   const currentResult = result?.key === reportKey ? result : null
   const report = currentResult?.report ?? null
   const loading = tab === 'category' && currentResult === null
-  const error = currentResult?.error ?? false
+  const error = currentResult?.error ?? null
   const [chartKind, setChartKind] = useState<ChartKind>('pie')
   const [selectedId, setSelectedId] = useState<string | null | undefined>()
 
@@ -79,12 +80,13 @@ export function ReportsPage({
       .categoryBreakdown(request)
       .then((value) => {
         if (!ignore) {
-          setResult({ key: reportKey, report: value, error: false })
+          setResult({ key: reportKey, report: value, error: null })
           setSelectedId(undefined)
         }
       })
-      .catch(() => {
-        if (!ignore) setResult({ key: reportKey, report: null, error: true })
+      .catch((error: unknown) => {
+        if (!ignore)
+          setResult({ key: reportKey, report: null, error: reportError(error) })
       })
     return () => {
       ignore = true
@@ -261,7 +263,7 @@ export function ReportsPage({
       )}
       {tab === 'category' && error && (
         <p role="alert" className="text-sm font-medium text-error">
-          {t('reports.error')}
+          {t(error)}
         </p>
       )}
       {tab === 'category' && !loading && !error && report && (

@@ -1,3 +1,4 @@
+import { reportError } from './lib/report-error'
 import { useAmountFormatters, usePrivacy } from './lib/privacy'
 import { useEffect, useMemo, useState } from 'react'
 import {
@@ -33,6 +34,7 @@ export function SpendingPaceSection({ language, t }: SpendingPaceSectionProps) {
   const [result, setResult] = useState<{
     key: typeof key
     report: SpendingPaceReport | null
+    error: MessageKey | null
   } | null>(null)
   const currentResult = result?.key === key ? result : null
   const loading = currentResult === null
@@ -42,10 +44,10 @@ export function SpendingPaceSection({ language, t }: SpendingPaceSectionProps) {
     let ignore = false
     void window.app.reports.spendingPace().then(
       (value) => {
-        if (!ignore) setResult({ key, report: value })
+        if (!ignore) setResult({ key, report: value, error: null })
       },
-      () => {
-        if (!ignore) setResult({ key, report: null })
+      (error: unknown) => {
+        if (!ignore) setResult({ key, report: null, error: reportError(error) })
       },
     )
     return () => {
@@ -177,7 +179,7 @@ export function SpendingPaceSection({ language, t }: SpendingPaceSectionProps) {
       )}
       {!loading && !report && (
         <p role="alert" className="text-sm font-medium text-error">
-          {t('reports.error')}
+          {t(currentResult?.error ?? 'reports.error')}
         </p>
       )}
       {report && (
