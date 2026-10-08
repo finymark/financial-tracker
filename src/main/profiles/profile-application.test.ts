@@ -213,6 +213,26 @@ describe('profile application API', () => {
     }
   })
 
+  test('restoring a snapshot removes a leftover rollback journal of the replaced database', async () => {
+    const { registry } = setup()
+    const profile = registry.createProfile('Restore journal')
+    const paths = registry.getProfilePaths(profile.id)
+    const application = await openProfileApplication({ profile, paths, clock })
+    try {
+      const backup = application.queries.listBackups()[0]
+      // A persistent-mode journal keeps a zeroed header after its transaction.
+      writeFileSync(`${paths.databasePath}-journal`, Buffer.alloc(512))
+      await application.commands.restoreBackup({
+        backupId: backup.id,
+        confirmed: true,
+      })
+      expect(existsSync(`${paths.databasePath}-journal`)).toBe(false)
+      expect(application.queries.getProfileInfo().id).toBe(profile.id)
+    } finally {
+      application.close()
+    }
+  })
+
   test('controller restore returns saved settings and restores accounts while blocking overlapping operations', async () => {
     const { registry } = setup()
     const profile = registry.createProfile('Saved finances')
@@ -1111,6 +1131,53 @@ describe('profile application API', () => {
     })
     for (const suffix of ['', '-journal', '-wal', '-shm']) {
       expect(existsSync(`${paths.databasePath}${suffix}`)).toBe(false)
+    }
+  })
+
+  test('restoring after a failing migration removes a leftover rollback journal', async () => {
+    const { registry } = setup()
+    const profile = registry.createProfile('Leftover journal')
+    const paths = registry.getProfilePaths(profile.id)
+    const initial = await openProfileApplication({
+      profile,
+      paths,
+      clock,
+      createStartupBackup: false,
+      startBackgroundWork: false,
+    })
+    initial.close()
+    // A persistent journal mode keeps the -journal file after rollback/close.
+    const leavesJournal = defineSqlMigration(
+      currentVersion + 1,
+      'fails after keeping its rollback journal',
+      'PRAGMA journal_mode = PERSIST; CREATE TABLE leftover_journal (value TEXT); INVALID SQL',
+    )
+
+    await expect(
+      openProfileApplication({
+        profile,
+        paths,
+        migrations: [...CURRENT_MIGRATIONS, leavesJournal],
+        clock,
+        createStartupBackup: false,
+        startBackgroundWork: false,
+      }),
+    ).rejects.toBeInstanceOf(MigrationError)
+
+    expect(existsSync(`${paths.databasePath}-journal`)).toBe(false)
+    const reopened = await openProfileApplication({
+      profile,
+      paths,
+      clock,
+      createStartupBackup: false,
+      startBackgroundWork: false,
+    })
+    try {
+      expect(reopened.queries.getProfileInfo().schemaVersion).toBe(
+        currentVersion,
+      )
+    } finally {
+      reopened.close()
     }
   })
 
