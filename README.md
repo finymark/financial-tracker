@@ -175,8 +175,14 @@ rename this folder or change the appId. Uninstalling keeps profile data.
 
 `electron-builder.yml` produces a per-user, one-click **unsigned NSIS x64**
 installer. Windows may show an unknown-publisher/SmartScreen warning; code
-signing is not configured. Executable resource editing is disabled, so the
-installer/app currently use Electron's default icon. Native SQLite and Sharp
+signing is deliberately not configured. Executable resource editing stays on
+(`signAndEditExecutable: true`, `signExecutable: false`), so the executable,
+shortcuts, taskbar, installer and uninstaller use the app icon. `build/icon.svg`
+is the icon's master; after changing it, run `node scripts/generate-icons.mjs`
+to regenerate `build/icon.png` and the multi-size `build/icon.ico` (16–256 px)
+and commit all three. Windows does not let an app pin itself to the taskbar;
+users right-click the running app's taskbar button and choose **Pin to
+taskbar**. Native SQLite and Sharp
 image-processing binaries are explicitly unpacked from asar, and native
 dependency rebuilding is disabled. `better-sqlite3` 13 already ships the
 compatible Node-API binary.
@@ -304,6 +310,12 @@ not pruned. These are local backups, not off-device copies.
   Failed saves show a translated error and leave the previous choices applied.
   Base currency drives exact HUF/CHF conversion with official MNB rates cached
   inside that profile's database.
+- There is no application menu bar. Both windows use a hidden title bar with
+  Windows' native minimize/maximize/close overlay; the app draws the 36 px top
+  strip (icon, **Financial Tracker**, active profile name) and sends only the
+  resolved `light`/`dark` theme over IPC so the overlay colors match the
+  `--title-bar` tokens. Ctrl+= / Ctrl+- / Ctrl+0 still zoom; the packaged app
+  ignores Ctrl+R, Ctrl+Shift+R, Ctrl+Shift+I and F12.
 - The system theme follows Windows through `prefers-color-scheme`, using
   Electron's default system `nativeTheme`. Explicit light/dark modes override
   that preference in the renderer, including native form controls.
@@ -1598,3 +1610,41 @@ Automated pure tests cover temporary-folder app-settings defaults, persistence,
 validation, atomic replace/retries/failure preservation, translated menu templates
 and language fallback/rebuilds, strict autostart input, and exact `--hidden`
 argument parsing. No ledger schema change is required.
+
+### Manual window chrome check (installed NSIS build)
+
+Use synthetic profiles and data only. Windows icon caching, native title-bar
+behavior and taskbar integration are manual checks, not covered by the unit suite.
+
+1. Run `npm run build`, then `npx electron-builder --win nsis --publish never`.
+   Verify the generated installer, `release/win-unpacked/Financial Tracker.exe`,
+   desktop shortcut, Start menu entry, Apps list and uninstaller show the dark
+   navy icon with three mint bars instead of Electron's icon. Repeat at 100%,
+   125%, 150% and 200% display scaling and check the small tray, shortcut and
+   taskbar icons remain legible.
+2. Install or update the generated NSIS build. Windows may retain an older cached
+   shortcut or pinned-taskbar icon; if it does, unpin the old entry, remove and
+   recreate the shortcut or restart Windows Explorer, then launch the updated
+   app again. Windows does not allow the app to pin itself: right-click the
+   running taskbar button and choose **Pin to taskbar**, then relaunch from the
+   pinned icon and verify the same app icon appears in the taskbar and Alt+Tab.
+3. Open the profile picker, an active profile and the quick-add window. Verify
+   each has no File/Edit/View/Window/Help menu or white system caption. The top
+   strip must show the app icon and **Financial Tracker**, plus the active
+   profile name when one is open. Repeat with a collapsed sidebar and a narrow
+   window; text may truncate, but it must not overlap the native minimize,
+   maximize and close buttons.
+4. Drag each window from empty title-bar space, double-click to maximize/restore,
+   and hover the native maximize button to open Windows snap layouts. Verify all
+   three native buttons remain clickable and no app button or form control falls
+   inside the draggable region.
+5. Select Light and Dark, then Follow Windows and change Windows' app color mode.
+   Verify the drawn strip and native window buttons update immediately in the
+   main window, profile picker and an already-open quick-add window. Rename or
+   switch the active profile and verify the title updates without reopening the
+   quick-add window.
+6. In the installed build, verify Ctrl+=, Ctrl+-, and Ctrl+0 change/reset zoom.
+   In text inputs, verify Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+A and text undo still work.
+   Recheck Ctrl+Z ledger undo, Ctrl+Shift+H, N, Ctrl+N, ?, Alt+1–3,
+   Ctrl+Enter, Esc and global Ctrl+Alt+N. Ctrl+R, Ctrl+Shift+R,
+   Ctrl+Shift+I and F12 must not reload the app or open developer tools.

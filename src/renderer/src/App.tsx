@@ -61,6 +61,7 @@ import { RecurringPage } from './RecurringPage'
 import type { RecurringPrefill } from './lib/recurring-prefill'
 import { WatchedFolderSettings } from './components/watched-folder-settings'
 import { ReceiptInboxPage } from './ReceiptInboxPage'
+import { TitleBar } from './components/title-bar'
 
 const pages = [
   { id: 'overview', icon: LayoutDashboard },
@@ -207,7 +208,7 @@ function ProfilePicker({
   }
 
   return (
-    <main className="min-h-dvh bg-muted p-6 sm:p-10">
+    <main className="h-full overflow-y-auto bg-muted p-6 sm:p-10">
       <div className="mx-auto max-w-2xl space-y-6">
         <header className="text-center">
           <UsersRound
@@ -632,7 +633,7 @@ function Shell({
   }
 
   return (
-    <div className="flex h-dvh overflow-hidden">
+    <div className="flex h-full overflow-hidden">
       <aside
         className={cn(
           'flex shrink-0 flex-col border-r bg-sidebar p-4',
@@ -1294,7 +1295,7 @@ export default function App() {
   let content
   if (loading) {
     content = (
-      <main className="grid min-h-dvh place-items-center text-sm text-muted-foreground">
+      <main className="grid h-full place-items-center text-sm text-muted-foreground">
         {t('profile.loading')}
       </main>
     )
@@ -1342,12 +1343,33 @@ export default function App() {
     )
   }
   return (
-    <>
-      {content}
+    <div className="flex h-dvh flex-col">
+      <TitleBar profileName={active?.name} />
+      <div className="window-content min-h-0 flex-1">
+        {content}
+        {(dropActive || dropBusy) && active && !showPicker && (
+          <div className="pointer-events-none fixed inset-0 z-[100] grid place-items-center bg-foreground/25 p-8">
+            <div className="rounded-xl border-2 border-dashed bg-background p-10 text-center text-lg font-semibold shadow-xl">
+              {t(dropBusy ? 'receipts.dropProcessing' : 'receipts.dropOverlay')}
+            </div>
+          </div>
+        )}
+        {dropError && (
+          <aside
+            role="alert"
+            className="fixed right-4 bottom-4 z-[101] flex max-w-md items-center gap-3 rounded-lg border bg-card p-4 text-sm text-error shadow-lg"
+          >
+            <p>{t(dropError)}</p>
+            <Button variant="ghost" onClick={() => setDropError(null)}>
+              {t('tray.noticeOk')}
+            </Button>
+          </aside>
+        )}
+      </div>
       {startupShortcutFailure && (
         <aside
           role="alert"
-          className="fixed top-4 right-4 z-50 max-w-md space-y-3 rounded-lg border bg-card p-4 text-sm font-medium text-error shadow-lg"
+          className="fixed top-[calc(var(--title-bar-height)+1rem)] right-4 z-50 max-w-md space-y-3 rounded-lg border bg-card p-4 text-sm font-medium text-error shadow-lg"
         >
           <p>{shortcutConflictMessage(t, startupShortcutFailure)}</p>
           <Button
@@ -1358,25 +1380,7 @@ export default function App() {
           </Button>
         </aside>
       )}
-      {(dropActive || dropBusy) && active && !showPicker && (
-        <div className="pointer-events-none fixed inset-0 z-[100] grid place-items-center bg-foreground/25 p-8">
-          <div className="rounded-xl border-2 border-dashed bg-background p-10 text-center text-lg font-semibold shadow-xl">
-            {t(dropBusy ? 'receipts.dropProcessing' : 'receipts.dropOverlay')}
-          </div>
-        </div>
-      )}
-      {dropError && (
-        <aside
-          role="alert"
-          className="fixed right-4 bottom-4 z-[101] flex max-w-md items-center gap-3 rounded-lg border bg-card p-4 text-sm text-error shadow-lg"
-        >
-          <p>{t(dropError)}</p>
-          <Button variant="ghost" onClick={() => setDropError(null)}>
-            {t('tray.noticeOk')}
-          </Button>
-        </aside>
-      )}
       <UpdateNotice t={t} />
-    </>
+    </div>
   )
 }

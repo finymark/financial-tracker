@@ -6,6 +6,10 @@ import type {
 } from '../shared/settings'
 
 const bridge: AppBridge = {
+  windowChrome: {
+    setTheme: (theme) =>
+      ipcRenderer.invoke(IPC_CHANNELS.windowChromeSetTheme, theme),
+  },
   phoneUpload: {
     start: (input) => ipcRenderer.invoke(IPC_CHANNELS.phoneUploadStart, input),
     stop: (input) => ipcRenderer.invoke(IPC_CHANNELS.phoneUploadStop, input),

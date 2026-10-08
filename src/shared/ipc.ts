@@ -129,6 +129,7 @@ import type {
   ReceiptPrefill,
   ReceiptPreviewInput,
 } from './receipts'
+import type { ResolvedTheme } from './window-chrome'
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
@@ -141,6 +142,7 @@ export const IPC_CHANNELS = {
   desktopQuickAddSaved: 'desktop:quick-add-saved',
   desktopDataChanged: 'desktop:data-changed',
   desktopProfileChanged: 'desktop:profile-changed',
+  windowChromeSetTheme: 'window-chrome:set-theme',
   updatesIsReady: 'updates:is-ready',
   updatesReady: 'updates:ready',
   updatesRestart: 'updates:restart',
@@ -247,6 +249,9 @@ export const IPC_CHANNELS = {
 } as const
 
 export interface AppBridge {
+  windowChrome: {
+    setTheme(theme: ResolvedTheme): Promise<void>
+  }
   phoneUpload: {
     start(input: PhoneUploadStartInput): Promise<PhoneUploadStartResult>
     stop(input: PhoneUploadStopInput): Promise<void>

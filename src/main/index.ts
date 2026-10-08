@@ -6,6 +6,7 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  nativeTheme,
   screen,
   Tray,
   type BrowserWindowConstructorOptions,
@@ -56,6 +57,14 @@ import { registerPhoneUploadIpc, renderPhoneUploadQr } from './phone-upload-ipc'
 import sharp from 'sharp'
 import { preprocessReceiptImage } from './ocr/receipt-preprocessing'
 import { TesseractOcrEngine } from './ocr/tesseract-ocr-engine'
+import { titleBarOverlay } from '../shared/window-chrome'
+import { registerWindowChromeIpc } from './window-chrome'
+import {
+  blocksPackagedShortcut,
+  developmentWindowCommand,
+  nextZoomLevel,
+  zoomCommand,
+} from './window-shortcuts'
 
 let mainWindow: BrowserWindow | null = null
 let quickAddWindow: BrowserWindow | null = null
@@ -78,12 +87,23 @@ export function openQuickAdd(): void {
 const APP_ID = 'com.finymark.financial-tracker'
 const APP_NAME = 'Financial Tracker'
 
+function applicationIconPath(): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, 'icon.ico')
+    : join(app.getAppPath(), 'build/icon.ico')
+}
+
 function createAppWindow(
   options: Omit<BrowserWindowConstructorOptions, 'webPreferences'>,
   view?: 'quick-add',
 ): BrowserWindow {
   const window = new BrowserWindow({
+    icon: applicationIconPath(),
     ...options,
+    titleBarStyle: 'hidden',
+    titleBarOverlay: titleBarOverlay(
+      nativeTheme.shouldUseDarkColors ? 'dark' : 'light',
+    ),
     webPreferences: {
       preload: join(import.meta.dirname, '../preload/index.cjs'),
       contextIsolation: true,
@@ -91,8 +111,30 @@ function createAppWindow(
       sandbox: true,
     },
   })
+  window.removeMenu()
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   window.webContents.on('will-navigate', (event) => event.preventDefault())
+  window.webContents.on('before-input-event', (event, input) => {
+    if (app.isPackaged && blocksPackagedShortcut(input)) {
+      event.preventDefault()
+      return
+    }
+    if (!app.isPackaged) {
+      const developmentCommand = developmentWindowCommand(input)
+      if (developmentCommand) {
+        event.preventDefault()
+        if (developmentCommand === 'reload') window.webContents.reload()
+        else window.webContents.toggleDevTools()
+        return
+      }
+    }
+    const command = zoomCommand(input)
+    if (!command) return
+    event.preventDefault()
+    window.webContents.setZoomLevel(
+      nextZoomLevel(window.webContents.getZoomLevel(), command),
+    )
+  })
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
     const url = new URL(process.env.ELECTRON_RENDERER_URL)
@@ -277,6 +319,7 @@ function startApplication(): void {
     void smokeTest()
     return
   }
+  Menu.setApplicationMenu(null)
   let settings: AppSettingsFile
   try {
     settings = new AppSettingsFile(app.getPath('userData'))
@@ -341,6 +384,9 @@ function startApplication(): void {
         Boolean(window && !window.isDestroyed()),
       )
       .map((window) => window.webContents),
+  )
+  registerWindowChromeIpc(ipcMain, (contents) =>
+    BrowserWindow.fromWebContents(contents),
   )
 
   const activeLanguage = () =>
@@ -519,13 +565,12 @@ function startApplication(): void {
       },
     )
   })
-  const iconPath = app.isPackaged
-    ? join(process.resourcesPath, 'icon.png')
-    : join(app.getAppPath(), 'build/icon.png')
+  const iconPath = applicationIconPath()
   const icon = nativeImage.createFromPath(iconPath)
   if (icon.isEmpty())
     throw new Error('Application tray icon could not be loaded')
-  tray = new Tray(icon.resize({ width: 16, height: 16 }))
+  // Pass the ICO path so Windows can select the best frame for the current DPI.
+  tray = new Tray(iconPath)
   tray.on('click', showMainWindow)
   tray.on('double-click', showMainWindow)
   updateTray()
