@@ -2,6 +2,7 @@ import type { IpcMain } from 'electron'
 import { IPC_CHANNELS, type AppBridge } from '../../shared/ipc'
 import type { ProfileController } from './profile-controller'
 import {
+  parseTransactionListInput,
   validateTransactionAccountId,
   validateTransactionCategoryId,
   validateTransactionDate,
@@ -38,8 +39,13 @@ export function registerTransactionIpc(
 ): void {
   ipcMain.handle(
     IPC_CHANNELS.transactionsList,
-    (): Awaited<ReturnType<AppBridge['transactions']['list']>> =>
-      controller.getActiveApplication().queries.listTransactions(),
+    (
+      _event,
+      value: unknown,
+    ): Awaited<ReturnType<AppBridge['transactions']['list']>> =>
+      controller
+        .getActiveApplication()
+        .queries.listTransactions(parseTransactionListInput(value)),
   )
   ipcMain.handle(
     IPC_CHANNELS.payeesList,

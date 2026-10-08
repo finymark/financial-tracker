@@ -1,4 +1,8 @@
-import type { TransactionKind } from '../../shared/transactions'
+import type {
+  TransactionKind,
+  TransactionListInput,
+  TransactionPeriod,
+} from '../../shared/transactions'
 import { validateAccountId } from './account-validation'
 import { validateCategoryId, validateCategoryKind } from './category-validation'
 
@@ -91,4 +95,61 @@ export function validateTransactionNote(value: unknown): string {
     throw new Error('transactions.error.note')
   }
   return value
+}
+
+export function parseTransactionListInput(
+  value: unknown = {},
+): TransactionListInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new Error('transactions.error.filters')
+  const input = value as Record<string, unknown>
+  const period = input.period === undefined ? 'all' : input.period
+  if (
+    typeof period !== 'string' ||
+    !['all', 'thisMonth', 'lastMonth', 'thisYear', 'custom'].includes(period)
+  )
+    throw new Error('transactions.error.filters')
+  const date = (value: unknown): string | undefined => {
+    if (value === undefined) return undefined
+    if (typeof value !== 'string' || !isCalendarDate(value))
+      throw new Error('transactions.error.filters')
+    return value
+  }
+  const from = date(input.from)
+  const to = date(input.to)
+  if (
+    (period === 'custom' && (!from || !to)) ||
+    (from && to && from > to) ||
+    (period !== 'custom' && (from !== undefined || to !== undefined))
+  )
+    throw new Error('transactions.error.filters')
+  const id = (value: unknown): string | undefined => {
+    if (value === undefined) return undefined
+    if (typeof value !== 'string' || !UUID.test(value))
+      throw new Error('transactions.error.filters')
+    return value
+  }
+  const offset = input.offset === undefined ? 0 : input.offset
+  const limit = input.limit === undefined ? 100 : input.limit
+  if (
+    !Number.isSafeInteger(offset) ||
+    (offset as number) < 0 ||
+    !Number.isSafeInteger(limit) ||
+    (limit as number) < 1 ||
+    (limit as number) > 500 ||
+    (input.search !== undefined &&
+      (typeof input.search !== 'string' || input.search.length > 1000))
+  )
+    throw new Error('transactions.error.filters')
+  return {
+    period: period as TransactionPeriod,
+    from,
+    to,
+    accountId: id(input.accountId),
+    categoryId: id(input.categoryId),
+    payeeId: id(input.payeeId),
+    search: (input.search as string | undefined)?.trim(),
+    offset: offset as number,
+    limit: limit as number,
+  }
 }

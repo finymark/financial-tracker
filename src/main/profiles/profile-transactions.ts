@@ -3,11 +3,16 @@ import type Database from 'better-sqlite3'
 import type {
   CreateTransactionInput,
   Payee,
+  TransactionListInput,
+  TransactionPage,
+  TransactionTotals,
   Transaction,
   UpdateTransactionInput,
 } from '../../shared/transactions'
 import { getCategory } from './profile-categories'
 import {
+  parseTransactionListInput,
+  today,
   validateTransactionAccountId,
   validateTransactionCategoryId,
   validateTransactionDate,
@@ -89,16 +94,6 @@ export function getTransaction(
       .prepare(`${TRANSACTION_SELECT} WHERE transactions.id = ?`)
       .get(id) as StoredTransaction | undefined,
   )
-}
-
-export function listTransactions(database: Database.Database): Transaction[] {
-  return (
-    database
-      .prepare(
-        `${TRANSACTION_SELECT} ORDER BY transactions.date DESC, transactions.created_at DESC, transactions.rowid DESC`,
-      )
-      .all() as StoredTransaction[]
-  ).map(transactionView)
 }
 
 export function listPayees(database: Database.Database): Payee[] {
@@ -245,4 +240,136 @@ export function deleteTransaction(
     .prepare('DELETE FROM transaction_lines WHERE transaction_id = ?')
     .run(current.id)
   database.prepare('DELETE FROM transactions WHERE id = ?').run(current.id)
+}
+
+const LIST_ORDER =
+  'transactions.date DESC, transactions.created_at DESC, transactions.id DESC'
+
+function foldText(value: string): string {
+  return value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+}
+
+export function listTransactions(
+  database: Database.Database,
+  value: TransactionListInput | undefined,
+  clock: () => Date,
+): TransactionPage {
+  const input = parseTransactionListInput(value)
+  const where: string[] = []
+  const parameters: (string | number)[] = []
+  const add = (condition: string, ...values: (string | number)[]) => {
+    where.push(condition)
+    parameters.push(...values)
+  }
+  const current = today(clock)
+  let from = input.from
+  let to = input.to
+  if (input.period === 'thisMonth') {
+    from = `${current.slice(0, 7)}-01`
+    to = current
+  } else if (input.period === 'thisYear') {
+    from = `${current.slice(0, 4)}-01-01`
+    to = current
+  } else if (input.period === 'lastMonth') {
+    const first = new Date(`${current.slice(0, 7)}-01T12:00:00`)
+    first.setDate(0)
+    const last = today(() => first)
+    from = `${last.slice(0, 7)}-01`
+    to = last
+  }
+  if (from) add('transactions.date >= ?', from)
+  if (to) add('transactions.date <= ?', to)
+  if (input.accountId) add('transactions.account_id = ?', input.accountId)
+  if (input.payeeId) add('transactions.payee_id = ?', input.payeeId)
+  if (input.categoryId)
+    add(
+      `EXISTS (
+    SELECT 1 FROM transaction_lines AS filter_lines
+    JOIN categories ON categories.id = filter_lines.category_id
+    WHERE filter_lines.transaction_id = transactions.id
+      AND (categories.id = ? OR categories.parent_id = ?)
+  )`,
+      input.categoryId,
+      input.categoryId,
+    )
+  if (input.search) {
+    database.function('fold_text', { deterministic: true }, (text: unknown) =>
+      foldText(String(text ?? '')),
+    )
+    add(
+      '(instr(fold_text(payees.name), ?) > 0 OR instr(fold_text(transactions.note), ?) > 0)',
+      foldText(input.search),
+      foldText(input.search),
+    )
+  }
+  const filtered = `FROM transactions
+    JOIN accounts ON accounts.id = transactions.account_id
+    LEFT JOIN payees ON payees.id = transactions.payee_id
+    ${where.length ? `WHERE ${where.join(' AND ')}` : ''}`
+  // One read snapshot for rows and aggregates. Offset allows arbitrary virtual
+  // windows; only the bounded page goes through the ledger line checks.
+  return database.transaction(() => {
+    const rows = (
+      database
+        .prepare(
+          `${TRANSACTION_SELECT}
+      WHERE transactions.id IN (SELECT transactions.id ${filtered}
+        ORDER BY ${LIST_ORDER} LIMIT ? OFFSET ?)
+      ORDER BY ${LIST_ORDER}`,
+        )
+        .all(...parameters, input.limit!, input.offset!) as StoredTransaction[]
+    ).map(transactionView)
+    const aggregates = database
+      .prepare(
+        `SELECT transactions.date, accounts.currency,
+      SUM(CASE transactions.kind WHEN 'expense' THEN transactions.total_minor ELSE 0 END) AS expenseMinor,
+      SUM(CASE transactions.kind WHEN 'income' THEN transactions.total_minor ELSE 0 END) AS incomeMinor,
+      COUNT(*) AS count ${filtered}
+      GROUP BY transactions.date, accounts.currency ORDER BY transactions.date DESC, accounts.currency`,
+      )
+      .safeIntegers()
+      .all(...parameters) as {
+      date: string
+      currency: TransactionTotals['currency']
+      expenseMinor: bigint
+      incomeMinor: bigint
+      count: bigint
+    }[]
+    const totals = new Map<TransactionTotals['currency'], TransactionTotals>()
+    const days: TransactionPage['days'] = []
+    let totalCount = 0
+    const safe = (value: bigint): number => {
+      const number = Number(value)
+      if (!Number.isSafeInteger(number))
+        throw new Error('transactions.error.totals')
+      return number
+    }
+    for (const row of aggregates) {
+      const dayTotal = {
+        currency: row.currency,
+        expenseMinor: safe(row.expenseMinor),
+        incomeMinor: safe(row.incomeMinor),
+      }
+      if (days.at(-1)?.date !== row.date)
+        days.push({ date: row.date, totals: [] })
+      days.at(-1)!.totals.push(dayTotal)
+      const total = totals.get(row.currency) ?? {
+        currency: row.currency,
+        expenseMinor: 0,
+        incomeMinor: 0,
+      }
+      total.expenseMinor = safe(BigInt(total.expenseMinor) + row.expenseMinor)
+      total.incomeMinor = safe(BigInt(total.incomeMinor) + row.incomeMinor)
+      totals.set(row.currency, total)
+      totalCount += safe(row.count)
+    }
+    return {
+      rows,
+      totalCount,
+      totals: [...totals.values()].sort((a, b) =>
+        a.currency.localeCompare(b.currency),
+      ),
+      days,
+    }
+  })()
 }

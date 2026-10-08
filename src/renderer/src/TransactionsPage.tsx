@@ -6,12 +6,16 @@ import type {
   Payee,
   Transaction,
   TransactionKind,
+  TransactionPage,
+  TransactionListInput,
+  TransactionPeriod,
 } from '../../shared/transactions'
 import { Button } from './components/ui/button'
 import { CardContent } from './components/ui/card'
 import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
-import { createFormatters, type Language, type MessageKey } from './i18n'
+import { type Language, type MessageKey } from './i18n'
+import { TransactionTable, Totals } from './components/transaction-table'
 
 const errorKeys = [
   'transactions.error.account',
@@ -24,6 +28,8 @@ const errorKeys = [
   'transactions.error.note',
   'transactions.error.notFound',
   'transactions.error.lines',
+  'transactions.error.filters',
+  'transactions.error.totals',
 ] as const satisfies readonly MessageKey[]
 
 function today(): string {
@@ -84,7 +90,27 @@ function emptyForm(accountId = ''): FormState {
 }
 
 export function TransactionsPage({ language, t }: TransactionsPageProps) {
-  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [page, setPage] = useState<TransactionPage>({
+    rows: [],
+    totals: [],
+    days: [],
+    totalCount: 0,
+  })
+  const [request, setRequest] = useState<TransactionListInput>({
+    period: 'thisMonth',
+    limit: 200,
+    offset: 0,
+  })
+  const [filters, setFilters] = useState({
+    period: 'thisMonth' as TransactionPeriod,
+    from: '',
+    to: '',
+    accountId: '',
+    categoryId: '',
+    payeeId: '',
+    search: '',
+  })
+  const [revision, setRevision] = useState(0)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [payees, setPayees] = useState<Payee[]>([])
@@ -93,27 +119,30 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
   const [error, setError] = useState<MessageKey | null>(null)
   const [form, setForm] = useState<FormState | null>(null)
   const [deleting, setDeleting] = useState<Transaction | null>(null)
-  const format = createFormatters(language)
-
-  async function load() {
-    const [nextTransactions, nextAccounts, nextCategories, nextPayees] =
-      await Promise.all([
-        window.app.transactions.list(),
-        window.app.accounts.list(),
-        window.app.categories.list(),
-        window.app.payees.list(),
-      ])
-    setTransactions(nextTransactions)
-    setAccounts(nextAccounts)
-    setCategories(nextCategories)
-    setPayees(nextPayees)
-  }
 
   useEffect(() => {
     let ignore = false
-    void load()
-      .catch(() => {
-        if (!ignore) setError('transactions.error')
+    setLoading(true)
+    setError(null)
+    void Promise.all([
+      window.app.transactions.list(request),
+      window.app.accounts.list(),
+      window.app.categories.list(),
+      window.app.payees.list(),
+    ])
+      .then(([nextPage, nextAccounts, nextCategories, nextPayees]) => {
+        if (ignore) return
+        setPage(nextPage)
+        setAccounts(nextAccounts)
+        setCategories(nextCategories)
+        setPayees(nextPayees)
+      })
+      .catch((error: unknown) => {
+        if (!ignore)
+          setError(
+            errorKeys.find((key) => String(error).includes(key)) ??
+              'transactions.error',
+          )
       })
       .finally(() => {
         if (!ignore) setLoading(false)
@@ -121,14 +150,31 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
     return () => {
       ignore = true
     }
-  }, [])
+  }, [request, revision, language])
+
+  function applyFilters(event: FormEvent) {
+    event.preventDefault()
+    setRequest({
+      period: filters.period,
+      ...(filters.period === 'custom'
+        ? { from: filters.from, to: filters.to }
+        : {}),
+      accountId: filters.accountId || undefined,
+      categoryId: filters.categoryId || undefined,
+      payeeId: filters.payeeId || undefined,
+      search: filters.search,
+      limit: 200,
+      offset: 0,
+    })
+  }
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true)
     setError(null)
     try {
       await action()
-      await load()
+      setRequest((current) => ({ ...current, offset: 0 }))
+      setRevision((current) => current + 1)
       setForm(null)
       setDeleting(null)
     } catch (error) {
@@ -198,107 +244,228 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
           </Button>
         </div>
       )}
+
+      <form
+        onSubmit={applyFilters}
+        className="grid gap-3 rounded-md border p-3 sm:grid-cols-3 lg:grid-cols-6"
+        aria-label={t('transactions.filters')}
+      >
+        <label className="space-y-1 text-xs font-medium">
+          {t('transactions.period')}
+          <NativeSelect
+            value={filters.period}
+            onChange={(event) =>
+              setFilters({
+                ...filters,
+                period: event.target.value as TransactionPeriod,
+              })
+            }
+          >
+            {(
+              ['all', 'thisMonth', 'lastMonth', 'thisYear', 'custom'] as const
+            ).map((period) => (
+              <option key={period} value={period}>
+                {t(`transactions.period.${period}`)}
+              </option>
+            ))}
+          </NativeSelect>
+        </label>
+        {filters.period === 'custom' && (
+          <>
+            <label className="space-y-1 text-xs font-medium">
+              {t('transactions.from')}
+              <Input
+                type="date"
+                value={filters.from}
+                required
+                onChange={(event) =>
+                  setFilters({ ...filters, from: event.target.value })
+                }
+              />
+            </label>
+            <label className="space-y-1 text-xs font-medium">
+              {t('transactions.to')}
+              <Input
+                type="date"
+                value={filters.to}
+                min={filters.from || undefined}
+                required
+                onChange={(event) =>
+                  setFilters({ ...filters, to: event.target.value })
+                }
+              />
+            </label>
+          </>
+        )}
+        <label className="space-y-1 text-xs font-medium">
+          {t('transactions.account')}
+          <NativeSelect
+            value={filters.accountId}
+            onChange={(event) =>
+              setFilters({ ...filters, accountId: event.target.value })
+            }
+          >
+            <option value="">{t('transactions.allAccounts')}</option>
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.name} ({account.currency})
+              </option>
+            ))}
+          </NativeSelect>
+        </label>
+        <label className="space-y-1 text-xs font-medium">
+          {t('transactions.category')}
+          <NativeSelect
+            value={filters.categoryId}
+            onChange={(event) =>
+              setFilters({ ...filters, categoryId: event.target.value })
+            }
+          >
+            <option value="">{t('transactions.allCategories')}</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.parentId ? '— ' : ''}
+                {category.name}
+              </option>
+            ))}
+          </NativeSelect>
+        </label>
+        <label className="space-y-1 text-xs font-medium">
+          {t('transactions.payee')}
+          <NativeSelect
+            value={filters.payeeId}
+            onChange={(event) =>
+              setFilters({ ...filters, payeeId: event.target.value })
+            }
+          >
+            <option value="">{t('transactions.allPayees')}</option>
+            {payees.map((payee) => (
+              <option key={payee.id} value={payee.id}>
+                {payee.name}
+              </option>
+            ))}
+          </NativeSelect>
+        </label>
+        <label className="space-y-1 text-xs font-medium">
+          {t('transactions.search')}
+          <Input
+            value={filters.search}
+            maxLength={1000}
+            onChange={(event) =>
+              setFilters({ ...filters, search: event.target.value })
+            }
+          />
+        </label>
+        <Button type="submit" disabled={busy || loading} className="self-end">
+          {t('transactions.applyFilters')}
+        </Button>
+      </form>
       {loading ? (
         <p role="status" className="text-sm text-muted-foreground">
           {t('transactions.loading')}
         </p>
-      ) : transactions.length === 0 ? (
-        <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
-          {t('transactions.empty')}
-        </p>
       ) : (
-        <ul className="space-y-3" aria-label={t('navigation.transactions')}>
-          {transactions.map((transaction) => {
-            const account = accounts.find(
-              (candidate) => candidate.id === transaction.accountId,
-            )
-            const category = categories.find(
-              (candidate) => candidate.id === transaction.line.categoryId,
-            )
-            return (
-              <li key={transaction.id} className="rounded-lg border p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 space-y-1">
-                    <p className="font-medium">
-                      {transaction.payeeName ?? t('transactions.noPayee')}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {format.date(new Date(`${transaction.date}T00:00:00`))}
-                      {' · '}
-                      {account?.name ?? t('transactions.unknownAccount')}
-                      {' · '}
-                      {category?.name ?? t('transactions.noCategory')}
-                    </p>
-                    {transaction.note && (
-                      <p className="break-words text-sm">{transaction.note}</p>
-                    )}
-                  </div>
-                  <p className="font-semibold tabular-nums">
-                    {transaction.kind === 'expense' ? '−' : '+'}
-                    {account
-                      ? format.money(transaction.totalMinor, account.currency)
-                      : amountInput(transaction.totalMinor)}
-                  </p>
-                </div>
-                <div className="mt-3 flex gap-2">
-                  <Button
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() =>
-                      setForm({
-                        id: transaction.id,
-                        kind: transaction.kind,
-                        date: transaction.date,
-                        accountId: transaction.accountId,
-                        amount: amountInput(transaction.totalMinor),
-                        payeeName: transaction.payeeName ?? '',
-                        categoryId: transaction.line.categoryId ?? '',
-                        note: transaction.note,
-                      })
-                    }
-                  >
-                    {t('transactions.edit')}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() => setDeleting(transaction)}
-                  >
-                    {t('transactions.delete')}
-                  </Button>
-                </div>
-                {deleting?.id === transaction.id && (
-                  <div className="mt-3 space-y-3 rounded-lg bg-muted p-4">
-                    <p className="text-sm">
-                      {t('transactions.deleteConfirmation')}
-                    </p>
-                    <div className="flex gap-2">
-                      <Button
-                        disabled={busy}
-                        onClick={() =>
-                          void run(() =>
-                            window.app.transactions.delete({
-                              id: transaction.id,
-                            }),
-                          )
-                        }
-                      >
-                        {t('transactions.confirmDelete')}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        disabled={busy}
-                        onClick={() => setDeleting(null)}
-                      >
-                        {t('transactions.cancel')}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </li>
-            )
-          })}
-        </ul>
+        !error && (
+          <>
+            <div
+              role="status"
+              className="flex flex-wrap items-center justify-between gap-3 text-sm"
+            >
+              <span>
+                {t('transactions.filteredTotals')} · {page.totalCount}{' '}
+                {t('transactions.matches')}
+              </span>
+              <Totals totals={page.totals} language={language} t={t} />
+            </div>
+            {page.rows.length === 0 ? (
+              <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
+                {t('transactions.noMatches')}
+              </p>
+            ) : (
+              <TransactionTable
+                key={`${JSON.stringify(request)}-${revision}`}
+                page={page}
+                accounts={accounts}
+                categories={categories}
+                language={language}
+                t={t}
+                busy={busy}
+                onEdit={(transaction) =>
+                  setForm({
+                    id: transaction.id,
+                    kind: transaction.kind,
+                    date: transaction.date,
+                    accountId: transaction.accountId,
+                    amount: amountInput(transaction.totalMinor),
+                    payeeName: transaction.payeeName ?? '',
+                    categoryId: transaction.line.categoryId ?? '',
+                    note: transaction.note,
+                  })
+                }
+                onDelete={setDeleting}
+              />
+            )}
+            <div className="flex items-center justify-end gap-3 text-sm">
+              <Button
+                variant="ghost"
+                disabled={busy || !request.offset}
+                onClick={() => {
+                  setDeleting(null)
+                  setRequest({
+                    ...request,
+                    offset: Math.max(0, (request.offset ?? 0) - 200),
+                  })
+                }}
+              >
+                {t('transactions.previousPage')}
+              </Button>
+              <span>
+                {page.totalCount ? (request.offset ?? 0) + 1 : 0}–
+                {Math.min((request.offset ?? 0) + 200, page.totalCount)} /{' '}
+                {page.totalCount}
+              </span>
+              <Button
+                variant="ghost"
+                disabled={
+                  busy || (request.offset ?? 0) + 200 >= page.totalCount
+                }
+                onClick={() => {
+                  setDeleting(null)
+                  setRequest({
+                    ...request,
+                    offset: (request.offset ?? 0) + 200,
+                  })
+                }}
+              >
+                {t('transactions.nextPage')}
+              </Button>
+            </div>
+          </>
+        )
+      )}
+      {deleting && (
+        <section role="alert" className="space-y-3 rounded-lg bg-muted p-4">
+          <p className="text-sm">{t('transactions.deleteConfirmation')}</p>
+          <div className="flex gap-2">
+            <Button
+              disabled={busy || loading}
+              onClick={() =>
+                void run(() =>
+                  window.app.transactions.delete({ id: deleting.id }),
+                )
+              }
+            >
+              {t('transactions.confirmDelete')}
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() => setDeleting(null)}
+            >
+              {t('transactions.cancel')}
+            </Button>
+          </div>
+        </section>
       )}
 
       {form && (
