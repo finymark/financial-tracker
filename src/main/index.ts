@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { openDatabase, pingDatabase } from './db'
 import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 import { ProfileController } from './profiles/profile-controller'
+import { registerAccountIpc } from './profiles/account-ipc'
 import { registerProfileIpc } from './profiles/profile-ipc'
 import { ProfileRegistry } from './profiles/profile-registry'
 
@@ -47,10 +48,20 @@ void app.whenReady().then(() => {
     (): Awaited<ReturnType<AppBridge['dbPing']>> => pingDatabase(database),
   )
   registerProfileIpc(ipcMain, profiles)
+  registerAccountIpc(ipcMain, profiles)
 
-  app.on('will-quit', () => {
-    profiles.close()
-    database.close()
+  let shutdownStarted = false
+  let shutdownComplete = false
+  app.on('before-quit', (event) => {
+    if (shutdownComplete) return
+    event.preventDefault()
+    if (shutdownStarted) return
+    shutdownStarted = true
+    void profiles.shutdown().then(() => {
+      database.close()
+      shutdownComplete = true
+      app.quit()
+    })
   })
   createWindow()
 })

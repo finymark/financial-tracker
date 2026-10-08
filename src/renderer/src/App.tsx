@@ -13,6 +13,8 @@ import type {
   ActiveProfileInfo,
   ProfileRegistrySnapshot,
 } from '../../shared/profiles'
+import { BackupSettings } from './components/backup-settings'
+import { AccountsPage } from './AccountsPage'
 import { Button } from './components/ui/button'
 import {
   Card,
@@ -321,14 +323,22 @@ interface ShellProps {
   t: Translate
   onSettingsChange(changes: ProfileSettingsChanges): Promise<void>
   onSwitchProfile(): void
+  onRestored(profile: ActiveProfileInfo): void
 }
 
-function Shell({ active, t, onSettingsChange, onSwitchProfile }: ShellProps) {
+function Shell({
+  active,
+  t,
+  onSettingsChange,
+  onSwitchProfile,
+  onRestored,
+}: ShellProps) {
   const [page, setPage] = useState<Page>('overview')
   const [collapsed, setCollapsed] = useState(false)
   const { language, theme, baseCurrency } = active.settings
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsError, setSettingsError] = useState(false)
+  const [backupBusy, setBackupBusy] = useState(false)
   const format = createFormatters(language)
 
   async function saveSettings(changes: ProfileSettingsChanges) {
@@ -394,6 +404,7 @@ function Shell({ active, t, onSettingsChange, onSwitchProfile }: ShellProps) {
               aria-label={t(`navigation.${id}`)}
               aria-current={page === id ? 'page' : undefined}
               title={collapsed ? t(`navigation.${id}`) : undefined}
+              disabled={backupBusy}
               onClick={() => setPage(id)}
             >
               <Icon aria-hidden="true" />
@@ -412,6 +423,7 @@ function Shell({ active, t, onSettingsChange, onSwitchProfile }: ShellProps) {
           title={
             collapsed ? `${active.name} — ${t('profile.switch')}` : undefined
           }
+          disabled={backupBusy}
           onClick={onSwitchProfile}
         >
           <UsersRound className="size-5 shrink-0" aria-hidden="true" />
@@ -447,6 +459,9 @@ function Shell({ active, t, onSettingsChange, onSwitchProfile }: ShellProps) {
               <CardTitle>{t(`${page}.title`)}</CardTitle>
               <CardDescription>{t(`${page}.description`)}</CardDescription>
             </CardHeader>
+            {page === 'accounts' && (
+              <AccountsPage key={active.id} language={language} t={t} />
+            )}
             {page === 'settings' && (
               <CardContent className="space-y-6">
                 <div className="grid gap-6 sm:grid-cols-2">
@@ -457,7 +472,7 @@ function Shell({ active, t, onSettingsChange, onSwitchProfile }: ShellProps) {
                     <NativeSelect
                       id="language"
                       value={language}
-                      disabled={savingSettings}
+                      disabled={savingSettings || backupBusy}
                       onChange={(event) => {
                         const value = languages.find(
                           (item) => item === event.target.value,
@@ -479,7 +494,7 @@ function Shell({ active, t, onSettingsChange, onSwitchProfile }: ShellProps) {
                     <NativeSelect
                       id="theme"
                       value={theme}
-                      disabled={savingSettings}
+                      disabled={savingSettings || backupBusy}
                       onChange={(event) => {
                         const value = themeModes.find(
                           (item) => item === event.target.value,
@@ -504,7 +519,7 @@ function Shell({ active, t, onSettingsChange, onSwitchProfile }: ShellProps) {
                     <NativeSelect
                       id="base-currency"
                       value={baseCurrency}
-                      disabled={savingSettings}
+                      disabled={savingSettings || backupBusy}
                       onChange={(event) => {
                         const value = baseCurrencies.find(
                           (item) => item === event.target.value,
@@ -557,6 +572,16 @@ function Shell({ active, t, onSettingsChange, onSwitchProfile }: ShellProps) {
               </CardContent>
             )}
           </Card>
+          {page === 'settings' && (
+            <BackupSettings
+              key={active.id}
+              language={language}
+              t={t}
+              onRestored={onRestored}
+              onBusyChange={setBackupBusy}
+              disabled={savingSettings}
+            />
+          )}
         </div>
       </main>
     </div>
@@ -626,6 +651,7 @@ export default function App() {
           current?.id === active.id ? { ...current, settings: saved } : current,
         )
       }}
+      onRestored={setActive}
       onSwitchProfile={() => setShowPicker(true)}
     />
   )

@@ -25,6 +25,7 @@ export interface ProfilePaths {
   profileDirectory: string
   databasePath: string
   dataDirectory: string
+  backupDirectory: string
   preMigrationBackupDirectory: string
 }
 
@@ -204,6 +205,7 @@ export class ProfileRegistry {
       profileDirectory,
       databasePath: join(profileDirectory, 'profile.sqlite'),
       dataDirectory: join(profileDirectory, 'data'),
+      backupDirectory: join(profileDirectory, 'backups'),
       preMigrationBackupDirectory: join(
         profileDirectory,
         'backups',

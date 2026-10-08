@@ -1,7 +1,16 @@
 import type {
+  Account,
+  AccountIdInput,
+  CreateAccountInput,
+  RenameAccountInput,
+  ChangeAccountCurrencyInput,
+} from './accounts'
+import type {
   CreateProfileInput,
   DeleteProfileInput,
+  ProfileBackup,
   ProfileIdInput,
+  RestoreBackupInput,
   ActiveProfileInfo,
   UpdateProfileSettingsInput,
   ProfileRegistrySnapshot,
@@ -20,6 +29,15 @@ export const IPC_CHANNELS = {
   profilesOpen: 'profiles:open',
   profilesGetActive: 'profiles:get-active',
   profilesClose: 'profiles:close',
+  backupsList: 'backups:list',
+  backupsRestore: 'backups:restore',
+  accountsList: 'accounts:list',
+  accountsListOptions: 'accounts:list-options',
+  accountsCreate: 'accounts:create',
+  accountsRename: 'accounts:rename',
+  accountsChangeCurrency: 'accounts:change-currency',
+  accountsArchive: 'accounts:archive',
+  accountsDelete: 'accounts:delete',
   profilesUpdateSettings: 'profiles:update-settings',
 } as const
 
@@ -28,6 +46,19 @@ export type DatabasePing = 'ok'
 export interface AppBridge {
   getVersion(): Promise<string>
   dbPing(): Promise<DatabasePing>
+  backups: {
+    list(): Promise<ProfileBackup[]>
+    restore(input: RestoreBackupInput): Promise<ActiveProfileInfo>
+  }
+  accounts: {
+    list(): Promise<Account[]>
+    listOptions(): Promise<Account[]>
+    create(input: CreateAccountInput): Promise<Account>
+    rename(input: RenameAccountInput): Promise<Account>
+    changeCurrency(input: ChangeAccountCurrencyInput): Promise<Account>
+    archive(input: AccountIdInput): Promise<void>
+    delete(input: AccountIdInput): Promise<void>
+  }
   profiles: {
     list(): Promise<ProfileRegistrySnapshot>
     create(input: CreateProfileInput): Promise<ProfileSummary>
