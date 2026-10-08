@@ -33,6 +33,10 @@ import {
   type DrawerForm,
 } from './components/transactions/transaction-form'
 import { useTransactionReferenceData } from './components/transactions/use-transaction-reference-data'
+import {
+  recurringPrefillFromTransaction,
+  type RecurringPrefill,
+} from './lib/recurring-prefill'
 interface TransactionsPageProps {
   language: Language
   baseCurrency: Currency
@@ -41,6 +45,7 @@ interface TransactionsPageProps {
   newTransactionRequested: boolean
   onNewTransactionHandled(): void
   onTransactionChanged(): void
+  onCreateRecurring(prefill: RecurringPrefill): void
   initialReportFilter: TransactionListInput | null
 }
 
@@ -52,6 +57,7 @@ export function TransactionsPage({
   newTransactionRequested,
   onNewTransactionHandled,
   onTransactionChanged,
+  onCreateRecurring,
   initialReportFilter,
 }: TransactionsPageProps) {
   const [reportFilterActive, setReportFilterActive] = useState(
@@ -547,6 +553,10 @@ export function TransactionsPage({
                     true,
                   )
                 }
+                onCreateRecurring={(transaction) => {
+                  const prefill = recurringPrefillFromTransaction(transaction)
+                  if (prefill) onCreateRecurring(prefill)
+                }}
                 onDelete={setDeleting}
               />
             )}
@@ -658,6 +668,7 @@ export function TransactionsPage({
           run={run}
           onClose={() => setForm(null)}
           onRuleOffer={setRuleOffer}
+          onCreateRecurring={onCreateRecurring}
           createRef={createRef}
         />
       )}

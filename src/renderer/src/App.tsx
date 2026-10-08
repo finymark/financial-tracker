@@ -52,6 +52,7 @@ import { ReportsPage } from './ReportsPage'
 import { OverviewPage } from './OverviewPage'
 import type { TransactionListInput } from '../../shared/transactions'
 import { RecurringPage } from './RecurringPage'
+import type { RecurringPrefill } from './lib/recurring-prefill'
 
 const pages = [
   { id: 'overview', icon: LayoutDashboard },
@@ -377,6 +378,9 @@ function Shell({
   const [reportTransactionFilter, setReportTransactionFilter] =
     useState<TransactionListInput | null>(null)
   const [newTransactionRequested, setNewTransactionRequested] = useState(false)
+  const [recurringPrefill, setRecurringPrefill] =
+    useState<RecurringPrefill | null>(null)
+  const [duePendingCount, setDuePendingCount] = useState(0)
   const [showShortcutHelp, setShowShortcutHelp] = useState(false)
   const transactionRequestHandled = useCallback(
     () => setNewTransactionRequested(false),
@@ -439,6 +443,26 @@ function Shell({
     }
     load()
     const unsubscribe = window.app.rates.onStatusChanged(load)
+    return () => {
+      ignore = true
+      unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    let ignore = false
+    const load = () => {
+      void window.app.recurring
+        .dueCount()
+        .then((count) => {
+          if (!ignore) setDuePendingCount(count)
+        })
+        .catch(() => {
+          if (!ignore) setDuePendingCount(0)
+        })
+    }
+    load()
+    const unsubscribe = window.app.recurring.onPendingChanged(load)
     return () => {
       ignore = true
       unsubscribe()
@@ -619,7 +643,7 @@ function Shell({
               variant="ghost"
               size={collapsed ? 'icon' : 'default'}
               className={cn(
-                'w-full',
+                'relative w-full',
                 !collapsed && 'justify-start',
                 page === id && 'bg-accent text-accent-foreground',
               )}
@@ -640,6 +664,18 @@ function Shell({
             >
               <Icon aria-hidden="true" />
               {!collapsed && t(`navigation.${id}`)}
+              {id === 'recurring' && duePendingCount > 0 && (
+                <span
+                  className={cn(
+                    'rounded-full bg-error px-2 py-0.5 text-xs text-white',
+                    !collapsed && 'ml-auto',
+                    collapsed && 'absolute -top-1 -right-1',
+                  )}
+                  aria-label={`${t('pending.dueCount')}: ${duePendingCount}`}
+                >
+                  {duePendingCount}
+                </span>
+              )}
             </Button>
           ))}
         </nav>
@@ -770,6 +806,10 @@ function Shell({
                   setUndoError(false)
                   setUndoOffered(true)
                 }}
+                onCreateRecurring={(prefill) => {
+                  setRecurringPrefill(prefill)
+                  setPage('recurring')
+                }}
                 initialReportFilter={reportTransactionFilter}
               />
             )}
@@ -795,6 +835,8 @@ function Shell({
                   setUndoError(false)
                   setUndoOffered(true)
                 }}
+                initialPrefill={recurringPrefill}
+                onPrefillHandled={() => setRecurringPrefill(null)}
               />
             )}
             {page === 'reports' && (

@@ -1,5 +1,6 @@
 import type {
   CreateRecurringTransactionInput,
+  ConfirmPendingTransactionInput,
   RecurringSchedule,
 } from '../../shared/recurring'
 import { UUID_PATTERN } from '../../shared/validation'
@@ -13,6 +14,20 @@ import {
   validateTransactionPayeeName,
   validateTransactionTotal,
 } from './transaction-validation'
+
+export function confirmPendingFields(
+  input: Record<string, unknown>,
+): ConfirmPendingTransactionInput {
+  return {
+    id: validateRecurringId(input.id),
+    ...(input.amountMinor === undefined
+      ? {}
+      : { amountMinor: validateTransactionTotal(input.amountMinor) }),
+    ...(input.date === undefined
+      ? {}
+      : { date: validateTransactionDateShape(input.date) }),
+  }
+}
 
 export function validateRecurringId(value: unknown): string {
   if (typeof value !== 'string' || !UUID_PATTERN.test(value))

@@ -24,7 +24,7 @@ async function setup(initial = '2026-01-15T10:00:00.000Z') {
   applications.push(application)
   const account = application.commands.createAccount({
     name: 'Cash',
-    currency: 'CHF',
+    currency: 'HUF',
     openingBalance: 0,
     openingDate: '2025-01-01',
   })
@@ -265,6 +265,178 @@ test('pending snapshots do not affect balances, transaction list totals, or expe
   expect(
     context.application.queries.getCategoryBreakdown({ period: 'thisMonth' }),
   ).toMatchObject({ total: { roundedMinor: 0 }, categories: [] })
+})
+
+test('confirm creates the exact snapshotted transaction and undo restores the pending occurrence', async () => {
+  const context = await setup()
+  context.application.commands.createRecurringTransaction({
+    ...context.input,
+    schedule: { type: 'monthly', day: 15, intervalMonths: 1 },
+  })
+  context.application.commands.generateRecurringTransactions()
+  const pending = context.application.queries.listPendingTransactions()[0]
+
+  const confirmed = context.application.commands.confirmPendingTransaction({
+    id: pending.id,
+  })
+
+  expect(confirmed).toMatchObject({
+    accountId: context.account.id,
+    kind: 'expense',
+    date: '2026-01-15',
+    totalMinor: 12_345,
+    payeeName: 'Power company',
+    note: 'Estimated amount',
+    excluded: false,
+    lines: [
+      {
+        amountMinor: 12_345,
+        categoryId: context.category.id,
+        note: 'Estimated amount',
+        tags: [context.tag],
+      },
+    ],
+  })
+  expect(context.application.queries.listPendingTransactions()).toEqual([])
+  expect(
+    context.application.queries.getAccountBalance(context.account.id),
+  ).toBe(-12_345)
+  expect(
+    context.application.queries.getCategoryBreakdown({ period: 'thisMonth' }),
+  ).toMatchObject({ total: { roundedMinor: 12_345 } })
+
+  expect(context.application.commands.undoLast()).toBe(true)
+  expect(context.application.queries.listTransactions().totalCount).toBe(0)
+  expect(context.application.queries.listPendingTransactions()).toEqual([
+    pending,
+  ])
+  expect(
+    context.application.queries.getAccountBalance(context.account.id),
+  ).toBe(0)
+})
+
+test('confirm accepts a changed amount and past date, rejects future and duplicate confirmation, and resolves payee aliases', async () => {
+  const context = await setup()
+  const aliasSource = context.application.commands.createTransaction({
+    accountId: context.account.id,
+    kind: 'income',
+    date: '2026-01-01',
+    totalMinor: 1,
+    payeeName: 'Canonical company',
+    categoryId: null,
+    note: '',
+  })
+  context.application.commands.addPayeeAlias({
+    payeeId: aliasSource.payeeId!,
+    name: 'Power company',
+  })
+  context.application.commands.createRecurringTransaction({
+    ...context.input,
+    schedule: { type: 'monthly', day: 15, intervalMonths: 1 },
+  })
+  context.application.commands.generateRecurringTransactions()
+  const pending = context.application.queries.listPendingTransactions()[0]
+
+  expect(() =>
+    context.application.commands.confirmPendingTransaction({
+      id: pending.id,
+      amountMinor: 54_321,
+      date: '2026-01-16',
+    }),
+  ).toThrow('transactions.error.futureDate')
+  expect(context.application.queries.listPendingTransactions()).toEqual([
+    pending,
+  ])
+
+  const confirmed = context.application.commands.confirmPendingTransaction({
+    id: pending.id,
+    amountMinor: 54_321,
+    date: '2026-01-14',
+  })
+  expect(confirmed).toMatchObject({
+    date: '2026-01-14',
+    totalMinor: 54_321,
+    payeeId: aliasSource.payeeId,
+    payeeName: 'Canonical company',
+  })
+  expect(() =>
+    context.application.commands.confirmPendingTransaction({ id: pending.id }),
+  ).toThrow('pending.error.notPending')
+})
+
+test('skip and undo update the due counter, and consumed occurrences never regenerate across reopen', async () => {
+  const context = await setup()
+  context.application.commands.createRecurringTransaction({
+    ...context.input,
+    schedule: { type: 'monthly', day: 15, intervalMonths: 1 },
+  })
+  context.application.commands.generateRecurringTransactions()
+  const pending = context.application.queries.listPendingTransactions()[0]
+  expect(context.application.queries.getDuePendingTransactionCount()).toBe(1)
+
+  context.application.commands.skipPendingTransaction(pending.id)
+  expect(context.application.queries.listPendingTransactions()).toEqual([])
+  expect(context.application.queries.getDuePendingTransactionCount()).toBe(0)
+  expect(context.application.commands.undoLast()).toBe(true)
+  expect(context.application.queries.listPendingTransactions()).toEqual([
+    pending,
+  ])
+  expect(context.application.queries.getDuePendingTransactionCount()).toBe(1)
+
+  context.application.commands.skipPendingTransaction(pending.id)
+  context.application.close()
+  const reopened = await openProfileApplication({
+    profile: context.profile,
+    paths: context.paths,
+    clock: context.clock,
+  })
+  applications.push(reopened)
+  reopened.commands.generateRecurringTransactions()
+  expect(reopened.queries.listPendingTransactions()).toEqual([])
+  expect(reopened.queries.getDuePendingTransactionCount()).toBe(0)
+})
+
+test('confirm rejects an archived snapshot account without consuming the occurrence', async () => {
+  const context = await setup()
+  context.application.commands.createRecurringTransaction({
+    ...context.input,
+    schedule: { type: 'monthly', day: 15, intervalMonths: 1 },
+  })
+  context.application.commands.generateRecurringTransactions()
+  const pending = context.application.queries.listPendingTransactions()[0]
+  context.application.commands.archiveAccount(context.account.id)
+  expect(() =>
+    context.application.commands.confirmPendingTransaction({ id: pending.id }),
+  ).toThrow('pending.error.accountArchived')
+  expect(context.application.queries.listPendingTransactions()).toEqual([
+    pending,
+  ])
+})
+
+test('confirmed occurrences never regenerate across reopen', async () => {
+  const context = await setup()
+  context.application.commands.createRecurringTransaction({
+    ...context.input,
+    schedule: { type: 'monthly', day: 15, intervalMonths: 1 },
+  })
+  context.application.commands.generateRecurringTransactions()
+  const pending = context.application.queries.listPendingTransactions()[0]
+  const confirmed = context.application.commands.confirmPendingTransaction({
+    id: pending.id,
+  })
+  context.application.close()
+
+  const reopened = await openProfileApplication({
+    profile: context.profile,
+    paths: context.paths,
+    clock: context.clock,
+  })
+  applications.push(reopened)
+  reopened.commands.generateRecurringTransactions()
+  expect(reopened.queries.listPendingTransactions()).toEqual([])
+  expect(reopened.queries.listTransactions().rows).toEqual([
+    expect.objectContaining({ id: confirmed.id }),
+  ])
 })
 
 test('account deletion is guarded while category and tag deletion null/remove references with undo', async () => {

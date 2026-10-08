@@ -1,21 +1,32 @@
 import type Database from 'better-sqlite3'
 import type {
   CreateRecurringTransactionInput,
+  ConfirmPendingTransactionInput,
   PendingTransaction,
   RecurringTransaction,
   UpdateRecurringTransactionInput,
 } from '../../shared/recurring'
+import type { Transaction } from '../../shared/transactions'
 import type { UndoableCommand } from './undo-history'
 import {
+  confirmPendingTransaction,
   createRecurringTransaction,
   deleteRecurringTransaction,
+  getPendingTransaction,
   listPendingTransactions,
   listRecurringTransactions,
   setRecurringPaused,
+  skipPendingTransaction,
   storePendingTransaction,
   storeRecurringTransaction,
   updateRecurringTransaction,
 } from './profile-recurring'
+import {
+  captureTransactionAggregate,
+  restoreTransactionAggregate,
+  type TransactionAggregateImage,
+} from './transaction-undo'
+import { findPayeeByName } from './profile-payees'
 
 interface RecurringImage {
   recurring: RecurringTransaction | null
@@ -115,3 +126,72 @@ export const deleteRecurringUndoableCommand = (
     () => deleteRecurringTransaction(database, id),
     () => id,
   )
+
+interface PendingDecisionImage {
+  pending: PendingTransaction
+  transaction: TransactionAggregateImage
+}
+
+function restorePendingState(
+  database: Database.Database,
+  pending: PendingTransaction,
+): void {
+  database
+    .prepare(
+      `UPDATE pending_transactions SET status = ?, confirmed_transaction_id = ?
+       WHERE id = ?`,
+    )
+    .run(pending.status, pending.confirmedTransactionId, pending.id)
+}
+
+export function confirmPendingUndoableCommand(
+  database: Database.Database,
+  input: ConfirmPendingTransactionInput,
+  clock: () => Date,
+): UndoableCommand<PendingDecisionImage, PendingDecisionImage, Transaction> {
+  return {
+    captureBefore: () => {
+      const pending = getPendingTransaction(database, input.id)
+      const payee = findPayeeByName(database, pending.payeeName)
+      return {
+        pending,
+        transaction: captureTransactionAggregate(
+          database,
+          null,
+          [payee?.id ?? null],
+          pending.tagIds,
+        ),
+      }
+    },
+    execute: () => confirmPendingTransaction(database, input, clock),
+    captureAfter: (transaction, before) => ({
+      pending: getPendingTransaction(database, input.id),
+      transaction: captureTransactionAggregate(
+        database,
+        transaction.id,
+        before.transaction.payees.map((payee) => payee.id),
+        before.pending.tagIds,
+      ),
+    }),
+    restoreBefore: (before, after) => {
+      restoreTransactionAggregate(
+        database,
+        before.transaction,
+        after.transaction,
+      )
+      restorePendingState(database, before.pending)
+    },
+  }
+}
+
+export function skipPendingUndoableCommand(
+  database: Database.Database,
+  id: string,
+): UndoableCommand<PendingTransaction, PendingTransaction, void> {
+  return {
+    captureBefore: () => getPendingTransaction(database, id),
+    execute: () => skipPendingTransaction(database, id),
+    captureAfter: () => getPendingTransaction(database, id),
+    restoreBefore: (before) => restorePendingState(database, before),
+  }
+}

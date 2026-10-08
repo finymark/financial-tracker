@@ -149,10 +149,18 @@ function startApplication(): void {
     if (mainWindow && !mainWindow.isDestroyed())
       mainWindow.webContents.send(IPC_CHANNELS.ratesStatusChanged)
   }
+  const onPendingTransactionsChanged = () => {
+    if (mainWindow && !mainWindow.isDestroyed())
+      mainWindow.webContents.send(IPC_CHANNELS.pendingChanged)
+  }
   const profiles = new ProfileController(
     new ProfileRegistry({ userDataDirectory: app.getPath('userData') }),
     app.getLocale(),
-    { exchangeRateSource: rateSource, onRateStatusChanged },
+    {
+      exchangeRateSource: rateSource,
+      onRateStatusChanged,
+      onPendingTransactionsChanged,
+    },
   )
   const exchangeRates = new ExchangeRateScheduler(profiles, rateSource, {
     onStatusChanged: onRateStatusChanged,

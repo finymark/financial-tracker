@@ -2,7 +2,11 @@ import type { IpcMain } from 'electron'
 import { IPC_CHANNELS, type AppBridge } from '../../shared/ipc'
 import { inputRecord, registerIpcHandler } from '../ipc'
 import type { ProfileController } from './profile-controller'
-import { recurringFields, validateRecurringId } from './recurring-validation'
+import {
+  confirmPendingFields,
+  recurringFields,
+  validateRecurringId,
+} from './recurring-validation'
 
 export function registerRecurringIpc(
   ipcMain: IpcMain,
@@ -13,6 +17,35 @@ export function registerRecurringIpc(
     IPC_CHANNELS.recurringList,
     (): Awaited<ReturnType<AppBridge['recurring']['list']>> =>
       controller.getActiveApplication().queries.listRecurringTransactions(),
+  )
+  registerIpcHandler(
+    ipcMain,
+    IPC_CHANNELS.pendingList,
+    (): Awaited<ReturnType<AppBridge['recurring']['pending']>> =>
+      controller.getActiveApplication().queries.listPendingTransactions(),
+  )
+  registerIpcHandler(
+    ipcMain,
+    IPC_CHANNELS.pendingDueCount,
+    (): Awaited<ReturnType<AppBridge['recurring']['dueCount']>> =>
+      controller.getActiveApplication().queries.getDuePendingTransactionCount(),
+  )
+  registerIpcHandler(
+    ipcMain,
+    IPC_CHANNELS.pendingConfirm,
+    (_event, value): Awaited<ReturnType<AppBridge['recurring']['confirm']>> =>
+      controller
+        .getActiveApplication()
+        .commands.confirmPendingTransaction(
+          confirmPendingFields(inputRecord(value)),
+        ),
+  )
+  registerIpcHandler(ipcMain, IPC_CHANNELS.pendingSkip, (_event, value): void =>
+    controller
+      .getActiveApplication()
+      .commands.skipPendingTransaction(
+        validateRecurringId(inputRecord(value).id),
+      ),
   )
   registerIpcHandler(
     ipcMain,

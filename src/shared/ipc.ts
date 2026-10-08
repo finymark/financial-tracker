@@ -89,6 +89,8 @@ import type {
 } from './reports'
 import type {
   CreateRecurringTransactionInput,
+  ConfirmPendingTransactionInput,
+  PendingTransaction,
   RecurringTransaction,
   RecurringTransactionIdInput,
   UpdateRecurringTransactionInput,
@@ -175,6 +177,11 @@ export const IPC_CHANNELS = {
   recurringPause: 'recurring:pause',
   recurringResume: 'recurring:resume',
   recurringDelete: 'recurring:delete',
+  pendingList: 'pending:list',
+  pendingDueCount: 'pending:due-count',
+  pendingConfirm: 'pending:confirm',
+  pendingSkip: 'pending:skip',
+  pendingChanged: 'pending:changed',
 } as const
 
 export interface AppBridge {
@@ -195,6 +202,11 @@ export interface AppBridge {
     pause(input: RecurringTransactionIdInput): Promise<void>
     resume(input: RecurringTransactionIdInput): Promise<void>
     delete(input: RecurringTransactionIdInput): Promise<void>
+    pending(): Promise<PendingTransaction[]>
+    dueCount(): Promise<number>
+    confirm(input: ConfirmPendingTransactionInput): Promise<Transaction>
+    skip(input: RecurringTransactionIdInput): Promise<void>
+    onPendingChanged(listener: () => void): () => void
   }
   reports: {
     cashFlow(input: ReportDateRangeInput): Promise<CashFlowReport>

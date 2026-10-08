@@ -163,6 +163,21 @@ export const en = {
   'navigation.accounts': 'Accounts',
   'navigation.settings': 'Settings',
   'recurring.title': 'Recurring transactions',
+  'recurring.definitions': 'Definitions',
+  'recurring.sections': 'Recurring transaction sections',
+  'recurring.fromTransaction': 'Create recurring transaction',
+  'recurring.fromTemplate': 'Create recurring from template',
+  'recurring.fromSplitHint':
+    'Split transactions cannot be used to create a recurring transaction.',
+  'pending.title': 'Pending',
+  'pending.empty': 'No pending transactions.',
+  'pending.confirm': 'Confirm',
+  'pending.editAndConfirm': 'Edit & confirm',
+  'pending.skip': 'Skip',
+  'pending.overdue': 'Overdue',
+  'pending.dueCount': 'Due pending transactions',
+  'pending.error.accountArchived':
+    'This account is archived. Edit the recurring transaction and choose an active account before confirming.',
   'recurring.description':
     'Create regular expense and income estimates. Due occurrences stay pending and do not affect your finances yet.',
   'recurring.create': 'Create recurring transaction',

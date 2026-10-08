@@ -55,7 +55,15 @@ export interface PendingTransaction {
   categoryId: string | null
   tagIds: string[]
   note: string
+  status: 'pending' | 'confirmed' | 'skipped'
+  confirmedTransactionId: string | null
   createdAt: string
+}
+
+export interface ConfirmPendingTransactionInput {
+  id: string
+  amountMinor?: number
+  date?: string
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000

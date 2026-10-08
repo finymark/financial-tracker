@@ -166,6 +166,21 @@ export const hu = {
   'navigation.accounts': 'Számlák',
   'navigation.settings': 'Beállítások',
   'recurring.title': 'Ismétlődő tranzakciók',
+  'recurring.definitions': 'Beállítások',
+  'recurring.sections': 'Ismétlődő tranzakciók szakaszai',
+  'recurring.fromTransaction': 'Ismétlődő tranzakció létrehozása',
+  'recurring.fromTemplate': 'Ismétlődő létrehozása sablonból',
+  'recurring.fromSplitHint':
+    'Felosztott tranzakcióból nem hozható létre ismétlődő tranzakció.',
+  'pending.title': 'Függőben',
+  'pending.empty': 'Nincs függőben lévő tranzakció.',
+  'pending.confirm': 'Megerősítés',
+  'pending.editAndConfirm': 'Módosítás és megerősítés',
+  'pending.skip': 'Kihagyás',
+  'pending.overdue': 'Lejárt',
+  'pending.dueCount': 'Esedékes függő tranzakciók',
+  'pending.error.accountArchived':
+    'Ez a számla archivált. Megerősítés előtt módosítsa az ismétlődő tranzakciót, és válasszon aktív számlát.',
   'recurring.description':
     'Rendszeres kiadások és bevételek becslései. Az esedékes alkalmak függőben maradnak, és még nem módosítják a pénzügyi adatokat.',
   'recurring.create': 'Ismétlődő tranzakció létrehozása',

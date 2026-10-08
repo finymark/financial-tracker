@@ -319,11 +319,19 @@ not off-device copies or backups of the separate data folder.
   transaction and due date. Occurrences before a definition's creation date are
   intentionally not generated. Pending snapshots do not affect balances,
   transaction-list totals, reports, CSV exports, or exchange-rate needs.
+- The **Pending** tab lists snapshots oldest first and marks overdue items. The
+  Recurring sidebar badge counts pending occurrences due today or earlier.
+  Confirming posts the snapshotted payee, account, category, tags, and note as a
+  normal transaction; its amount and non-future date can be adjusted first.
+  Skipping consumes only that occurrence. Confirm and skip are undoable, and an
+  archived snapshot account must be replaced on the recurring definition before
+  confirmation.
 - Editing changes only occurrences not yet created. Pausing stops generation;
   resuming starts from yesterday, so dates passed during the pause are skipped.
   Deleting removes still-pending occurrences. Create, edit, pause, resume and
-  delete are undoable. Confirming/skipping and the pending list arrive in the
-  follow-up ticket.
+  delete are undoable. An unsplit expense/income transaction or a transaction
+  template can prefill a new monthly recurring definition; the first occurrence
+  defaults to the next matching date.
 
 ### Manual recurring-transactions check
 
@@ -334,9 +342,16 @@ categories, then open **Recurring**. In HU/EN/DE, create monthly (including day
 dates, the amount calculator, nullable category/tags/payee/note, start/end dates,
 and narrow-window/light/dark layouts. Edit a definition and check its list row;
 pause and resume it; delete it; use the Undo toast after each operation. Close
-and reopen the profile and verify definitions persist. Pending occurrences are
-not shown until the follow-up ticket; verify balances, Overview, Reports,
-Transactions totals and CSV remain unchanged when a definition becomes due.
+and reopen the profile and verify definitions persist. In **Pending**, verify
+oldest-first ordering, overdue highlighting, the due sidebar badge, one-click
+confirm, calculator/date editing before confirm, skip, keyboard navigation, and
+Undo for both decisions. Confirmed amounts must appear in the account balance,
+Transactions, Overview and Reports; skipped and still-pending amounts must not.
+Archive a pending item's account and verify confirmation explains that the
+recurring definition needs an active account. Reopen the profile and verify
+confirmed/skipped occurrences do not return. From an unsplit expense/income and
+from a template, open the prefilled recurring form and verify its monthly date;
+the action on a split transaction must be disabled with an explanatory hint.
 
 ## Exchange rates and base-currency conversion
 

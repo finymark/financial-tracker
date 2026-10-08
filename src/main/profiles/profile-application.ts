@@ -186,19 +186,23 @@ import type { OverviewDashboard } from '../../shared/report-overview'
 import { getMonthlyTrend } from './profile-report-trend'
 import type {
   CreateRecurringTransactionInput,
+  ConfirmPendingTransactionInput,
   PendingTransaction,
   RecurringTransaction,
   UpdateRecurringTransactionInput,
 } from '../../shared/recurring'
 import {
   generateRecurringTransactions,
+  getDuePendingTransactionCount,
   listPendingTransactions,
   listRecurringTransactions,
 } from './profile-recurring'
 import {
   createRecurringUndoableCommand,
+  confirmPendingUndoableCommand,
   deleteRecurringUndoableCommand,
   pauseRecurringUndoableCommand,
+  skipPendingUndoableCommand,
   updateRecurringUndoableCommand,
 } from './recurring-undo'
 
@@ -254,10 +258,12 @@ export interface OpenProfileApplicationOptions {
   createStartupBackup?: boolean
   exchangeRateSource?: ExchangeRateSource
   onRateStatusChanged?: () => void
+  onPendingTransactionsChanged?: () => void
   logger?: Pick<Console, 'error'>
 }
 
 export interface ProfileQueries {
+  getDuePendingTransactionCount(): number
   listPendingTransactions(): PendingTransaction[]
   listRecurringTransactions(): RecurringTransaction[]
   getCashFlow(input: ReportDateRangeInput): CashFlowReport
@@ -293,6 +299,8 @@ export interface ProfileQueries {
 }
 
 export interface ProfileCommands {
+  confirmPendingTransaction(input: ConfirmPendingTransactionInput): Transaction
+  skipPendingTransaction(id: string): void
   generateRecurringTransactions(): void
   createRecurringTransaction(
     input: CreateRecurringTransactionInput,
@@ -915,6 +923,18 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
     CREATE INDEX pending_transaction_tags_tag_id ON pending_transaction_tags(tag_id, pending_id);
   `,
   ),
+  defineSqlMigration(
+    20,
+    'pending transaction decisions',
+    `
+    ALTER TABLE pending_transactions ADD COLUMN status TEXT NOT NULL
+      DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'skipped'));
+    ALTER TABLE pending_transactions ADD COLUMN confirmed_transaction_id TEXT
+      REFERENCES transactions(id) ON DELETE SET NULL;
+    CREATE INDEX pending_transactions_status_due_date
+      ON pending_transactions(status, due_date, created_at, id);
+  `,
+  ),
 ]
 
 function validateMigrations(
@@ -1057,10 +1077,25 @@ class OpenProfileApplication implements ProfileApplication {
     this.#options = options
     this.#clock = options.clock ?? (() => new Date())
     this.commands = {
-      generateRecurringTransactions: () =>
+      generateRecurringTransactions: () => {
         this.#executeBackgroundWrite(() =>
           generateRecurringTransactions(this.#database, this.#clock),
-        ),
+        )
+        this.#options.onPendingTransactionsChanged?.()
+      },
+      confirmPendingTransaction: (input) => {
+        const transaction = this.#executeAndRefreshRates(
+          confirmPendingUndoableCommand(this.#database, input, this.#clock),
+        )
+        this.#options.onPendingTransactionsChanged?.()
+        return transaction
+      },
+      skipPendingTransaction: (id) => {
+        this.#executeUndoableCommand(
+          skipPendingUndoableCommand(this.#database, id),
+        )
+        this.#options.onPendingTransactionsChanged?.()
+      },
       createRecurringTransaction: (input) =>
         this.#executeUndoableCommand(
           createRecurringUndoableCommand(this.#database, input, this.#clock),
@@ -1197,7 +1232,10 @@ class OpenProfileApplication implements ProfileApplication {
       undoLast: () => {
         this.#assertAvailable()
         const undone = this.#undoHistory.undoLast(this.#database)
-        if (undone) this.#maybeRefreshExchangeRates()
+        if (undone) {
+          this.#maybeRefreshExchangeRates()
+          this.#options.onPendingTransactionsChanged?.()
+        }
         return undone
       },
       deleteCategory: (input) =>
@@ -1281,6 +1319,10 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      getDuePendingTransactionCount: () => {
+        this.#assertAvailable()
+        return getDuePendingTransactionCount(this.#database, this.#clock)
+      },
       listPendingTransactions: () => {
         this.#assertAvailable()
         return listPendingTransactions(this.#database)

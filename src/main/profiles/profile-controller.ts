@@ -18,6 +18,7 @@ import type { ExchangeRateSource } from '../exchange-rates/exchange-rate-source'
 interface ProfileControllerOptions {
   exchangeRateSource?: ExchangeRateSource
   onRateStatusChanged?: () => void
+  onPendingTransactionsChanged?: () => void
   logger?: Pick<Console, 'error'>
 }
 
