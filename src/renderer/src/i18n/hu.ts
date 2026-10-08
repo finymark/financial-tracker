@@ -186,6 +186,8 @@ export const hu = {
   'pending.skip': 'Kihagyás',
   'pending.overdue': 'Lejárt',
   'pending.dueCount': 'Esedékes függő tranzakciók',
+  'pending.error.notFound':
+    'A függő tranzakció nem található. Frissítsd a listát.',
   'pending.error.accountArchived':
     'Ez a számla archivált. Állítsd vissza a számlát az archívumból, vagy hagyd ki ezt az előfordulást.',
   'recurring.description':

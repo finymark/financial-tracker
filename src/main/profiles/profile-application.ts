@@ -1096,27 +1096,27 @@ class OpenProfileApplication implements ProfileApplication {
         const recurring = this.#executeUndoableCommand(
           createRecurringUndoableCommand(this.#database, input, this.#clock),
         )
-        this.#generateRecurringTransactions()
+        this.#options.onPendingTransactionsChanged?.()
         return recurring
       },
       updateRecurringTransaction: (input) => {
         const recurring = this.#executeUndoableCommand(
           updateRecurringUndoableCommand(this.#database, input, this.#clock),
         )
-        this.#generateRecurringTransactions()
+        this.#options.onPendingTransactionsChanged?.()
         return recurring
       },
       pauseRecurringTransaction: (id) => {
-        this.#generateRecurringTransactions()
         this.#executeUndoableCommand(
           pauseRecurringUndoableCommand(this.#database, id, true, this.#clock),
         )
+        this.#options.onPendingTransactionsChanged?.()
       },
       resumeRecurringTransaction: (id) => {
         this.#executeUndoableCommand(
           pauseRecurringUndoableCommand(this.#database, id, false, this.#clock),
         )
-        this.#generateRecurringTransactions()
+        this.#options.onPendingTransactionsChanged?.()
       },
       deleteRecurringTransaction: (id) =>
         this.#executeUndoableCommand(

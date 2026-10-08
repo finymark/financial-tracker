@@ -183,6 +183,8 @@ export const en = {
   'pending.skip': 'Skip',
   'pending.overdue': 'Overdue',
   'pending.dueCount': 'Due pending transactions',
+  'pending.error.notFound':
+    'The pending transaction could not be found. Refresh the list.',
   'pending.error.accountArchived':
     'This account is archived. Unarchive the account or skip this occurrence.',
   'recurring.description':

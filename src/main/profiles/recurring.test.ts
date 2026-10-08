@@ -186,6 +186,26 @@ test('pause generates occurrences due since the last tick and resume generates i
       .listPendingTransactions()
       .map((pending) => pending.dueDate),
   ).toEqual(['2026-01-15', '2026-01-22'])
+  expect(context.application.commands.undoLast()).toBe(true)
+  expect(
+    context.application.queries.listRecurringTransactions()[0],
+  ).toMatchObject({
+    paused: false,
+    generatedThrough: '2026-01-15',
+  })
+  expect(
+    context.application.queries
+      .listPendingTransactions()
+      .map((pending) => pending.dueDate),
+  ).toEqual(['2026-01-15'])
+
+  context.application.commands.generateRecurringTransactions()
+  expect(
+    context.application.queries
+      .listPendingTransactions()
+      .map((pending) => pending.dueDate),
+  ).toEqual(['2026-01-15', '2026-01-22'])
+  context.application.commands.pauseRecurringTransaction(recurring.id)
 
   context.setNow('2026-01-29T10:00:00.000Z')
   context.application.commands.resumeRecurringTransaction(recurring.id)
@@ -194,6 +214,18 @@ test('pause generates occurrences due since the last tick and resume generates i
       .listPendingTransactions()
       .map((pending) => pending.dueDate),
   ).toEqual(['2026-01-15', '2026-01-22', '2026-01-29'])
+  expect(context.application.commands.undoLast()).toBe(true)
+  expect(
+    context.application.queries.listRecurringTransactions()[0],
+  ).toMatchObject({
+    paused: true,
+    generatedThrough: '2026-01-22',
+  })
+  expect(
+    context.application.queries
+      .listPendingTransactions()
+      .map((pending) => pending.dueDate),
+  ).toEqual(['2026-01-15', '2026-01-22'])
 })
 
 test('pause, resume and end date control generation; every recurring command is undoable', async () => {
@@ -276,7 +308,9 @@ test('editing changes only not-yet-generated snapshots and delete undo restores 
   expect(context.application.queries.listRecurringTransactions()[0]).toEqual(
     beforeEdit,
   )
-  expect(context.application.queries.listPendingTransactions()).toHaveLength(2)
+  expect(context.application.queries.listPendingTransactions()).toEqual([
+    originalPending,
+  ])
   context.application.commands.deleteRecurringTransaction(recurring.id)
   expect(context.application.queries.listRecurringTransactions()).toEqual([])
   expect(context.application.queries.listPendingTransactions()).toEqual([])
@@ -284,7 +318,59 @@ test('editing changes only not-yet-generated snapshots and delete undo restores 
   expect(context.application.queries.listRecurringTransactions()).toEqual([
     beforeEdit,
   ])
-  expect(context.application.queries.listPendingTransactions()).toHaveLength(2)
+  expect(context.application.queries.listPendingTransactions()).toEqual([
+    originalPending,
+  ])
+})
+
+test('a recurring command generates only its definition and later background occurrences survive undo', async () => {
+  const context = await setup()
+  const first = context.application.commands.createRecurringTransaction({
+    ...context.input,
+    schedule: { type: 'weekly', weekday: 4, intervalWeeks: 1 },
+  })
+  const second = context.application.commands.createRecurringTransaction({
+    ...context.input,
+    payeeName: 'Second company',
+    schedule: { type: 'weekly', weekday: 4, intervalWeeks: 1 },
+  })
+
+  context.setNow('2026-01-22T10:00:00.000Z')
+  context.application.commands.updateRecurringTransaction({
+    ...context.input,
+    id: first.id,
+    amountMinor: 54_321,
+    schedule: { type: 'weekly', weekday: 4, intervalWeeks: 1 },
+  })
+  const commandPending = context.application.queries.listPendingTransactions()
+  expect(
+    commandPending
+      .filter((pending) => pending.recurringId === first.id)
+      .map((pending) => pending.dueDate),
+  ).toEqual(['2026-01-15', '2026-01-22'])
+  expect(
+    commandPending
+      .filter((pending) => pending.recurringId === second.id)
+      .map((pending) => pending.dueDate),
+  ).toEqual(['2026-01-15'])
+
+  context.setNow('2026-01-29T10:00:00.000Z')
+  context.application.commands.generateRecurringTransactions()
+  expect(context.application.commands.undoLast()).toBe(true)
+  expect(
+    context.application.queries
+      .listRecurringTransactions()
+      .find((recurring) => recurring.id === first.id)?.amountMinor,
+  ).toBe(12_345)
+  expect(
+    context.application.queries
+      .listPendingTransactions()
+      .filter((pending) => pending.recurringId === first.id)
+      .map((pending) => [pending.dueDate, pending.amountMinor]),
+  ).toEqual([
+    ['2026-01-15', 12_345],
+    ['2026-01-29', 54_321],
+  ])
 })
 
 test('pending snapshots do not affect balances, transaction list totals, or expense reports', async () => {

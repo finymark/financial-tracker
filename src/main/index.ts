@@ -319,10 +319,15 @@ function startApplication(): void {
       showQuickAddWindow(created)
     } catch (error) {
       console.error('Could not open quick add.', error)
-      dialog.showErrorBox(
-        APP_NAME,
-        desktopMessages[activeLanguage()]['quickAdd.openError'],
-      )
+      void dialog
+        .showMessageBox({
+          type: 'error',
+          title: APP_NAME,
+          message: desktopMessages[activeLanguage()]['quickAdd.openError'],
+        })
+        .catch(() => {
+          console.warn('Could not show the quick-add error.')
+        })
       showMainWindow()
     } finally {
       openingQuickAdd = false
@@ -335,6 +340,10 @@ function startApplication(): void {
     openQuickAdd,
   )
   quickAddShortcut.start()
+  const disposeDesktopIntegrations = () => {
+    quickAddShortcut.dispose()
+    if (tray && !tray.isDestroyed()) tray.destroy()
+  }
 
   registerDesktopIpc(ipcMain, app, {
     shortcutStatus: () => quickAddShortcut.status(),
@@ -407,6 +416,7 @@ function startApplication(): void {
       (error: unknown) => {
         console.error('Application shutdown failed', error)
         shutdownPromise = null
+        disposeDesktopIntegrations()
         app.exit(1)
       },
     )
@@ -421,10 +431,7 @@ function startApplication(): void {
   tray.on('click', showMainWindow)
   tray.on('double-click', showMainWindow)
   updateTray()
-  app.on('will-quit', () => {
-    quickAddShortcut.dispose()
-    tray?.destroy()
-  })
+  app.on('will-quit', disposeDesktopIntegrations)
 
   mainWindow = createWindow(startsHidden(process.argv))
   mainWindow.on('close', (event) => {
