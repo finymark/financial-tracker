@@ -198,7 +198,20 @@ export const hu = {
     'A profiladatbázis nem egyezik a kiválasztott profillal.',
   'overview.title': 'Pénzügyeid átláthatóan',
   'overview.description':
-    'A pénzügyek összesített áttekintése később lesz itt elérhető.',
+    'Az aktuális hónap eddigi összegei a teljes előző hónaphoz képest, az alapdevizában.',
+  'overview.error': 'Az áttekintés betöltése nem sikerült.',
+  'overview.expenses': 'Kiadások',
+  'overview.incomes': 'Bevételek',
+  'overview.net': 'Nettó',
+  'overview.thisMonthToDate': 'Aktuális hónap a mai napig',
+  'overview.fullLastMonth': 'Teljes előző hónap',
+  'overview.change': 'Változás az előző hónaphoz képest',
+  'overview.topCategories': 'A hónap 5 legnagyobb kiadási kategóriája',
+  'overview.transactions': 'Tranzakciók megtekintése',
+  'overview.reports': 'Kimutatások megtekintése',
+  'overview.chartLabel': 'A hónap öt legnagyobb kiadási kategóriája',
+  'overview.shareHint':
+    'Az arányok az összes kategória átváltott kiadásain alapulnak, nem csak az első ötén. A nem átváltott összegek külön jelennek meg, és nem számítanak bele az arányokba.',
   'reports.trend.title': 'Havi trend',
   'reports.trend.description':
     'Kiadások, bevételek és egyenleg az alapdevizában.',

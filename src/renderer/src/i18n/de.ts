@@ -211,7 +211,20 @@ export const de = {
     'Die Profildatenbank stimmt nicht mit dem ausgewählten Profil überein.',
   'overview.title': 'Deine Finanzen im Überblick',
   'overview.description':
-    'Eine zusammengefasste Finanzübersicht wird später hier verfügbar sein.',
+    'Dieser Monat bis heute im Vergleich zum vollständigen letzten Monat, in Ihrer Basiswährung.',
+  'overview.error': 'Die Übersicht konnte nicht geladen werden.',
+  'overview.expenses': 'Ausgaben',
+  'overview.incomes': 'Einnahmen',
+  'overview.net': 'Saldo',
+  'overview.thisMonthToDate': 'Dieser Monat bis heute',
+  'overview.fullLastMonth': 'Vollständiger letzter Monat',
+  'overview.change': 'Änderung zum letzten Monat',
+  'overview.topCategories': 'Top 5 Ausgabenkategorien dieses Monats',
+  'overview.transactions': 'Transaktionen anzeigen',
+  'overview.reports': 'Berichte anzeigen',
+  'overview.chartLabel': 'Die fünf größten Ausgabenkategorien dieses Monats',
+  'overview.shareHint':
+    'Anteile beziehen sich auf umgerechnete Ausgaben aller Kategorien, nicht nur der ersten fünf. Nicht umgerechnete Beträge werden separat angezeigt und sind nicht in den Anteilen enthalten.',
   'reports.trend.title': 'Monatlicher Trend',
   'reports.trend.description':
     'Ausgaben, Einnahmen und Saldo in der Basiswährung.',

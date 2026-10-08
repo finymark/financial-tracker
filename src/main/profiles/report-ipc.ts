@@ -10,6 +10,12 @@ export function registerReportIpc(
 ): void {
   registerIpcHandler(
     ipcMain,
+    IPC_CHANNELS.reportsOverviewDashboard,
+    (): Awaited<ReturnType<AppBridge['reports']['overviewDashboard']>> =>
+      controller.getActiveApplication().queries.getOverviewDashboard(),
+  )
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.reportsMonthlyTrend,
     (
       _event,

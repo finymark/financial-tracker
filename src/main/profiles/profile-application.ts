@@ -176,6 +176,8 @@ import {
   resolveReportDateRange,
 } from './report-validation'
 import { getCategoryBreakdown } from './profile-reports'
+import { getOverviewDashboard } from './profile-report-overview'
+import type { OverviewDashboard } from '../../shared/report-overview'
 import { getMonthlyTrend } from './profile-report-trend'
 
 const MIGRATION_TABLE_SQL = `
@@ -231,6 +233,7 @@ export interface OpenProfileApplicationOptions {
 }
 
 export interface ProfileQueries {
+  getOverviewDashboard(): OverviewDashboard
   getMonthlyTrend(input: ReportDateRangeInput): MonthlyTrendReport
   getCategoryBreakdown(input: ReportDateRangeInput): CategoryBreakdownReport
   convertToBaseCurrency(
@@ -1144,6 +1147,12 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      getOverviewDashboard: () => {
+        this.#assertAvailable()
+        return this.#database.transaction(() =>
+          getOverviewDashboard(this.#database, this.#clock),
+        )()
+      },
       getMonthlyTrend: (input) => {
         this.#assertAvailable()
         const range = resolveReportDateRange(
