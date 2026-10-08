@@ -101,6 +101,27 @@ export const en = {
     'Record expenses, income and transfers, then keep account balances up to date.',
   'transactions.listDescription':
     'Filter transactions by period, account, category, payee, tag or note.',
+  'adjustments.setRealBalance': 'Set real balance',
+  'adjustments.edit': 'Edit balance adjustment',
+  'adjustments.save': 'Save balance adjustment',
+  'adjustments.deleteConfirmation':
+    'Permanently delete this balance adjustment? The account balance will update.',
+  'adjustments.confirmDelete': 'Delete balance adjustment',
+  'adjustments.rowType': 'Balance adjustment',
+  'adjustments.observedBalance': 'Observed balance',
+  'adjustments.difference': 'Current difference',
+  'adjustments.zeroDifference': 'No correction needed',
+  'adjustments.zeroDifferenceHint':
+    'This adjustment no longer corrects anything and can be deleted.',
+  'adjustments.error.account': 'Choose an active account.',
+  'adjustments.error.date': 'Enter a valid calendar date.',
+  'adjustments.error.futureDate':
+    'The balance observation date cannot be in the future.',
+  'adjustments.error.balance':
+    'Enter a valid balance within ±90,071,992,547,409.91.',
+  'adjustments.error.note': 'Enter a note of at most 1,000 characters.',
+  'adjustments.error.notFound':
+    'The balance adjustment could not be found. Refresh the list.',
   'transactions.excluded': 'Excluded',
   'transactions.excludedHint':
     'Included in the account balance, but left out of expense and income totals.',
@@ -218,7 +239,7 @@ export const en = {
   'undo.error': 'The change could not be undone.',
   'accounts.title': 'A place for each account',
   'accounts.description':
-    'Each balance combines its opening balance with income and expenses in the account currency.',
+    'Each balance combines its dated movements and observed balance adjustments in the account currency.',
   'accounts.create': 'Create account',
   'accounts.name': 'Account name',
   'accounts.currency': 'Currency',

@@ -102,6 +102,28 @@ export const hu = {
     'Rögzítsd kiadásaidat, bevételeidet és átvezetéseidet, hogy a számlaegyenlegek naprakészek legyenek.',
   'transactions.listDescription':
     'Szűrd a tranzakciókat időszak, számla, kategória, partner, címke vagy megjegyzés szerint.',
+  'adjustments.setRealBalance': 'Valós egyenleg beállítása',
+  'adjustments.edit': 'Egyenlegkorrekció szerkesztése',
+  'adjustments.save': 'Egyenlegkorrekció mentése',
+  'adjustments.deleteConfirmation':
+    'Végleg törlöd ezt az egyenlegkorrekciót? A számlaegyenleg frissülni fog.',
+  'adjustments.confirmDelete': 'Egyenlegkorrekció törlése',
+  'adjustments.rowType': 'Egyenlegkorrekció',
+  'adjustments.observedBalance': 'Megfigyelt egyenleg',
+  'adjustments.difference': 'Aktuális eltérés',
+  'adjustments.zeroDifference': 'Nincs szükség korrekcióra',
+  'adjustments.zeroDifferenceHint':
+    'Ez a korrekció már semmit sem korrigál, ezért törölhető.',
+  'adjustments.error.account': 'Válassz aktív számlát.',
+  'adjustments.error.date': 'Adj meg érvényes naptári dátumot.',
+  'adjustments.error.futureDate':
+    'Az egyenleg megfigyelésének dátuma nem lehet jövőbeli.',
+  'adjustments.error.balance':
+    'Adj meg érvényes egyenleget ±90 071 992 547 409,91 határon belül.',
+  'adjustments.error.note':
+    'Legfeljebb 1000 karakter hosszú megjegyzést adj meg.',
+  'adjustments.error.notFound':
+    'Az egyenlegkorrekció nem található. Frissítsd a listát.',
   'transactions.excluded': 'Kizárt',
   'transactions.excludedHint':
     'A számla egyenlegébe beleszámít, de a kiadások és bevételek összesítéséből kimarad.',
@@ -221,7 +243,7 @@ export const hu = {
   'undo.error': 'A módosítást nem sikerült visszavonni.',
   'accounts.title': 'Minden számlának saját hely',
   'accounts.description':
-    'Minden egyenleg a nyitó egyenleget, valamint a számla pénznemében rögzített bevételeket és kiadásokat összesíti.',
+    'Minden egyenleg a számla pénznemében rögzített, dátumozott pénzmozgásokat és egyenlegkorrekciókat összesíti.',
   'accounts.create': 'Számla létrehozása',
   'accounts.name': 'Számla neve',
   'accounts.currency': 'Pénznem',
