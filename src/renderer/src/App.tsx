@@ -61,6 +61,7 @@ import { RecurringPage } from './RecurringPage'
 import type { RecurringPrefill } from './lib/recurring-prefill'
 import { WatchedFolderSettings } from './components/watched-folder-settings'
 import { ReceiptInboxPage } from './ReceiptInboxPage'
+import { TitleBar } from './components/title-bar'
 
 const pages = [
   { id: 'overview', icon: LayoutDashboard },
@@ -207,7 +208,7 @@ function ProfilePicker({
   }
 
   return (
-    <main className="min-h-dvh bg-muted p-6 sm:p-10">
+    <main className="h-full overflow-y-auto bg-muted p-6 sm:p-10">
       <div className="mx-auto max-w-2xl space-y-6">
         <header className="text-center">
           <UsersRound
@@ -632,7 +633,7 @@ function Shell({
   }
 
   return (
-    <div className="flex h-dvh overflow-hidden">
+    <div className="flex h-full overflow-hidden">
       <aside
         className={cn(
           'flex shrink-0 flex-col border-r bg-sidebar p-4',
@@ -1294,7 +1295,7 @@ export default function App() {
   let content
   if (loading) {
     content = (
-      <main className="grid min-h-dvh place-items-center text-sm text-muted-foreground">
+      <main className="grid h-full place-items-center text-sm text-muted-foreground">
         {t('profile.loading')}
       </main>
     )
@@ -1342,12 +1343,13 @@ export default function App() {
     )
   }
   return (
-    <>
-      {content}
+    <div className="flex h-dvh flex-col">
+      <TitleBar profileName={active?.name} />
+      <div className="min-h-0 flex-1">{content}</div>
       {startupShortcutFailure && (
         <aside
           role="alert"
-          className="fixed top-4 right-4 z-50 max-w-md space-y-3 rounded-lg border bg-card p-4 text-sm font-medium text-error shadow-lg"
+          className="fixed top-[calc(var(--title-bar-height)+1rem)] right-4 z-50 max-w-md space-y-3 rounded-lg border bg-card p-4 text-sm font-medium text-error shadow-lg"
         >
           <p>{shortcutConflictMessage(t, startupShortcutFailure)}</p>
           <Button
@@ -1377,6 +1379,6 @@ export default function App() {
         </aside>
       )}
       <UpdateNotice t={t} />
-    </>
+    </div>
   )
 }

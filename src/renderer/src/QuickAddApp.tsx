@@ -22,6 +22,7 @@ import { shortcutTargetContext } from './lib/shortcut-context'
 import { PrivacyProvider } from './lib/privacy'
 import { useTheme } from './lib/theme'
 import { today } from '../../shared/date'
+import { TitleBar } from './components/title-bar'
 
 type Translate = (key: MessageKey) => string
 
@@ -478,38 +479,41 @@ export default function QuickAddApp() {
       privacyMode={settings.privacyMode}
       language={settings.language}
     >
-      <main className="min-h-dvh bg-background p-5 text-foreground">
-        <header className="mb-5 flex items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold">{t('quickAdd.title')}</h1>
-          <Button
-            variant="ghost"
-            onClick={() => void window.app.desktop.closeQuickAdd()}
-          >
-            {t('transactions.close')}
-          </Button>
-        </header>
-        {active === undefined ? (
-          <p className="text-sm text-muted-foreground">
-            {t('quickAdd.loading')}
-          </p>
-        ) : active === null ? (
-          <div className="space-y-4">
-            <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
-              {t('quickAdd.noProfiles')}
-            </p>
-            <Button onClick={() => void window.app.desktop.showMain()}>
-              {t('tray.open')}
+      <div className="flex h-dvh flex-col">
+        <TitleBar profileName={active?.name} />
+        <main className="min-h-0 flex-1 overflow-y-auto bg-background p-5 text-foreground">
+          <header className="mb-5 flex items-center justify-between gap-3">
+            <h1 className="text-xl font-semibold">{t('quickAdd.title')}</h1>
+            <Button
+              variant="ghost"
+              onClick={() => void window.app.desktop.closeQuickAdd()}
+            >
+              {t('transactions.close')}
             </Button>
-          </div>
-        ) : (
-          <QuickAddForm
-            key={active.id}
-            active={active}
-            revision={activeRevision}
-            t={t}
-          />
-        )}
-      </main>
+          </header>
+          {active === undefined ? (
+            <p className="text-sm text-muted-foreground">
+              {t('quickAdd.loading')}
+            </p>
+          ) : active === null ? (
+            <div className="space-y-4">
+              <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
+                {t('quickAdd.noProfiles')}
+              </p>
+              <Button onClick={() => void window.app.desktop.showMain()}>
+                {t('tray.open')}
+              </Button>
+            </div>
+          ) : (
+            <QuickAddForm
+              key={active.id}
+              active={active}
+              revision={activeRevision}
+              t={t}
+            />
+          )}
+        </main>
+      </div>
     </PrivacyProvider>
   )
 }

@@ -79,7 +79,7 @@ export function registerProfileIpc(
   controller: ProfileController,
   onProfileNeedsRateRefresh: () => void = () => {},
   onProfileClosed: () => void = () => {},
-  onProfileLanguageChanged: () => void = () => {},
+  onProfilePresentationChanged: () => void = () => {},
   beforeActiveProfileChange: () => Promise<void> = () => Promise.resolve(),
 ): void {
   registerIpcHandler(
@@ -99,7 +99,7 @@ export function registerProfileIpc(
       const restored = await controller.restoreBackup(
         parseRestoreBackupInput(value),
       )
-      onProfileLanguageChanged()
+      onProfilePresentationChanged()
       return restored
     },
   )
@@ -127,7 +127,10 @@ export function registerProfileIpc(
       value: unknown,
     ): Awaited<ReturnType<AppBridge['profiles']['rename']>> => {
       const input = parseRenameProfileInput(value)
-      return controller.rename(input.id, input.name)
+      const renamed = controller.rename(input.id, input.name)
+      if (controller.getActive()?.id === input.id)
+        onProfilePresentationChanged()
+      return renamed
     },
   )
   registerIpcHandler(
@@ -140,7 +143,7 @@ export function registerProfileIpc(
       await controller.delete(input.id, input.confirmation)
       if (deletesActiveProfile) {
         onProfileClosed()
-        onProfileLanguageChanged()
+        onProfilePresentationChanged()
       }
     },
   )
@@ -155,7 +158,7 @@ export function registerProfileIpc(
       if (controller.getActive()) await beforeActiveProfileChange()
       const opened = await controller.open(input.id)
       onProfileNeedsRateRefresh()
-      onProfileLanguageChanged()
+      onProfilePresentationChanged()
       return opened
     },
   )
@@ -176,7 +179,8 @@ export function registerProfileIpc(
     > => {
       const input = parseUpdateSettingsInput(value)
       const settings = await controller.updateSettings(input)
-      if (input.settings.language) onProfileLanguageChanged()
+      if (input.settings.language || input.settings.theme)
+        onProfilePresentationChanged()
       if (input.settings.baseCurrency) onProfileNeedsRateRefresh()
       return settings
     },
@@ -205,7 +209,7 @@ export function registerProfileIpc(
       if (controller.getActive()) await beforeActiveProfileChange()
       await controller.close()
       onProfileClosed()
-      onProfileLanguageChanged()
+      onProfilePresentationChanged()
     },
   )
 }

@@ -10,6 +10,11 @@ export function useTheme(mode: ThemeMode): void {
     const applyTheme = () => {
       const dark = mode === 'dark' || (mode === 'system' && systemTheme.matches)
       document.documentElement.classList.toggle('dark', dark)
+      void window.app.windowChrome
+        .setTheme(dark ? 'dark' : 'light')
+        .catch(() => {
+          // The window may be closing while a Windows theme change is delivered.
+        })
     }
 
     applyTheme()

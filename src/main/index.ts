@@ -6,6 +6,7 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  nativeTheme,
   screen,
   Tray,
   type BrowserWindowConstructorOptions,
@@ -56,6 +57,9 @@ import { registerPhoneUploadIpc, renderPhoneUploadQr } from './phone-upload-ipc'
 import sharp from 'sharp'
 import { preprocessReceiptImage } from './ocr/receipt-preprocessing'
 import { TesseractOcrEngine } from './ocr/tesseract-ocr-engine'
+import { titleBarOverlay } from '../shared/window-chrome'
+import { registerWindowChromeIpc } from './window-chrome'
+import { blocksPackagedShortcut, zoomCommand } from './window-shortcuts'
 
 let mainWindow: BrowserWindow | null = null
 let quickAddWindow: BrowserWindow | null = null
@@ -91,6 +95,10 @@ function createAppWindow(
   const window = new BrowserWindow({
     icon: applicationIconPath(),
     ...options,
+    titleBarStyle: 'hidden',
+    titleBarOverlay: titleBarOverlay(
+      nativeTheme.shouldUseDarkColors ? 'dark' : 'light',
+    ),
     webPreferences: {
       preload: join(import.meta.dirname, '../preload/index.cjs'),
       contextIsolation: true,
@@ -98,8 +106,26 @@ function createAppWindow(
       sandbox: true,
     },
   })
+  window.removeMenu()
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   window.webContents.on('will-navigate', (event) => event.preventDefault())
+  window.webContents.on('before-input-event', (event, input) => {
+    if (app.isPackaged && blocksPackagedShortcut(input)) {
+      event.preventDefault()
+      return
+    }
+    const command = zoomCommand(input)
+    if (!command) return
+    event.preventDefault()
+    if (command === 'reset') {
+      window.webContents.setZoomLevel(0)
+      return
+    }
+    const direction = command === 'in' ? 0.5 : -0.5
+    window.webContents.setZoomLevel(
+      window.webContents.getZoomLevel() + direction,
+    )
+  })
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
     const url = new URL(process.env.ELECTRON_RENDERER_URL)
@@ -284,6 +310,7 @@ function startApplication(): void {
     void smokeTest()
     return
   }
+  Menu.setApplicationMenu(null)
   let settings: AppSettingsFile
   try {
     settings = new AppSettingsFile(app.getPath('userData'))
@@ -348,6 +375,9 @@ function startApplication(): void {
         Boolean(window && !window.isDestroyed()),
       )
       .map((window) => window.webContents),
+  )
+  registerWindowChromeIpc(ipcMain, (contents) =>
+    BrowserWindow.fromWebContents(contents),
   )
 
   const activeLanguage = () =>
