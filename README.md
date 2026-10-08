@@ -302,7 +302,8 @@ not off-device copies or backups of the separate data folder.
   switches profiles. Accounts lists active and archived accounts with balances in
   their own currency. Transactions provides a filterable, virtualised table and a
   right-side create/edit drawer. Reports provides base-currency expense totals by
-  main category and subcategory plus spending pace; Overview remains a placeholder.
+  main category and subcategory plus spending pace; Overview shows this month's expenses, income,
+  net, and top five expense categories compared with the full last month.
 
 ## Exchange rates and base-currency conversion
 
@@ -327,6 +328,58 @@ not off-device copies or backups of the separate data folder.
   and additionally show a base-currency total, provisional state, and any
   unconverted currency bucket.
 
+## Overview dashboard
+
+- **Overview** is the start page: expenses, income, and net (income minus expenses)
+  for this month to date, alongside the full previous calendar month and the
+  absolute change. Both inclusive date ranges are displayed; last month is not
+  cut at today's day-of-month.
+- The dashboard reuses the category-breakdown query and report-line selection,
+  so expense totals and category amounts agree with **Reports** for the same
+  range. Transfers, balance adjustments, and excluded transactions never count.
+  Splits use each part's category, including the uncategorized group.
+- All totals use the profile's base currency, explicit unconverted buckets, and
+  provisional-rate indicators. Net and changes use exact signed converted lines
+  and round once, rather than subtracting rounded card amounts.
+- The top five main expense categories include uncategorized when it ranks in
+  the top five. Ranking and shares use exact converted expenses; shares use all
+  categories as the denominator, not just the top five. Missing-rate amounts
+  remain separate and do not count in ranking or shares. With no converted
+  expenses, shares are zero and the unconverted bucket remains visible.
+- Expense/income cards and category names open the matching transaction list
+  with the dashboard's date range and excluded transactions hidden. **View
+  reports** opens the full category breakdown. Rates refreshing and returning
+  focus to the app reload the dashboard.
+
+### Manual Overview and report charts check
+
+Run `npm run dev` with synthetic HUF/CHF accounts and transactions. Repeat in
+HU/EN/DE and light/dark themes, including a collapsed sidebar and a narrow
+window. Verify Overview opens first, the two explicit date ranges show this
+month to date versus the full last month, and expense/income/net cards show
+current totals, previous totals, and signed absolute changes. Test no data,
+income only, negative net, and year/month rollover.
+
+Create more than five main expense categories, subcategories, split parts, and
+uncategorized lines; check the top-five order, amounts, and shares against the
+Reports breakdown for the same inclusive dates. Verify excluded expenses and
+income, transfers, and balance adjustments never count. Check missing-rate
+buckets on current/previous/change totals and category rows, and stale-rate
+indicators while offline; after refresh the dashboard should update. Switch
+base currency and profiles, return from editing or undoing transactions, and
+verify totals and translated category names reload without another profile's
+values.
+
+Check the overview bar chart and Reports pie/bar charts use theme-token colors,
+readable labels, and locale-formatted money tooltips. Check top-five table links,
+expense/income card links, and View reports using keyboard navigation; category
+links must preserve the inclusive dates, include subcategories, handle
+uncategorized, and hide excluded transactions. Chart rendering/tooltips and
+navigation remain manual checks. Temporary SQLite application-API tests cover
+dashboard/breakdown agreement, splits, exclusions, exact net/change rounding,
+date-based conversion, missing/stale rates, top-five shares, and calendar
+rollover.
+
 ## Reports
 
 - **Reports** defaults to this month and also offers last month, this year, the
@@ -340,7 +393,7 @@ not off-device copies or backups of the separate data folder.
 - Switch between pie and bar charts. Choose a main category to see its direct
   lines and subcategories, then open Transactions with that category and the
   inclusive report range applied.
-- **Spending pace** is a separate section, independent of the category date-range
+- **Spending pace** is a separate view, independent of the report date-range
   filter. It compares expenses from the first of this month through today with
   the average of the previous three calendar months, each cut at today’s day of
   month and clamped to that month’s length. Empty months still count in the
@@ -357,11 +410,19 @@ not off-device copies or backups of the separate data folder.
   comparison partial; provisional rates remain flagged. **Refresh pace** reloads
   the comparison, and background exchange-rate updates refresh it automatically.
 
+- **Monthly trend** shows expenses and incomes as bars with a net line and a
+  month-by-month table, in base currency, for the same report date range. Empty
+  months stay visible as zero. Partial first/last months count only in-range days
+  and show their covered dates. Each month's expense, income, and net totals keep
+  their own explicit unconverted currency amounts and provisional-rate markers.
+  Net is converted and rounded independently from exact income minus expense
+  lines, not calculated by subtracting rounded display totals.
+
 ### Manual Reports and charts check
 
 Run `npm run dev` with synthetic HUF/CHF expenses across this month and the prior
 three months. In Reports, check pie/bar category drill-down and custom ranges,
-then scroll to **Spending pace**. Verify its current-month dates stay independent
+then switch to **Spending pace**. Verify its current-month dates stay independent
 of the category range. Check total and main-category current/average amounts,
 ahead/behind amount and percent, split parts, uncategorized lines, categories
 used only in earlier months, empty months, and zero baselines. Include expenses
@@ -376,6 +437,24 @@ tooltip currency formatting/contrast, and narrow-window table scrolling. Charts
 remain manual checks; temporary SQLite profile-application tests cover the pace
 query, injected clock, leap/non-leap clamping, grouping/exclusions, and exact
 conversion/rounding.
+
+### Manual Reports chart check
+
+Run `npm run dev` with synthetic HUF/CHF expenses and income over several months,
+including an empty month, split categories, uncategorized lines, excluded
+transactions, transfers with included/excluded fees, and balance adjustments.
+In **Reports**, check both category charts and their drill-down, then switch to
+**Monthly trend**. Verify expense/income bars, the positive/negative net line,
+legend, tooltips, and table agree with the known amounts. Try every preset and a
+custom range starting/ending mid-month, a single day, year rollover, and leap
+February; only in-range days count and partial labels show the covered dates.
+Check zeros in empty months, separate missing-rate amounts in each month's
+expense/income/net cells (not plotted as converted values), and provisional-rate
+markers when using stale cached rates. Switch base currency and repeat in HU/EN/DE
+and light/dark themes; confirm localized month/money labels, themed axes/series/
+tooltips, horizontal scrolling for long ranges, keyboard range/tab controls, and
+loading/error states. Chart rendering remains a manual check; application-API
+SQLite tests cover the aggregation and translation completeness is automated.
 
 ## Accounts
 

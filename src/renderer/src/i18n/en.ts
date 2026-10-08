@@ -196,7 +196,33 @@ export const en = {
     'The profile database does not match the selected profile.',
   'overview.title': 'A clear view of your finances',
   'overview.description':
-    'A summarized financial overview will be available here later.',
+    'This month to date compared with the full last month, in your base currency.',
+  'overview.error': 'The overview could not be loaded.',
+  'overview.expenses': 'Expenses',
+  'overview.incomes': 'Income',
+  'overview.net': 'Net',
+  'overview.thisMonthToDate': 'This month to date',
+  'overview.fullLastMonth': 'Full last month',
+  'overview.change': 'Change vs last month',
+  'overview.topCategories': 'Top 5 expense categories this month',
+  'overview.transactions': 'View transactions',
+  'overview.reports': 'View reports',
+  'overview.chartLabel': 'Top five expense categories this month',
+  'overview.shareHint':
+    'Shares use converted expenses across all categories, not only the top five. Unconverted amounts are shown separately and are not included in shares.',
+  'reports.trend.title': 'Monthly trend',
+  'reports.trend.description':
+    'Expenses, incomes and net in your base currency.',
+  'reports.trend.partial': 'partial',
+  'reports.trend.partialHint':
+    'Partial months include only days within the selected range.',
+  'reports.trend.unconvertedHint':
+    'Amounts without a rate are not in the chart. Each month lists them separately below.',
+  'reports.trend.chartLabel': 'Monthly expenses and incomes with a net line',
+  'reports.trend.month': 'Month',
+  'reports.trend.expenses': 'Expenses',
+  'reports.trend.incomes': 'Incomes',
+  'reports.trend.net': 'Net',
   'reports.pace.title': 'Spending pace',
   'reports.pace.description':
     'This month so far compared with the average of the previous three calendar months up to the same day, clamped to each month’s length.',
