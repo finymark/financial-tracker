@@ -272,7 +272,8 @@ export const en = {
   'reports.period.custom': 'Custom range',
   'reports.apply': 'Apply range',
   'reports.loading': 'Loading report…',
-  'reports.error': 'The report could not be loaded. Check the date range.',
+  'reports.error':
+    'The report could not be loaded. Dates must be on or after 1900-01-01 and span no more than 100 years.',
   'reports.total': 'Total expenses',
   'reports.provisional': 'provisional rates',
   'reports.chartType': 'Chart type',
@@ -289,8 +290,10 @@ export const en = {
   'reports.back': 'Back to main categories',
   'reports.drillHint':
     'Choose a main category, then choose a subcategory to open its transactions.',
-  'reports.transactionFilter':
-    'Opened from Reports with the category and inclusive date range applied.',
+  'reports.transactionFilter': 'From report:',
+  'reports.transactionFilter.expense': 'expenses only',
+  'reports.transactionFilter.income': 'income only',
+  'reports.transactionFilter.clear': 'Clear report filter',
   'transactions.title': 'Your transactions in one place',
   'transactions.description':
     'Record expenses, income and transfers, then keep account balances up to date.',

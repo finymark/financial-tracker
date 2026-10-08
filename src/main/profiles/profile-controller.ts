@@ -13,18 +13,31 @@ import {
   type ProfileApplication,
 } from './profile-application'
 import { ProfileRegistry } from './profile-registry'
+import type { ExchangeRateSource } from '../exchange-rates/exchange-rate-source'
+
+interface ProfileControllerOptions {
+  exchangeRateSource?: ExchangeRateSource
+  onRateStatusChanged?: () => void
+  logger?: Pick<Console, 'error'>
+}
 
 export class ProfileController {
   readonly #registry: ProfileRegistry
   readonly #defaultLanguage: Language
+  readonly #options: ProfileControllerOptions
   #changing = false
   #shuttingDown = false
   #pending: Promise<unknown> | null = null
   #active: { id: string; application: ProfileApplication } | null = null
   #shutdownProfileId: string | null = null
 
-  constructor(registry: ProfileRegistry, systemLocale = 'en') {
+  constructor(
+    registry: ProfileRegistry,
+    systemLocale = 'en',
+    options: ProfileControllerOptions = {},
+  ) {
     this.#registry = registry
+    this.#options = options
     const language = systemLocale.toLowerCase().split(/[-_]/)[0]
     this.#defaultLanguage =
       language === 'hu' || language === 'de' ? language : 'en'
@@ -45,6 +58,7 @@ export class ProfileController {
           profile,
           paths: this.#registry.getProfilePaths(profile.id),
           createStartupBackup: false,
+          ...this.#applicationOptions(),
         })
         application.commands.updateSettings({ language: this.#defaultLanguage })
         application.close()
@@ -79,6 +93,7 @@ export class ProfileController {
           const application = await openProfileApplication({
             profile,
             paths: this.#registry.getProfilePaths(id),
+            ...this.#applicationOptions(),
           })
           this.#active = { id, application }
         }
@@ -93,6 +108,7 @@ export class ProfileController {
       const application = await openProfileApplication({
         profile,
         paths: this.#registry.getProfilePaths(id),
+        ...this.#applicationOptions(),
       })
       try {
         this.#registry.rememberLastUsed(id)
@@ -192,5 +208,9 @@ export class ProfileController {
   #closeActive(): void {
     this.#active?.application.close()
     this.#active = null
+  }
+
+  #applicationOptions(): ProfileControllerOptions {
+    return this.#options
   }
 }

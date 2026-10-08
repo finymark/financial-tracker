@@ -144,16 +144,33 @@ test('category breakdown aggregates expense lines and excludes non-report moveme
     categoryId: travel.id,
     name: 'Travel',
     total: { roundedMinor: 950 },
+    shareBasisPoints: 8636,
     subcategories: [
-      { categoryId: travel.id, name: 'Travel', total: { roundedMinor: 100 } },
-      { categoryId: tickets.id, name: 'Tickets', total: { roundedMinor: 250 } },
-      { categoryId: lodging.id, name: 'Lodging', total: { roundedMinor: 600 } },
+      {
+        categoryId: travel.id,
+        name: 'Travel',
+        total: { roundedMinor: 100 },
+        shareBasisPoints: 1053,
+      },
+      {
+        categoryId: tickets.id,
+        name: 'Tickets',
+        total: { roundedMinor: 250 },
+        shareBasisPoints: 2632,
+      },
+      {
+        categoryId: lodging.id,
+        name: 'Lodging',
+        total: { roundedMinor: 600 },
+        shareBasisPoints: 6316,
+      },
     ],
   })
   expect(report.categories[1]).toMatchObject({
     categoryId: null,
     name: null,
     total: { roundedMinor: 150 },
+    shareBasisPoints: 1364,
     subcategories: [],
   })
   expect(
@@ -274,6 +291,55 @@ test('CHF-base category totals use exact inverse conversion and round once after
   })
 })
 
+test('category shares use exact converted totals rather than rounded display values', async () => {
+  const application = await setup()
+  application.commands.updateSettings({ baseCurrency: 'CHF' })
+  const huf = application.commands.createAccount({
+    name: 'HUF',
+    currency: 'HUF',
+    openingBalance: 0,
+    openingDate: '2026-03-15',
+  })
+  const first = application.commands.createCategory({
+    name: 'One third',
+    kind: 'expense',
+  })
+  const second = application.commands.createCategory({
+    name: 'Two thirds',
+    kind: 'expense',
+  })
+  await application.commands.refreshExchangeRates(
+    rateSource([{ date: '2026-03-15', currency: 'CHF', rate: '3', unit: 1 }]),
+  )
+  for (const [categoryId, totalMinor] of [
+    [first.id, 1],
+    [second.id, 2],
+  ] as const) {
+    application.commands.createTransaction({
+      accountId: huf.id,
+      kind: 'expense',
+      date: '2026-03-15',
+      totalMinor,
+      payeeName: null,
+      categoryId,
+      note: '',
+    })
+  }
+
+  const report = application.queries.getCategoryBreakdown({
+    period: 'thisMonth',
+  })
+  expect(
+    report.categories.map(({ total, shareBasisPoints }) => ({
+      roundedMinor: total.roundedMinor,
+      shareBasisPoints,
+    })),
+  ).toEqual([
+    { roundedMinor: 0, shareBasisPoints: 3333 },
+    { roundedMinor: 1, shareBasisPoints: 6667 },
+  ])
+})
+
 test('report presets and custom endpoints resolve to validated inclusive ranges', async () => {
   const application = await setup()
   const account = application.commands.createAccount({
@@ -326,4 +392,22 @@ test('report presets and custom endpoints resolve to validated inclusive ranges'
       to: '2026-03-15',
     }),
   ).toThrow('reports.error.range')
+  for (const range of [
+    { from: '1899-12-31', to: '1900-01-01' },
+    { from: '1900-01-01', to: '2000-01-02' },
+  ]) {
+    expect(() =>
+      application.queries.getCategoryBreakdown({
+        period: 'custom',
+        ...range,
+      }),
+    ).toThrow('reports.error.range')
+  }
+  expect(() =>
+    application.queries.getCategoryBreakdown({
+      period: 'custom',
+      from: '1900-01-01',
+      to: '2000-01-01',
+    }),
+  ).not.toThrow()
 })

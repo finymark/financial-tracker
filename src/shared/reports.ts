@@ -28,6 +28,8 @@ export interface CategoryBreakdownSubcategory {
   categoryId: string
   name: string
   total: BaseCurrencyConversion
+  /** Share of its main category's exact converted total, in basis points. */
+  shareBasisPoints: number
 }
 
 export interface CategoryBreakdownCategory {
@@ -36,6 +38,8 @@ export interface CategoryBreakdownCategory {
   /** Null is translated as "Uncategorized" by the renderer. */
   name: string | null
   total: BaseCurrencyConversion
+  /** Share of the report's exact converted total, in basis points. */
+  shareBasisPoints: number
   subcategories: CategoryBreakdownSubcategory[]
 }
 

@@ -309,16 +309,26 @@ not off-device copies or backups of the separate data folder.
 ## Exchange rates and base-currency conversion
 
 - Profiles with an account outside their base currency fetch official CHF rates
-  from the MNB SOAP service after the profile opens and every 24 hours while the
-  app runs. Requests use Electron's system-proxy-aware network stack and never
-  block the renderer. Failures are logged and leave the visible rate status stale
-  or missing.
+  from the MNB SOAP service after the profile opens and every hour while the app
+  runs. Creating a non-base-currency account, changing an account's currency, or
+  writing a transaction/transfer also starts a coalesced background refresh when
+  it extends the needed history. Requests use Electron's system-proxy-aware
+  network stack and never block the renderer. MNB serves this SOAP endpoint only
+  over plain HTTP; ADR 0005 records the accepted integrity risk. Failures are
+  logged and leave the visible rate status stale or missing.
 - Migration 17 stores each quoted decimal string and unit by publication date,
   plus fetched coverage and the last successful refresh, in the profile database.
-  Profile backups and restores therefore remain self-contained. Weekends and
-  holidays use the latest earlier published rate within fetched coverage; dates
-  after coverage use the latest cached rate as provisional. An amount without an
-  earlier rate remains explicitly unconverted, never zero.
+  Requested past dates are final. Today remains open and is requested again each
+  hour until MNB's response includes today's publication; until then coverage
+  ends yesterday. A backwards extension starts 14 days before the earliest
+  needed date so weekends and holiday closures can use the previous publication.
+  Profile backups and restores remain self-contained. Weekends and holidays use
+  the latest earlier published rate within fetched coverage; dates after coverage
+  use the latest cached rate as provisional. Only a conversion that actually
+  uses a rate after coverage is marked provisional. The separate cache status is
+  up to date when coverage reaches at least yesterday, stale when it does not,
+  and missing when a needed date has no earlier published rate. An amount without
+  an earlier rate remains explicitly unconverted, never zero.
 - Conversion uses exact BigInt rational arithmetic. CHF converts to HUF with the
   MNB HUF-per-quoted-unit rate; HUF converts to CHF with its exact inverse. Values
   are aggregated exactly and rounded once per displayed total to integer
@@ -389,7 +399,8 @@ same applied date range when switching views. Pace uses its fixed month-to-date
 comparison and hides the date-range controls.
 
 - **Reports** defaults to this month and also offers last month, this year, the
-  rolling last 12 months, and an inclusive custom range.
+  rolling last 12 months, and an inclusive custom range. Custom dates cannot be
+  before 1900-01-01 or span more than 100 years.
 - The category breakdown uses ordinary expense transaction lines only. Income,
   transfers, balance adjustments, and excluded transactions do not count; split
   parts use their own categories and uncategorized lines remain explicit.
@@ -749,8 +760,9 @@ The UTF-8 file includes a BOM for Excel and uses CRLF records with RFC 4180
 quoting. HU/DE use comma decimals and semicolon-separated fields; EN uses dot
 decimals and comma-separated fields. An override changes both separators but
 keeps headers, kinds, yes/no values, and default category names in the profile
-language. Amounts use exact signed integer hundredths, always with two decimals
-and no thousands grouping, even for HUF; no currency conversion is performed.
+language. Amounts use exact signed integer hundredths in both HUF and CHF,
+always with two decimals and no thousands grouping; no currency conversion is
+performed.
 
 Columns are date (ISO YYYY-MM-DD), account, kind, payee, main category,
 subcategory, amount, currency, note, tags, and excluded. Matching expenses and
@@ -903,8 +915,9 @@ hidden too. Amount inputs (including calculator expressions, rule bounds and
 template amounts) are readable **only while focused** so editing remains usable;
 unfocused inputs are blurred password fields, and result previews stay hidden.
 Privacy is a screen-sharing aid, not encryption: underlying data and CSV exports
-are unchanged. Text written in notes/names is not scanned for amounts; chart
-shapes, category names, dates and transaction counts remain visible.
+are unchanged. Text written in notes/names is not scanned for amounts; category
+names, dates and transaction counts remain visible, while chart areas are blurred
+so bar lengths, slice sizes and Sankey widths cannot be read.
 
 ### Manual Privacy mode check
 
@@ -913,7 +926,8 @@ transfers, adjustments, templates and amount-bound rules, including cached and
 missing exchange rates. Turn privacy on with the button and Ctrl+Shift+H: verify
 **no readable amount anywhere** across Overview, Accounts, Transactions, Settings,
 and every Reports view (breakdown pie/bar, monthly trend, spending pace and
-cash-flow). Check filtered/day/base-currency totals and unconverted parts,
+cash-flow). Verify chart areas are blurred so bar lengths, pie slice sizes and
+Sankey widths are unreadable. Check filtered/day/base-currency totals and unconverted parts,
 opening/current balances, split parts/remainder, transfer rates, drawer previews,
 rule bounds, template fields, CSV-dialog decimal preview, and toasts. Hover chart
 points/bars/pie slices/Sankey nodes and check tooltips, axis ticks, SVG titles,

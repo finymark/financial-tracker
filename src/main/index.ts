@@ -88,21 +88,20 @@ void app.whenReady().then(() => {
     smokeTest()
     return
   }
+  let window: BrowserWindow | null = null
+  const rateSource = new MnbExchangeRateSource(createElectronNetTransport())
+  const onRateStatusChanged = () => {
+    if (window && !window.isDestroyed())
+      window.webContents.send(IPC_CHANNELS.ratesStatusChanged)
+  }
   const profiles = new ProfileController(
     new ProfileRegistry({ userDataDirectory: app.getPath('userData') }),
     app.getLocale(),
+    { exchangeRateSource: rateSource, onRateStatusChanged },
   )
-  let window: BrowserWindow | null = null
-  const exchangeRates = new ExchangeRateScheduler(
-    profiles,
-    new MnbExchangeRateSource(createElectronNetTransport()),
-    {
-      onStatusChanged: () => {
-        if (window && !window.isDestroyed())
-          window.webContents.send(IPC_CHANNELS.ratesStatusChanged)
-      },
-    },
-  )
+  const exchangeRates = new ExchangeRateScheduler(profiles, rateSource, {
+    onStatusChanged: onRateStatusChanged,
+  })
   exchangeRates.start()
 
   registerIpcHandler(
@@ -110,9 +109,15 @@ void app.whenReady().then(() => {
     IPC_CHANNELS.getVersion,
     (): Awaited<ReturnType<AppBridge['getVersion']>> => app.getVersion(),
   )
-  registerProfileIpc(ipcMain, profiles, () => {
-    void exchangeRates.refreshActive()
-  })
+  registerProfileIpc(
+    ipcMain,
+    profiles,
+    () => {
+      exchangeRates.start()
+      void exchangeRates.refreshActive()
+    },
+    () => exchangeRates.stop(),
+  )
   registerAccountIpc(ipcMain, profiles)
   registerCategoryIpc(ipcMain, profiles)
   registerTransactionIpc(ipcMain, profiles)

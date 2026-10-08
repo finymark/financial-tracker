@@ -70,6 +70,7 @@ export function registerProfileIpc(
   ipcMain: IpcMain,
   controller: ProfileController,
   onProfileNeedsRateRefresh: () => void = () => {},
+  onProfileClosed: () => void = () => {},
 ): void {
   registerIpcHandler(
     ipcMain,
@@ -118,7 +119,9 @@ export function registerProfileIpc(
     IPC_CHANNELS.profilesDelete,
     async (_event, value: unknown): Promise<void> => {
       const input = parseDeleteProfileInput(value)
+      const deletesActiveProfile = controller.getActive()?.id === input.id
       await controller.delete(input.id, input.confirmation)
+      if (deletesActiveProfile) onProfileClosed()
     },
   )
   registerIpcHandler(
@@ -155,6 +158,7 @@ export function registerProfileIpc(
   )
   registerIpcHandler(ipcMain, IPC_CHANNELS.profilesClose, (): Promise<void> => {
     controller.close()
+    onProfileClosed()
     return Promise.resolve()
   })
 }

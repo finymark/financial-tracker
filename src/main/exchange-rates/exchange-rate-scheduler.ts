@@ -1,7 +1,7 @@
 import type { ProfileApplication } from '../profiles/profile-application'
 import type { ExchangeRateSource } from './exchange-rate-source'
 
-const DAY_MS = 24 * 60 * 60 * 1000
+const HOUR_MS = 60 * 60 * 1000
 
 export interface ExchangeRateSchedulerTimers {
   setInterval(handler: () => void, delay: number): unknown
@@ -48,7 +48,7 @@ export class ExchangeRateScheduler {
     if (this.#interval !== null) return
     this.#interval = this.#timers.setInterval(() => {
       void this.refreshActive()
-    }, DAY_MS)
+    }, HOUR_MS)
   }
 
   stop(): void {

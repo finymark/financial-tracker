@@ -274,7 +274,7 @@ export const hu = {
   'reports.apply': 'Tartomány alkalmazása',
   'reports.loading': 'Kimutatás betöltése…',
   'reports.error':
-    'A kimutatás nem tölthető be. Ellenőrizze a dátumtartományt.',
+    'A kimutatás nem tölthető be. A dátum nem lehet 1900-01-01 előtti, és a tartomány legfeljebb 100 év lehet.',
   'reports.total': 'Összes kiadás',
   'reports.provisional': 'ideiglenes árfolyamok',
   'reports.chartType': 'Diagram típusa',
@@ -291,8 +291,10 @@ export const hu = {
   'reports.back': 'Vissza a főkategóriákhoz',
   'reports.drillHint':
     'Válasszon főkategóriát, majd alkategóriát a tranzakciók megnyitásához.',
-  'reports.transactionFilter':
-    'A Kimutatások oldalról megnyitva, a kategória és a zárt dátumtartomány alkalmazva.',
+  'reports.transactionFilter': 'Kimutatásból:',
+  'reports.transactionFilter.expense': 'csak kiadások',
+  'reports.transactionFilter.income': 'csak bevételek',
+  'reports.transactionFilter.clear': 'Kimutatásszűrő törlése',
   'transactions.title': 'Tranzakcióid egy helyen',
   'transactions.description':
     'Rögzítsd kiadásaidat, bevételeidet és átvezetéseidet, hogy a számlaegyenlegek naprakészek legyenek.',

@@ -289,7 +289,7 @@ export const de = {
   'reports.apply': 'Zeitraum anwenden',
   'reports.loading': 'Bericht wird geladen…',
   'reports.error':
-    'Der Bericht konnte nicht geladen werden. Prüfen Sie den Zeitraum.',
+    'Der Bericht konnte nicht geladen werden. Daten müssen am oder nach dem 01.01.1900 liegen und dürfen höchstens 100 Jahre umfassen.',
   'reports.total': 'Gesamtausgaben',
   'reports.provisional': 'vorläufige Kurse',
   'reports.chartType': 'Diagrammtyp',
@@ -306,8 +306,10 @@ export const de = {
   'reports.back': 'Zurück zu den Hauptkategorien',
   'reports.drillHint':
     'Wählen Sie eine Hauptkategorie und dann eine Unterkategorie, um deren Transaktionen zu öffnen.',
-  'reports.transactionFilter':
-    'Aus Berichte geöffnet; Kategorie und inklusiver Datumsbereich sind angewendet.',
+  'reports.transactionFilter': 'Aus Bericht:',
+  'reports.transactionFilter.expense': 'nur Ausgaben',
+  'reports.transactionFilter.income': 'nur Einnahmen',
+  'reports.transactionFilter.clear': 'Berichtsfilter entfernen',
   'transactions.title': 'Deine Transaktionen an einem Ort',
   'transactions.description':
     'Erfasse Ausgaben, Einnahmen und Umbuchungen, damit deine Kontosalden aktuell bleiben.',

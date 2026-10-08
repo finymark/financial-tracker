@@ -1,5 +1,10 @@
 import type Database from 'better-sqlite3'
-import type { ConversionLine } from '../../shared/exchange-rates'
+import type { Category } from '../../shared/categories'
+import type {
+  ExactBaseCurrencyAmount,
+  ConversionLine,
+} from '../../shared/exchange-rates'
+import { roundHalfAwayFromZero } from '../../shared/exact-math'
 import type {
   CategoryBreakdownCategory,
   CategoryBreakdownReport,
@@ -8,36 +13,71 @@ import type {
 } from '../../shared/reports'
 import type { Language } from '../../shared/settings'
 import { listCategories } from './profile-categories'
-import { convertToBaseCurrency } from './profile-exchange-rates'
+import { createBaseCurrencyConverter } from './profile-exchange-rates'
 
-interface ReportLine extends ConversionLine {
+export interface ReportLine extends ConversionLine {
+  kind: 'expense' | 'income'
   categoryId: string | null
 }
 
 export function reportLines(
   database: Database.Database,
   range: ReportDateRange,
-  kind: 'expense' | 'income' = 'expense',
 ): ReportLine[] {
   return database
     .prepare(
-      `SELECT transactions.date, accounts.currency,
+      `SELECT transactions.date, transactions.kind, accounts.currency,
         transaction_lines.amount_minor AS amountMinor,
         transaction_lines.category_id AS categoryId
        FROM transaction_lines
        JOIN transactions ON transactions.id = transaction_lines.transaction_id
        JOIN accounts ON accounts.id = transactions.account_id
-       WHERE transactions.kind = ?
+       WHERE transactions.kind IN ('expense', 'income')
          AND transactions.excluded = 0
          AND transactions.date >= ? AND transactions.date <= ?`,
     )
-    .all(kind, range.from, range.to) as ReportLine[]
+    .all(range.from, range.to) as ReportLine[]
+}
+
+export function groupReportLinesByMainCategory(
+  lines: readonly ReportLine[],
+  categories: readonly Category[],
+): Record<ReportLine['kind'], Map<string | null, ReportLine[]>> {
+  const categoryById = new Map(
+    categories.map((category) => [category.id, category]),
+  )
+  const groups = {
+    income: new Map<string | null, ReportLine[]>(),
+    expense: new Map<string | null, ReportLine[]>(),
+  }
+  for (const line of lines) {
+    const category = line.categoryId
+      ? categoryById.get(line.categoryId)
+      : undefined
+    const mainId = category ? (category.parentId ?? category.id) : null
+    const group = groups[line.kind].get(mainId) ?? []
+    group.push(line)
+    groups[line.kind].set(mainId, group)
+  }
+  return groups
+}
+
+export function shareBasisPoints(
+  amount: ExactBaseCurrencyAmount,
+  total: ExactBaseCurrencyAmount,
+): number {
+  if (BigInt(total.numerator) === 0n) return 0
+  return roundHalfAwayFromZero(
+    BigInt(amount.numerator) * BigInt(total.denominator) * 10_000n,
+    BigInt(amount.denominator) * BigInt(total.numerator),
+    'exchangeRates.error.total',
+  )
 }
 
 export function getCategoryBreakdown(
   database: Database.Database,
   range: ReportDateRange,
-  clock: () => Date,
+  loadedLines = reportLines(database, range),
 ): CategoryBreakdownReport {
   const language = (
     database
@@ -47,69 +87,86 @@ export function getCategoryBreakdown(
   const categories = listCategories(database, language).filter(
     (category) => category.kind === 'expense',
   )
-  const categoryById = new Map(
-    categories.map((category) => [category.id, category]),
-  )
-  const lines = reportLines(database, range)
-  const mainLines = new Map<string | null, ReportLine[]>()
+  const expenseLines = loadedLines.filter((line) => line.kind === 'expense')
+  const mainLines = groupReportLinesByMainCategory(
+    expenseLines,
+    categories,
+  ).expense
   const childLines = new Map<string, ReportLine[]>()
-  for (const line of lines) {
-    const category = line.categoryId
-      ? categoryById.get(line.categoryId)
-      : undefined
-    const mainId = category ? (category.parentId ?? category.id) : null
-    mainLines.set(mainId, [...(mainLines.get(mainId) ?? []), line])
-    if (category)
-      childLines.set(category.id, [
-        ...(childLines.get(category.id) ?? []),
-        line,
-      ])
+  for (const line of expenseLines) {
+    if (!line.categoryId) continue
+    const group = childLines.get(line.categoryId) ?? []
+    group.push(line)
+    childLines.set(line.categoryId, group)
   }
-  const totalFor = (items: readonly ReportLine[]) =>
-    convertToBaseCurrency(database, items, clock)
+  const convert = createBaseCurrencyConverter(database, expenseLines)
+  const reportTotal = convert(expenseLines)
   const result: CategoryBreakdownCategory[] = []
   for (const main of categories.filter(
     (category) => category.parentId === null,
   )) {
     const items = mainLines.get(main.id)
     if (!items) continue
+    const mainTotal = convert(items)
     const subcategories: CategoryBreakdownSubcategory[] = []
     const direct = childLines.get(main.id)
-    if (direct)
+    if (direct) {
+      const total = convert(direct)
       subcategories.push({
         categoryId: main.id,
         name: main.name,
-        total: totalFor(direct),
+        total,
+        shareBasisPoints: shareBasisPoints(
+          total.exactTotal,
+          mainTotal.exactTotal,
+        ),
       })
+    }
     for (const child of categories.filter(
       (category) => category.parentId === main.id,
     )) {
       const childItems = childLines.get(child.id)
-      if (childItems)
+      if (childItems) {
+        const total = convert(childItems)
         subcategories.push({
           categoryId: child.id,
           name: child.name,
-          total: totalFor(childItems),
+          total,
+          shareBasisPoints: shareBasisPoints(
+            total.exactTotal,
+            mainTotal.exactTotal,
+          ),
         })
+      }
     }
     result.push({
       categoryId: main.id,
       name: main.name,
-      total: totalFor(items),
+      total: mainTotal,
+      shareBasisPoints: shareBasisPoints(
+        mainTotal.exactTotal,
+        reportTotal.exactTotal,
+      ),
       subcategories,
     })
   }
   const uncategorized = mainLines.get(null)
-  if (uncategorized)
+  if (uncategorized) {
+    const total = convert(uncategorized)
     result.push({
       categoryId: null,
       name: null,
-      total: totalFor(uncategorized),
+      total,
+      shareBasisPoints: shareBasisPoints(
+        total.exactTotal,
+        reportTotal.exactTotal,
+      ),
       subcategories: [],
     })
+  }
   return {
     range,
-    total: totalFor(lines),
+    total: reportTotal,
     categories: result,
   }
 }

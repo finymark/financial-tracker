@@ -7,17 +7,20 @@ import type {
   RateStatus,
 } from '../../shared/exchange-rates'
 import { today } from '../../shared/date'
+import {
+  addRational,
+  rational,
+  roundHalfAwayFromZero,
+  safeInteger,
+  type Rational,
+} from '../../shared/exact-math'
 import type {
   ExchangeRate,
   ExchangeRateSource,
 } from '../exchange-rates/exchange-rate-source'
 
-interface Rational {
-  numerator: bigint
-  denominator: bigint
-}
-
 interface StoredRate {
+  date: string
   rate: string
   unit: number
 }
@@ -40,30 +43,6 @@ function hasRateCache(database: Database.Database): boolean {
   )
 }
 
-function gcd(left: bigint, right: bigint): bigint {
-  left = left < 0n ? -left : left
-  right = right < 0n ? -right : right
-  while (right !== 0n) [left, right] = [right, left % right]
-  return left || 1n
-}
-
-function rational(numerator: bigint, denominator = 1n): Rational {
-  if (denominator === 0n) throw new Error('exchangeRates.error.rate')
-  if (denominator < 0n) {
-    numerator = -numerator
-    denominator = -denominator
-  }
-  const divisor = gcd(numerator, denominator)
-  return { numerator: numerator / divisor, denominator: denominator / divisor }
-}
-
-function add(left: Rational, right: Rational): Rational {
-  return rational(
-    left.numerator * right.denominator + right.numerator * left.denominator,
-    left.denominator * right.denominator,
-  )
-}
-
 function decimal(value: string): Rational {
   const match = /^(\d+)(?:[,.](\d+))?$/.exec(value)
   if (!match) throw new Error('exchangeRates.error.rate')
@@ -71,24 +50,10 @@ function decimal(value: string): Rational {
   const parsed = rational(
     BigInt(match[1] + fraction),
     10n ** BigInt(fraction.length),
+    'exchangeRates.error.rate',
   )
   if (parsed.numerator <= 0n) throw new Error('exchangeRates.error.rate')
   return parsed
-}
-
-function safe(value: bigint): number {
-  const result = Number(value)
-  if (!Number.isSafeInteger(result))
-    throw new Error('exchangeRates.error.total')
-  return result
-}
-
-function round(ratio: Rational): number {
-  const negative = ratio.numerator < 0n
-  const absolute = negative ? -ratio.numerator : ratio.numerator
-  let result = absolute / ratio.denominator
-  if ((absolute % ratio.denominator) * 2n >= ratio.denominator) result += 1n
-  return safe(negative ? -result : result)
 }
 
 function coverage(database: Database.Database): StoredCoverage {
@@ -103,7 +68,7 @@ function coverage(database: Database.Database): StoredCoverage {
     .get() as StoredCoverage
 }
 
-function baseCurrency(database: Database.Database): Currency {
+export function baseCurrency(database: Database.Database): Currency {
   return (
     database
       .prepare(
@@ -132,20 +97,50 @@ function earliestNeededDate(
   return result.date
 }
 
-function findRate(
+export function needsExchangeRateRefresh(database: Database.Database): boolean {
+  const earliest = earliestNeededDate(database, baseCurrency(database))
+  const stored = coverage(database)
+  return Boolean(earliest && (!stored.startDate || earliest < stored.startDate))
+}
+
+function loadRates(
   database: Database.Database,
+  dates: readonly string[],
+): StoredRate[] {
+  if (!hasRateCache(database) || dates.length === 0) return []
+  const startDate = dates.reduce((left, right) => (left < right ? left : right))
+  const endDate = dates.reduce((left, right) => (left > right ? left : right))
+  return database
+    .prepare(
+      `SELECT date, rate, unit FROM exchange_rates
+       WHERE currency = 'CHF' AND (
+         (date >= ? AND date <= ?) OR
+         date = (SELECT MAX(date) FROM exchange_rates
+                 WHERE currency = 'CHF' AND date < ?)
+       )
+       ORDER BY date`,
+    )
+    .all(startDate, endDate, startDate) as StoredRate[]
+}
+
+function findRate(
+  rates: readonly StoredRate[],
   date: string,
 ): StoredRate | null {
-  if (!hasRateCache(database)) return null
-  return (
-    (database
-      .prepare(
-        `SELECT rate, unit FROM exchange_rates
-         WHERE currency = 'CHF' AND date <= ?
-         ORDER BY date DESC LIMIT 1`,
-      )
-      .get(date) as StoredRate | undefined) ?? null
-  )
+  let low = 0
+  let high = rates.length - 1
+  let found: StoredRate | null = null
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2)
+    const rate = rates[middle]
+    if (rate.date <= date) {
+      found = rate
+      low = middle + 1
+    } else {
+      high = middle - 1
+    }
+  }
+  return found
 }
 
 function moveDate(date: string, days: number): string {
@@ -186,11 +181,11 @@ export async function refreshExchangeRates(
   const stored = coverage(database)
   const spans: { startDate: string; endDate: string }[] = []
   if (!stored.startDate || !stored.endDate) {
-    spans.push({ startDate: earliest, endDate: current })
+    spans.push({ startDate: moveDate(earliest, -14), endDate: current })
   } else {
     if (earliest < stored.startDate) {
       spans.push({
-        startDate: earliest,
+        startDate: moveDate(earliest, -14),
         endDate: moveDate(stored.startDate, -1),
       })
     }
@@ -219,16 +214,20 @@ export async function refreshExchangeRates(
       for (const rate of rates)
         insert.run(rate.date, rate.currency, rate.rate, rate.unit)
       const before = coverage(database)
+      const finalizedEndDate =
+        span.endDate === current && !rates.some((rate) => rate.date === current)
+          ? moveDate(current, -1)
+          : span.endDate
       const startDate = before.startDate
         ? before.startDate < span.startDate
           ? before.startDate
           : span.startDate
         : span.startDate
       const endDate = before.endDate
-        ? before.endDate > span.endDate
+        ? before.endDate > finalizedEndDate
           ? before.endDate
-          : span.endDate
-        : span.endDate
+          : finalizedEndDate
+        : finalizedEndDate
       const refreshedAt = clock().toISOString()
       database
         .prepare(
@@ -262,76 +261,101 @@ export function getRateStatus(
     coverage: validCoverage,
     lastRefresh: stored.lastRefresh,
     stale: Boolean(
-      earliest && (!stored.endDate || stored.endDate < today(clock)),
+      earliest &&
+      (!stored.endDate || stored.endDate < moveDate(today(clock), -1)),
     ),
-    missing: Boolean(earliest && !findRate(database, earliest)),
+    missing: Boolean(
+      earliest && !findRate(loadRates(database, [earliest]), earliest),
+    ),
   }
 }
 
-export function convertToBaseCurrency(
+export function createBaseCurrencyConverter(
   database: Database.Database,
-  lines: readonly ConversionLine[],
-  clock: () => Date,
-): BaseCurrencyConversion {
+  candidateLines: readonly ConversionLine[],
+): (lines: readonly ConversionLine[]) => BaseCurrencyConversion {
   const base = baseCurrency(database)
   const stored = coverage(database)
-  let total = rational(0n)
-  let usesRate = false
-  let usesRateAfterCoverage = false
-  const unconverted = new Map<Currency, bigint>()
-  for (const line of lines) {
+  for (const line of candidateLines) {
     if (
       !DATE.test(line.date) ||
       !Number.isSafeInteger(line.amountMinor) ||
       (line.currency !== 'HUF' && line.currency !== 'CHF')
     )
       throw new Error('exchangeRates.error.line')
-    if (line.amountMinor === 0) continue
-    if (line.currency === base) {
-      total = add(total, rational(BigInt(line.amountMinor)))
-      continue
-    }
-    const rate = findRate(database, line.date)
-    if (!rate) {
-      unconverted.set(
-        line.currency,
-        (unconverted.get(line.currency) ?? 0n) + BigInt(line.amountMinor),
+  }
+  const rates = loadRates(
+    database,
+    candidateLines
+      .filter((line) => line.amountMinor !== 0 && line.currency !== base)
+      .map((line) => line.date),
+  )
+  return (lines) => {
+    let total = rational(0n)
+    let usesRateAfterCoverage = false
+    const unconverted = new Map<Currency, bigint>()
+    for (const line of lines) {
+      if (
+        !DATE.test(line.date) ||
+        !Number.isSafeInteger(line.amountMinor) ||
+        (line.currency !== 'HUF' && line.currency !== 'CHF')
       )
-      continue
+        throw new Error('exchangeRates.error.line')
+      if (line.amountMinor === 0) continue
+      if (line.currency === base) {
+        total = addRational(total, rational(BigInt(line.amountMinor)))
+        continue
+      }
+      const rate = findRate(rates, line.date)
+      if (!rate) {
+        unconverted.set(
+          line.currency,
+          (unconverted.get(line.currency) ?? 0n) + BigInt(line.amountMinor),
+        )
+        continue
+      }
+      if (!stored.endDate || line.date > stored.endDate)
+        usesRateAfterCoverage = true
+      const quoted = decimal(rate.rate)
+      const amount = BigInt(line.amountMinor)
+      total = addRational(
+        total,
+        base === 'HUF'
+          ? rational(
+              amount * quoted.numerator,
+              quoted.denominator * BigInt(rate.unit),
+            )
+          : rational(
+              amount * quoted.denominator * BigInt(rate.unit),
+              quoted.numerator,
+            ),
+      )
     }
-    usesRate = true
-    if (!stored.endDate || line.date > stored.endDate)
-      usesRateAfterCoverage = true
-    const quoted = decimal(rate.rate)
-    const amount = BigInt(line.amountMinor)
-    total = add(
-      total,
-      base === 'HUF'
-        ? rational(
-            amount * quoted.numerator,
-            quoted.denominator * BigInt(rate.unit),
-          )
-        : rational(
-            amount * quoted.denominator * BigInt(rate.unit),
-            quoted.numerator,
-          ),
-    )
+    return {
+      baseCurrency: base,
+      exactTotal: {
+        numerator: total.numerator.toString(),
+        denominator: total.denominator.toString(),
+      },
+      roundedMinor: roundHalfAwayFromZero(
+        total.numerator,
+        total.denominator,
+        'exchangeRates.error.total',
+      ),
+      unconverted: [...unconverted.entries()]
+        .map(([currency, amount]) => ({
+          currency,
+          amountMinor: safeInteger(amount, 'exchangeRates.error.total'),
+        }))
+        .sort((left, right) => left.currency.localeCompare(right.currency)),
+      stale: usesRateAfterCoverage,
+    }
   }
-  return {
-    baseCurrency: base,
-    exactTotal: {
-      numerator: total.numerator.toString(),
-      denominator: total.denominator.toString(),
-    },
-    roundedMinor: round(total),
-    unconverted: [...unconverted.entries()]
-      .map(([currency, amount]) => ({ currency, amountMinor: safe(amount) }))
-      .sort((left, right) => left.currency.localeCompare(right.currency)),
-    stale: Boolean(
-      usesRate &&
-      (usesRateAfterCoverage ||
-        !stored.endDate ||
-        stored.endDate < today(clock)),
-    ),
-  }
+}
+
+export function convertToBaseCurrency(
+  database: Database.Database,
+  lines: readonly ConversionLine[],
+): BaseCurrencyConversion {
+  return createBaseCurrencyConverter(database, lines)(lines)
 }

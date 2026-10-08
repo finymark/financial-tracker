@@ -53,6 +53,13 @@ export function TransactionsPage({
   onTransactionChanged,
   initialReportFilter,
 }: TransactionsPageProps) {
+  const [reportFlags, setReportFlags] = useState<
+    Pick<TransactionListInput, 'kind' | 'uncategorized' | 'exactCategory'>
+  >({
+    kind: initialReportFilter?.kind,
+    uncategorized: initialReportFilter?.uncategorized,
+    exactCategory: initialReportFilter?.exactCategory,
+  })
   const [page, setPage] = useState<TransactionPage>({
     rows: [],
     totals: [],
@@ -77,12 +84,13 @@ export function TransactionsPage({
     period: (initialReportFilter?.period ?? 'all') as TransactionPeriod,
     from: initialReportFilter?.from ?? '',
     to: initialReportFilter?.to ?? '',
-    accountId: '',
+    accountId: initialReportFilter?.accountId ?? '',
     categoryId: initialReportFilter?.categoryId ?? '',
-    payeeId: '',
-    tagId: '',
-    search: '',
-    exclusion: 'all' as TransactionExclusionFilter,
+    payeeId: initialReportFilter?.payeeId ?? '',
+    tagId: initialReportFilter?.tagId ?? '',
+    search: initialReportFilter?.search ?? '',
+    exclusion: (initialReportFilter?.exclusion ??
+      'all') as TransactionExclusionFilter,
   })
   const [revision, setRevision] = useState(0)
   const references = useTransactionReferenceData(
@@ -179,8 +187,34 @@ export function TransactionsPage({
       tagId: filters.tagId || undefined,
       search: filters.search,
       exclusion: filters.exclusion,
+      ...reportFlags,
       limit: 200,
       offset: 0,
+    })
+  }
+
+  const reportFilterParts = initialReportFilter
+    ? [
+        reportFlags.uncategorized
+          ? t('reports.uncategorized')
+          : filters.categoryId
+            ? categories.find((category) => category.id === filters.categoryId)
+                ?.name
+            : null,
+        reportFlags.kind
+          ? t(`reports.transactionFilter.${reportFlags.kind}`)
+          : null,
+      ].filter((part): part is string => Boolean(part))
+    : []
+
+  function clearReportFlags() {
+    setReportFlags({})
+    setRequest((current) => {
+      const next = { ...current }
+      delete next.kind
+      delete next.uncategorized
+      delete next.exactCategory
+      return { ...next, offset: 0 }
     })
   }
 
@@ -264,10 +298,20 @@ export function TransactionsPage({
         className="grid gap-3 rounded-md border p-3 sm:grid-cols-3 lg:grid-cols-6"
         aria-label={t('transactions.filters')}
       >
-        {initialReportFilter && (
-          <p className="self-end text-xs text-muted-foreground sm:col-span-3 lg:col-span-6">
-            {t('reports.transactionFilter')}
-          </p>
+        {reportFilterParts.length > 0 && (
+          <div className="flex items-center gap-2 self-end text-xs text-muted-foreground sm:col-span-3 lg:col-span-6">
+            <span className="rounded-full border bg-muted px-3 py-1">
+              {t('reports.transactionFilter')} {reportFilterParts.join(', ')}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={clearReportFlags}
+              aria-label={t('reports.transactionFilter.clear')}
+            >
+              {t('reports.transactionFilter.clear')}
+            </Button>
+          </div>
         )}
         <label className="space-y-1 text-xs font-medium">
           {t('transactions.period')}

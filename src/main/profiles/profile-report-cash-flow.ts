@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import type { Currency } from '../../shared/accounts'
-import type { ConversionLine } from '../../shared/exchange-rates'
+import { safeInteger } from '../../shared/exact-math'
 import type {
   CashFlowNode,
   CashFlowReport,
@@ -8,24 +8,15 @@ import type {
 import type { ReportDateRange } from '../../shared/reports'
 import type { Language } from '../../shared/settings'
 import { listCategories } from './profile-categories'
-import { convertToBaseCurrency } from './profile-exchange-rates'
-
-interface CashFlowLine extends ConversionLine {
-  kind: 'income' | 'expense'
-  categoryId: string | null
-}
-
-function safe(value: bigint): number {
-  const result = Number(value)
-  if (!Number.isSafeInteger(result))
-    throw new Error('exchangeRates.error.total')
-  return result
-}
+import {
+  baseCurrency,
+  createBaseCurrencyConverter,
+} from './profile-exchange-rates'
+import { groupReportLinesByMainCategory, reportLines } from './profile-reports'
 
 export function getCashFlow(
   database: Database.Database,
   range: ReportDateRange,
-  clock: () => Date,
 ): CashFlowReport {
   const language = (
     database
@@ -33,38 +24,12 @@ export function getCashFlow(
       .get() as { language: Language }
   ).language
   const categories = listCategories(database, language)
-  const categoryById = new Map(
-    categories.map((category) => [category.id, category]),
-  )
-  const lines = database
-    .prepare(
-      `SELECT transactions.date, transactions.kind, accounts.currency,
-      transaction_lines.amount_minor AS amountMinor,
-      transaction_lines.category_id AS categoryId
-     FROM transaction_lines
-     JOIN transactions ON transactions.id = transaction_lines.transaction_id
-     JOIN accounts ON accounts.id = transactions.account_id
-     WHERE transactions.kind IN ('income', 'expense')
-       AND transactions.excluded = 0
-       AND transactions.date >= ? AND transactions.date <= ?`,
-    )
-    .all(range.from, range.to) as CashFlowLine[]
-  const groups = {
-    income: new Map<string | null, CashFlowLine[]>(),
-    expense: new Map<string | null, CashFlowLine[]>(),
-  }
-  for (const line of lines) {
-    const category = line.categoryId
-      ? categoryById.get(line.categoryId)
-      : undefined
-    const mainId = category ? (category.parentId ?? category.id) : null
-    const group = groups[line.kind].get(mainId) ?? []
-    group.push(line)
-    groups[line.kind].set(mainId, group)
-  }
+  const lines = reportLines(database, range)
+  const groups = groupReportLinesByMainCategory(lines, categories)
+  const convert = createBaseCurrencyConverter(database, lines)
   const report: CashFlowReport = {
     range,
-    baseCurrency: convertToBaseCurrency(database, [], clock).baseCurrency,
+    baseCurrency: baseCurrency(database),
     stale: false,
     unconverted: [],
     nodes: [],
@@ -79,7 +44,7 @@ export function getCashFlow(
     for (const main of [...mainCategories, null]) {
       const items = groups[kind].get(main?.id ?? null)
       if (!items) continue
-      const total = convertToBaseCurrency(database, items, clock)
+      const total = convert(items)
       report.stale ||= total.stale
       for (const item of total.unconverted) {
         const amounts = unconverted.get(item.currency) ?? {
@@ -104,16 +69,18 @@ export function getCashFlow(
   report.unconverted = [...unconverted]
     .map(([currency, amounts]) => ({
       currency,
-      incomeMinor: safe(amounts.income),
-      expenseMinor: safe(amounts.expense),
+      incomeMinor: safeInteger(amounts.income, 'exchangeRates.error.total'),
+      expenseMinor: safeInteger(amounts.expense, 'exchangeRates.error.total'),
     }))
     .sort((left, right) => left.currency.localeCompare(right.currency))
   if (income.length === 0 && expense.length === 0) return report
-  const incomeMinor = safe(
+  const incomeMinor = safeInteger(
     income.reduce((sum, node) => sum + BigInt(node.value), 0n),
+    'exchangeRates.error.total',
   )
-  const expenseMinor = safe(
+  const expenseMinor = safeInteger(
     expense.reduce((sum, node) => sum + BigInt(node.value), 0n),
+    'exchangeRates.error.total',
   )
   // Round category totals once, then reuse them for links. The center and
   // balancing nodes must sum those displayed flows, not round a second total.

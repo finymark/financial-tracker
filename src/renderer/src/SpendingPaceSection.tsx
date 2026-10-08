@@ -1,4 +1,4 @@
-import { useAmountFormatters } from './lib/privacy'
+import { useAmountFormatters, usePrivacy } from './lib/privacy'
 import { useEffect, useMemo, useState } from 'react'
 import {
   Bar,
@@ -27,6 +27,7 @@ interface SpendingPaceSectionProps {
 /** Self-contained so Overview can reuse the same API-backed comparison later. */
 export function SpendingPaceSection({ language, t }: SpendingPaceSectionProps) {
   const format = useAmountFormatters(language)
+  const { privacyMode } = usePrivacy()
   const [revision, setRevision] = useState(0)
   const key = useMemo(() => ({ language, revision }), [language, revision])
   const [result, setResult] = useState<{
@@ -219,7 +220,7 @@ export function SpendingPaceSection({ language, t }: SpendingPaceSectionProps) {
             </div>
           </dl>
           <div
-            className="h-48 w-full"
+            className={`h-48 w-full${privacyMode ? ' private-amount' : ''}`}
             role="img"
             aria-label={t('reports.pace.chartLabel')}
           >

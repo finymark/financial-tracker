@@ -362,7 +362,7 @@ test('each month retains its own missing-currency bucket and marks cached conver
       exactTotal: { numerator: '1601', denominator: '2' },
       roundedMinor: 801,
       unconverted: [{ currency: 'CHF', amountMinor: 70 }],
-      stale: true,
+      stale: false,
     },
     incomes: {
       roundedMinor: 0,
@@ -372,7 +372,7 @@ test('each month retains its own missing-currency bucket and marks cached conver
     net: {
       roundedMinor: -801,
       unconverted: [{ currency: 'CHF', amountMinor: 30 }],
-      stale: true,
+      stale: false,
     },
   })
   expect(report.months[2]).toMatchObject({

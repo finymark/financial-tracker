@@ -347,11 +347,11 @@ test('pace exposes unconverted buckets per affected month and category, and mark
   expect(report.total.previousMonths).toMatchObject([
     {
       range: { from: '2026-02-01', to: '2026-02-28' },
-      total: { roundedMinor: 410, stale: true, unconverted: [] },
+      total: { roundedMinor: 410, stale: false, unconverted: [] },
     },
     {
       range: { from: '2026-01-01', to: '2026-01-31' },
-      total: { roundedMinor: 250, stale: true, unconverted: [] },
+      total: { roundedMinor: 250, stale: false, unconverted: [] },
     },
     {
       range: { from: '2025-12-01', to: '2025-12-31' },
@@ -362,7 +362,7 @@ test('pace exposes unconverted buckets per affected month and category, and mark
     },
   ])
   expect(report.total).toMatchObject({
-    average: { roundedMinor: 220, stale: true },
+    average: { roundedMinor: 220, stale: false },
     differenceMinor: 130,
     percentageBasisPoints: 5_909,
     incomplete: true,

@@ -1,4 +1,4 @@
-import { useAmountFormatters } from './lib/privacy'
+import { useAmountFormatters, usePrivacy } from './lib/privacy'
 import { useEffect, useMemo, useState } from 'react'
 import {
   ResponsiveContainer,
@@ -29,6 +29,7 @@ const nodeColors: Record<CashFlowNode['kind'], string> = {
 
 export function CashFlowReport({ request, language, t }: CashFlowReportProps) {
   const format = useAmountFormatters(language)
+  const { privacyMode } = usePrivacy()
   const reportKey = useMemo(() => ({ request, language }), [request, language])
   const [result, setResult] = useState<{
     key: typeof reportKey
@@ -159,7 +160,7 @@ export function CashFlowReport({ request, language, t }: CashFlowReportProps) {
         <>
           <div className="overflow-x-auto">
             <div
-              className="min-w-160 w-full"
+              className={`min-w-160 w-full${privacyMode ? ' private-amount' : ''}`}
               style={{ height: Math.max(320, data.nodes.length * 32) }}
             >
               <ResponsiveContainer width="100%" height="100%">
@@ -205,14 +206,16 @@ export function CashFlowReport({ request, language, t }: CashFlowReportProps) {
                 </tr>
               </thead>
               <tbody>
-                {data.nodes.map((node, index) => (
-                  <tr key={index}>
-                    <td className="border-t px-3 py-2">{node.name}</td>
-                    <td className="border-t px-3 py-2 text-right tabular-nums">
-                      {format.amount(node.value, report.baseCurrency)}
-                    </td>
-                  </tr>
-                ))}
+                {data.nodes
+                  .filter((node) => node.kind !== 'center')
+                  .map((node, index) => (
+                    <tr key={index}>
+                      <td className="border-t px-3 py-2">{node.name}</td>
+                      <td className="border-t px-3 py-2 text-right tabular-nums">
+                        {format.amount(node.value, report.baseCurrency)}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>

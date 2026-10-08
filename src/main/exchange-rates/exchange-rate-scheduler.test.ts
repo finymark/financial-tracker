@@ -5,12 +5,13 @@ import { ExchangeRateScheduler } from './exchange-rate-scheduler'
 
 const source: ExchangeRateSource = { fetchRates: async () => [] }
 
-test('refreshes on request and every 24 hours with injectable timers', async () => {
+test('refreshes on request and hourly with injectable timers', async () => {
   const refreshExchangeRates = vi.fn(async () => {})
   const application = {
     commands: { refreshExchangeRates },
   } as unknown as ProfileApplication
   let interval: (() => void) | undefined
+  const clearInterval = vi.fn()
   const onStatusChanged = vi.fn()
   const scheduler = new ExchangeRateScheduler(
     { getActiveApplication: () => application },
@@ -18,11 +19,11 @@ test('refreshes on request and every 24 hours with injectable timers', async () 
     {
       timers: {
         setInterval(handler, delay) {
-          expect(delay).toBe(24 * 60 * 60 * 1000)
+          expect(delay).toBe(60 * 60 * 1000)
           interval = handler
           return 1
         },
-        clearInterval: vi.fn(),
+        clearInterval,
       },
       onStatusChanged,
     },
@@ -35,6 +36,7 @@ test('refreshes on request and every 24 hours with injectable timers', async () 
   interval!()
   await vi.waitFor(() => expect(refreshExchangeRates).toHaveBeenCalledTimes(2))
   scheduler.stop()
+  expect(clearInterval).toHaveBeenCalledWith(1)
 })
 
 test('logs refresh failures without rejecting or blocking later refreshes', async () => {

@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3'
+import { safeInteger } from '../../shared/exact-math'
 
 interface Movement {
   date: string
@@ -7,12 +8,6 @@ interface Movement {
   amountMinor?: number
   adjustmentId?: string
   observedMinor?: number
-}
-
-function safe(value: bigint): number {
-  const number = Number(value)
-  if (!Number.isSafeInteger(number)) throw new Error('accounts.error.balance')
-  return number
 }
 
 /**
@@ -118,11 +113,17 @@ export function calculateAccountHistory(
   for (const movement of movements) {
     if (movement.adjustmentId) {
       const observed = BigInt(movement.observedMinor!)
-      adjustmentDifferences.set(movement.adjustmentId, safe(observed - balance))
+      adjustmentDifferences.set(
+        movement.adjustmentId,
+        safeInteger(observed - balance, 'accounts.error.balance'),
+      )
       balance = observed
     } else {
       balance += BigInt(movement.amountMinor!)
     }
   }
-  return { balance: safe(balance), adjustmentDifferences }
+  return {
+    balance: safeInteger(balance, 'accounts.error.balance'),
+    adjustmentDifferences,
+  }
 }
