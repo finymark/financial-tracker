@@ -1,3 +1,4 @@
+import Database from 'better-sqlite3'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -332,8 +333,16 @@ test('the category migration seeds existing profiles in their saved language and
   const { application, profile, paths } = await setup(
     CURRENT_MIGRATIONS.slice(0, 3),
   )
-  application.commands.updateSettings({ language: 'hu' })
   application.close()
+  // Arrange the old settings layout before applying the category migration.
+  const fixture = new Database(paths.databasePath)
+  try {
+    fixture
+      .prepare("UPDATE profile_settings SET language = 'hu' WHERE id = 1")
+      .run()
+  } finally {
+    fixture.close()
+  }
   const upgraded = await openProfileApplication({ profile, paths, clock })
   applications.push(upgraded)
   expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(

@@ -2,6 +2,7 @@ import { useRef, useState, type FormEvent, type RefObject } from 'react'
 import type { TransactionListInput } from '../../../../shared/transactions'
 import type { CsvDecimalSeparator } from '../../../../shared/transaction-csv'
 import type { Language, MessageKey } from '../../i18n'
+import { useAmountFormatters } from '../../lib/privacy'
 import { useDialogFocus } from '../../lib/use-dialog-focus'
 import { Button } from '../ui/button'
 import { NativeSelect } from '../ui/native-select'
@@ -23,6 +24,7 @@ export function ExportCsvDialog({
   onClose,
   onSaved,
 }: Props) {
+  const format = useAmountFormatters(language)
   const dialogRef = useRef<HTMLElement>(null)
   const selectRef = useRef<HTMLSelectElement>(null)
   useDialogFocus(true, dialogRef, selectRef, exportRef)
@@ -99,10 +101,14 @@ export function ExportCsvDialog({
             >
               <option value="profile">
                 {t('csv.profileDefault')} ·{' '}
-                {language === 'en' ? '123.45' : '123,45'}
+                {format.privateText(language === 'en' ? '123.45' : '123,45')}
               </option>
-              <option value=".">{t('csv.dot')}</option>
-              <option value=",">{t('csv.comma')}</option>
+              <option value=".">
+                {t('csv.dot').replace('123.45', format.privateText('123.45'))}
+              </option>
+              <option value=",">
+                {t('csv.comma').replace('123,45', format.privateText('123,45'))}
+              </option>
             </NativeSelect>
           </label>
           <div className="flex justify-end gap-2">

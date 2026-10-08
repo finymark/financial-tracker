@@ -32,6 +32,13 @@ interface ShortcutDefinition {
 
 export const shortcuts = [
   {
+    action: 'privacy',
+    scopes: ['app', 'drawer', 'help'],
+    label: 'Ctrl+Shift+H',
+    description: 'privacy.toggle',
+    bindings: [{ key: 'h', ctrl: true, shift: true }],
+  },
+  {
     action: 'newTransaction',
     scopes: ['app'],
     label: 'N / Ctrl+N',

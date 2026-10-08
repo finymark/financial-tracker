@@ -1,3 +1,4 @@
+import { useAmountFormatters } from './lib/privacy'
 import { useEffect, useMemo, useState } from 'react'
 import {
   Bar,
@@ -14,7 +15,7 @@ import type { OverviewDashboard } from '../../shared/report-overview'
 import type { TransactionListInput } from '../../shared/transactions'
 import { Button } from './components/ui/button'
 import { CardContent } from './components/ui/card'
-import { createFormatters, type Language, type MessageKey } from './i18n'
+import { type Language, type MessageKey } from './i18n'
 
 interface OverviewPageProps {
   language: Language
@@ -29,7 +30,7 @@ export function OverviewPage({
   onOpenReports,
   onOpenTransactions,
 }: OverviewPageProps) {
-  const format = createFormatters(language)
+  const format = useAmountFormatters(language)
   const requestKey = useMemo(() => ({ language }), [language])
   const [result, setResult] = useState<{
     key: typeof requestKey
@@ -70,7 +71,7 @@ export function OverviewPage({
       <>
         <span className="tabular-nums">
           {showSign && total.roundedMinor > 0 ? '+' : ''}
-          {format.money(total.roundedMinor, total.baseCurrency)}
+          {format.amount(total.roundedMinor, total.baseCurrency)}
         </span>
         {total.stale && (
           <span className="ml-2 text-xs font-normal text-muted-foreground">
@@ -84,7 +85,7 @@ export function OverviewPage({
           >
             {t('reports.unconverted')}:{' '}
             {showSign && item.amountMinor > 0 ? '+' : ''}
-            {format.money(item.amountMinor, item.currency)}
+            {format.amount(item.amountMinor, item.currency)}
           </span>
         ))}
       </>
@@ -291,9 +292,11 @@ export function OverviewPage({
                             {amount(category.total)}
                           </td>
                           <td className="border-t px-3 py-2 text-right tabular-nums">
-                            {format.number(category.shareBasisPoints / 100, {
-                              maximumFractionDigits: 2,
-                            })}
+                            {format.amountText(
+                              format.number(category.shareBasisPoints / 100, {
+                                maximumFractionDigits: 2,
+                              }),
+                            )}
                             %
                           </td>
                         </tr>

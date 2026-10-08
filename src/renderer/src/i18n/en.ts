@@ -1,6 +1,11 @@
 import { csvMessages } from '../../../shared/csv-translations'
 import { categoryNames } from '../../../shared/category-translations'
 export const en = {
+  'privacy.toggle': 'Privacy mode',
+  'privacy.hiddenAmount': 'Hidden amount',
+  'privacy.shortcutScope':
+    'Privacy mode works everywhere, including while typing (Ctrl+Shift+H).',
+
   'shortcuts.closeHelp': 'Close shortcut help',
   'transactions.saveAndAddAnother': 'Save and add another',
   'shortcuts.scope':

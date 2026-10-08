@@ -1,10 +1,11 @@
+import { useAmountFormatters } from './lib/privacy'
 import { useEffect, useState, type FormEvent } from 'react'
 import { currencies, type Account, type Currency } from '../../shared/accounts'
 import { Button } from './components/ui/button'
 import { CardContent } from './components/ui/card'
 import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
-import { createFormatters, type Language, type MessageKey } from './i18n'
+import { type Language, type MessageKey } from './i18n'
 import { parseAmountExpression } from '../../shared/amount-expression'
 import { AmountInput } from './components/amount-input'
 
@@ -44,7 +45,7 @@ export function AccountsPage({
   const [editing, setEditing] = useState<Editing>(null)
   const [newName, setNewName] = useState('')
   const [newCurrency, setNewCurrency] = useState<Currency>('HUF')
-  const format = createFormatters(language)
+  const format = useAmountFormatters(language)
 
   useEffect(() => {
     let ignore = false
@@ -147,13 +148,13 @@ export function AccountsPage({
                     {t('accounts.balance')}
                   </dt>
                   <dd className="font-semibold tabular-nums">
-                    {format.money(account.balance, account.currency)}
+                    {format.amount(account.balance, account.currency)}
                   </dd>
                 </dl>
               </div>
               <p className="text-sm text-muted-foreground">
                 {t('accounts.openingBalance')}:{' '}
-                {format.money(account.openingBalance, account.currency)}
+                {format.amount(account.openingBalance, account.currency)}
                 {' · '}
                 {t('accounts.openingDate')}:{' '}
                 {format.date(new Date(`${account.openingDate}T00:00:00`))}

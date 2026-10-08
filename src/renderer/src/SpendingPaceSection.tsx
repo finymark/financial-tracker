@@ -1,3 +1,4 @@
+import { useAmountFormatters } from './lib/privacy'
 import { useEffect, useMemo, useState } from 'react'
 import {
   Bar,
@@ -16,7 +17,7 @@ import type {
   SpendingPaceReport,
 } from '../../shared/reports'
 import { Button } from './components/ui/button'
-import { createFormatters, type Language, type MessageKey } from './i18n'
+import { type Language, type MessageKey } from './i18n'
 
 interface SpendingPaceSectionProps {
   language: Language
@@ -25,7 +26,7 @@ interface SpendingPaceSectionProps {
 
 /** Self-contained so Overview can reuse the same API-backed comparison later. */
 export function SpendingPaceSection({ language, t }: SpendingPaceSectionProps) {
-  const format = createFormatters(language)
+  const format = useAmountFormatters(language)
   const [revision, setRevision] = useState(0)
   const key = useMemo(() => ({ language, revision }), [language, revision])
   const [result, setResult] = useState<{
@@ -66,7 +67,7 @@ export function SpendingPaceSection({ language, t }: SpendingPaceSectionProps) {
   ) {
     return (
       <>
-        <span>{format.money(value.roundedMinor, value.baseCurrency)}</span>
+        <span>{format.amount(value.roundedMinor, value.baseCurrency)}</span>
         {value.stale && (
           <span className="ml-2 text-xs font-normal text-muted-foreground">
             {t('reports.provisional')}
@@ -79,7 +80,7 @@ export function SpendingPaceSection({ language, t }: SpendingPaceSectionProps) {
               className="block text-xs font-normal text-muted-foreground"
             >
               {t('reports.unconverted')}:{' '}
-              {format.money(item.amountMinor, item.currency)}
+              {format.amount(item.amountMinor, item.currency)}
             </span>
           ))}
       </>
@@ -98,9 +99,11 @@ export function SpendingPaceSection({ language, t }: SpendingPaceSectionProps) {
               className="block text-xs font-normal text-muted-foreground"
             >
               {dateRange(month.range)} — {t('reports.unconverted')}:{' '}
-              {month.total.unconverted
-                .map((item) => format.money(item.amountMinor, item.currency))
-                .join(', ')}
+              {month.total.unconverted.map((item) => (
+                <span key={item.currency}>
+                  {format.amount(item.amountMinor, item.currency)}{' '}
+                </span>
+              ))}
             </span>
           ))}
       </>
@@ -113,14 +116,16 @@ export function SpendingPaceSection({ language, t }: SpendingPaceSectionProps) {
         <span className="font-medium">
           {t(`reports.pace.${comparison.direction}`)}
         </span>{' '}
-        {format.money(
+        {format.amount(
           Math.abs(comparison.differenceMinor),
           comparison.current.baseCurrency,
         )}
         <span className="block text-xs font-normal text-muted-foreground">
           {comparison.percentageBasisPoints === null
             ? t('reports.pace.noBaseline')
-            : `${format.number(Math.abs(comparison.percentageBasisPoints) / 100, { maximumFractionDigits: 2 })}%`}
+            : format.amountText(
+                `${format.number(Math.abs(comparison.percentageBasisPoints) / 100, { maximumFractionDigits: 2 })}%`,
+              )}
         </span>
         {comparison.incomplete && (
           <span className="block text-xs text-muted-foreground">

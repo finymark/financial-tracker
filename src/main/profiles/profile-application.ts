@@ -808,6 +808,14 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
     VALUES (1, NULL, NULL, NULL);
   `,
   ),
+  defineSqlMigration(
+    18,
+    'profile privacy mode',
+    `
+    ALTER TABLE profile_settings ADD COLUMN privacy_mode INTEGER NOT NULL
+      DEFAULT 0 CHECK (privacy_mode IN (0, 1));
+  `,
+  ),
 ]
 
 function validateMigrations(
@@ -1490,27 +1498,46 @@ class OpenProfileApplication implements ProfileApplication {
   }
 
   #updateSettings(changes: ProfileSettingsChanges): ProfileSettings {
-    return this.#executeCommand(() => {
-      const settings = {
-        ...this.#getSettings(),
-        ...parseSettingsChanges(changes),
-      }
+    this.#assertAvailable()
+    const parsed = parseSettingsChanges(changes)
+    const update = () => {
+      const settings = { ...this.#getSettings(), ...parsed }
       this.#database
         .prepare(
-          'UPDATE profile_settings SET language = ?, theme = ?, base_currency = ? WHERE id = 1',
+          'UPDATE profile_settings SET language = ?, theme = ?, base_currency = ?, privacy_mode = ? WHERE id = 1',
         )
-        .run(settings.language, settings.theme, settings.baseCurrency)
+        .run(
+          settings.language,
+          settings.theme,
+          settings.baseCurrency,
+          Number(settings.privacyMode),
+        )
       return this.#getSettings()
-    })
+    }
+    // Privacy is presentation-only: do not invalidate ledger undo images.
+    // Mixed writes retain the existing non-undoable settings-command boundary.
+    if (Object.keys(parsed).every((key) => key === 'privacyMode')) {
+      return this.#database.transaction(update)()
+    }
+    return this.#executeCommand(update)
   }
 
   #getSettings(): ProfileSettings {
     this.#assertAvailable()
-    return this.#database
-      .prepare(
-        'SELECT language, theme, base_currency AS baseCurrency FROM profile_settings WHERE id = 1',
-      )
-      .get() as ProfileSettings
+    const row = this.#database
+      .prepare('SELECT * FROM profile_settings WHERE id = 1')
+      .get() as {
+      language: ProfileSettings['language']
+      theme: ProfileSettings['theme']
+      base_currency: ProfileSettings['baseCurrency']
+      privacy_mode?: number
+    }
+    return {
+      language: row.language,
+      theme: row.theme,
+      baseCurrency: row.base_currency,
+      privacyMode: row.privacy_mode === 1,
+    }
   }
 
   #getProfileInfo(): ProfileInfo {

@@ -76,6 +76,7 @@ describe('profile application API', () => {
         language,
         theme: 'system',
         baseCurrency: 'HUF',
+        privacyMode: false,
       })
       expect(controller.listBackups()).toHaveLength(1)
       controller.close()
@@ -265,15 +266,28 @@ describe('profile application API', () => {
       migrations: CURRENT_MIGRATIONS.slice(0, 2),
     }
     const initial = await openProfileApplication(olderOptions)
-    initial.commands.updateSettings(settings)
     initial.close()
+    // Arrange a historical schema snapshot with its historical settings columns.
+    const fixture = new Database(paths.databasePath)
+    try {
+      fixture
+        .prepare(
+          'UPDATE profile_settings SET language = ?, theme = ?, base_currency = ? WHERE id = 1',
+        )
+        .run(settings.language, settings.theme, settings.baseCurrency)
+    } finally {
+      fixture.close()
+    }
     const older = await openProfileApplication(olderOptions)
     const backup = older.queries.listBackups()[0]
     older.close()
 
     const application = await openProfileApplication(options)
     try {
-      expect(application.queries.getSettings()).toEqual(settings)
+      expect(application.queries.getSettings()).toEqual({
+        ...settings,
+        privacyMode: false,
+      })
       application.commands.createAccount({
         name: 'Later account',
         currency: 'HUF',
@@ -288,7 +302,10 @@ describe('profile application API', () => {
       expect(application.queries.getProfileInfo().schemaVersion).toBe(
         currentVersion,
       )
-      expect(application.queries.getSettings()).toEqual(settings)
+      expect(application.queries.getSettings()).toEqual({
+        ...settings,
+        privacyMode: false,
+      })
       expect(application.queries.listAccounts()).toEqual([])
       const created = application.commands.createAccount({
         name: 'Restored account',
@@ -794,6 +811,7 @@ describe('profile application API', () => {
           language: 'en',
           theme: 'system',
           baseCurrency: 'HUF',
+          privacyMode: false,
         })
       } finally {
         upgraded.close()
@@ -843,6 +861,7 @@ describe('profile application API', () => {
         language: 'hu',
         theme: 'dark',
         baseCurrency: 'CHF',
+        privacyMode: false,
       })
     } finally {
       reopened.close()
@@ -871,6 +890,7 @@ describe('profile application API', () => {
         language: 'hu',
         theme: 'dark',
         baseCurrency: 'CHF',
+        privacyMode: false,
       })
     } finally {
       backupApplication.close()

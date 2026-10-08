@@ -116,3 +116,29 @@ test.each([
     expect(matchShortcut(key('Enter', changes), { scope: 'drawer' })).toBeNull()
   },
 )
+
+test('Ctrl+Shift+H toggles privacy globally, including typing, without taking editing keys', () => {
+  for (const scope of ['app', 'drawer', 'help'] as const) {
+    expect(
+      matchShortcut(key('H', { ctrlKey: true, shiftKey: true }), {
+        scope,
+        editingText: true,
+        multiline: true,
+      }),
+    ).toBe('privacy')
+    for (const modifiers of [
+      {},
+      { ctrlKey: true },
+      { shiftKey: true },
+      { ctrlKey: true, shiftKey: true, altKey: true },
+      { ctrlKey: true, shiftKey: true, metaKey: true },
+      { ctrlKey: true, shiftKey: true, repeat: true },
+      { ctrlKey: true, shiftKey: true, isComposing: true },
+      { ctrlKey: true, shiftKey: true, defaultPrevented: true },
+    ]) {
+      expect(
+        matchShortcut(key('h', modifiers), { scope, editingText: true }),
+      ).toBeNull()
+    }
+  }
+})
