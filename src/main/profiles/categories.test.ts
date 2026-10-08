@@ -402,6 +402,79 @@ test('invalid category commands leave the profile unchanged', async () => {
   }
 })
 
+test('category create, rename, reorder, archive, unarchive, and delete-with-replacement are undoable', async () => {
+  const { application } = await setup()
+  const initial = application.queries.listCategories()
+  const created = application.commands.createCategory({
+    name: 'Undo category',
+    kind: 'expense',
+  })
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listCategories()).toEqual(initial)
+
+  const source = application.commands.createCategory({
+    name: 'Source',
+    kind: 'expense',
+  })
+  const replacement = application.commands.createCategory({
+    name: 'Replacement',
+    kind: 'expense',
+  })
+  application.commands.renameCategory({ id: source.id, name: 'Renamed' })
+  expect(application.commands.undoLast()).toBe(true)
+  expect(
+    application.queries.listCategories().find(({ id }) => id === source.id),
+  ).toEqual(source)
+
+  const beforeOrder = application.queries.listCategories()
+  application.commands.reorderCategory({ id: source.id, sortOrder: 0 })
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listCategories()).toEqual(beforeOrder)
+
+  application.commands.archiveCategory(source.id)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(
+    application.queries.listCategories().find(({ id }) => id === source.id),
+  ).toEqual(source)
+
+  application.commands.archiveCategory(source.id)
+  application.commands.unarchiveCategory(source.id)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(
+    application.queries.listCategories().find(({ id }) => id === source.id),
+  ).toEqual({ ...source, archived: true })
+  application.commands.unarchiveCategory(source.id)
+
+  const account = application.commands.createAccount({
+    name: 'Category undo account',
+    currency: 'HUF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  const transaction = application.commands.createTransaction({
+    accountId: account.id,
+    kind: 'expense',
+    date: '2026-01-15',
+    totalMinor: 100,
+    payeeName: null,
+    categoryId: source.id,
+    note: '',
+  })
+  application.commands.deleteCategory({
+    id: source.id,
+    replacementId: replacement.id,
+  })
+  expect(application.queries.listTransactions().rows[0]).toMatchObject({
+    line: { categoryId: replacement.id },
+  })
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toEqual([transaction])
+  expect(
+    application.queries.listCategories().find(({ id }) => id === source.id),
+  ).toEqual({ ...source, hasTransactions: true })
+  expect(created.id).not.toBe(source.id)
+})
+
 test('category IDs and commands stay isolated between profiles', async () => {
   const { application, registry } = await setup()
   const category = application.commands.createCategory({

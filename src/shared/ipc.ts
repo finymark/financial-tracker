@@ -68,7 +68,6 @@ import type {
 import type {
   CategorisationAutofill,
   CategorisationRule,
-  CategorisationRuleApplicationPreview,
   CategorisationRuleDraftInput,
   CategorisationRuleIdInput,
   CreateCategorisationRuleInput,
@@ -104,6 +103,7 @@ export const IPC_CHANNELS = {
   accountsRename: 'accounts:rename',
   accountsChangeCurrency: 'accounts:change-currency',
   accountsArchive: 'accounts:archive',
+  accountsUnarchive: 'accounts:unarchive',
   accountsDelete: 'accounts:delete',
   profilesUpdateSettings: 'profiles:update-settings',
   templatesList: 'templates:list',
@@ -138,8 +138,6 @@ export const IPC_CHANNELS = {
   rulesUpdate: 'rules:update',
   rulesReorder: 'rules:reorder',
   rulesDelete: 'rules:delete',
-  rulesPreviewApplication: 'rules:preview-application',
-  rulesApply: 'rules:apply',
 } as const
 
 export interface AppBridge {
@@ -152,8 +150,6 @@ export interface AppBridge {
     update(input: UpdateCategorisationRuleInput): Promise<CategorisationRule>
     reorder(input: ReorderCategorisationRuleInput): Promise<void>
     delete(input: CategorisationRuleIdInput): Promise<void>
-    previewApplication(): Promise<CategorisationRuleApplicationPreview>
-    apply(): Promise<CategorisationRuleApplicationPreview>
   }
   updates: {
     isReady(): Promise<boolean>
@@ -224,6 +220,7 @@ export interface AppBridge {
     rename(input: RenameAccountInput): Promise<Account>
     changeCurrency(input: ChangeAccountCurrencyInput): Promise<Account>
     archive(input: AccountIdInput): Promise<void>
+    unarchive(input: AccountIdInput): Promise<void>
     delete(input: AccountIdInput): Promise<void>
   }
   profiles: {

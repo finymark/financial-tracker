@@ -1,21 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import type Database from 'better-sqlite3'
 import type { Tag } from '../../shared/tags'
-import { normalizePayeeKey } from '../db'
-
-// Previous-schema application fixtures still exercise migration behavior.
-export function hasTagSchema(database: Database.Database): boolean {
-  return Boolean(
-    database
-      .prepare(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'tags'",
-      )
-      .get(),
-  )
-}
+import { tagKey } from '../../shared/text-keys'
 
 export function listTags(database: Database.Database): Tag[] {
-  if (!hasTagSchema(database)) return []
   return database
     .prepare(
       'SELECT id, name, created_at AS createdAt FROM tags ORDER BY normalized_name, id',
@@ -28,7 +16,7 @@ export function getLinesTags(
   lineIds: readonly string[],
 ): Map<string, Tag[]> {
   const result = new Map<string, Tag[]>()
-  if (lineIds.length === 0 || !hasTagSchema(database)) return result
+  if (lineIds.length === 0) return result
   const rows = database
     .prepare(
       `SELECT transaction_line_tags.line_id AS lineId,
@@ -59,15 +47,11 @@ export function setLineTags(
   names: string[],
   timestamp: string,
 ): void {
-  if (!hasTagSchema(database)) {
-    if (names.length) throw new Error('tags.error.notFound')
-    return
-  }
   database
     .prepare('DELETE FROM transaction_line_tags WHERE line_id = ?')
     .run(lineId)
   for (const name of names) {
-    const normalizedName = normalizePayeeKey(name)
+    const normalizedName = tagKey(name)
     let tag = database
       .prepare('SELECT id FROM tags WHERE normalized_name = ?')
       .get(normalizedName) as { id: string } | undefined

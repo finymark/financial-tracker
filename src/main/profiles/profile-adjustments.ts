@@ -42,14 +42,10 @@ function validateAccount(
 }
 
 function adjustmentView(
-  database: Database.Database,
   row: StoredBalanceAdjustment | undefined,
+  differenceMinor: number | undefined,
 ): BalanceAdjustment {
   if (!row) throw new Error('adjustments.error.notFound')
-  const differenceMinor = calculateAccountHistory(
-    database,
-    row.accountId,
-  ).adjustmentDifferences.get(row.id)
   if (differenceMinor === undefined)
     throw new Error('adjustments.error.notFound')
   return {
@@ -75,7 +71,36 @@ export function getBalanceAdjustment(
   database: Database.Database,
   id: string,
 ): BalanceAdjustment {
-  return adjustmentView(database, getStoredBalanceAdjustment(database, id))
+  return getBalanceAdjustments(database, [id])[0]
+}
+
+export function getBalanceAdjustments(
+  database: Database.Database,
+  ids: readonly string[],
+): BalanceAdjustment[] {
+  if (ids.length === 0) return []
+  const rows = database
+    .prepare(
+      `${ADJUSTMENT_SELECT} WHERE id IN (${ids.map(() => '?').join(',')})`,
+    )
+    .all(...ids) as StoredBalanceAdjustment[]
+  const differences = new Map(
+    [...new Set(rows.map((row) => row.accountId))].map((accountId) => [
+      accountId,
+      calculateAccountHistory(database, accountId).adjustmentDifferences,
+    ]),
+  )
+  const byId = new Map(
+    rows.map((row) => [
+      row.id,
+      adjustmentView(row, differences.get(row.accountId)?.get(row.id)),
+    ]),
+  )
+  return ids.map((id) => {
+    const adjustment = byId.get(id)
+    if (!adjustment) throw new Error('adjustments.error.notFound')
+    return adjustment
+  })
 }
 
 export function createBalanceAdjustment(

@@ -83,18 +83,4 @@ export function registerCategorisationRuleIpc(
           validateCategorisationRuleId(inputRecord(value).id),
         ),
   )
-  registerIpcHandler(
-    ipcMain,
-    IPC_CHANNELS.rulesPreviewApplication,
-    (): Awaited<ReturnType<AppBridge['rules']['previewApplication']>> =>
-      controller
-        .getActiveApplication()
-        .queries.previewCategorisationRuleApplication(),
-  )
-  registerIpcHandler(
-    ipcMain,
-    IPC_CHANNELS.rulesApply,
-    (): Awaited<ReturnType<AppBridge['rules']['apply']>> =>
-      controller.getActiveApplication().commands.applyCategorisationRules(),
-  )
 }

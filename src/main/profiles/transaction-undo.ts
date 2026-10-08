@@ -4,9 +4,9 @@ import type {
   Transaction,
   UpdateTransactionInput,
 } from '../../shared/transactions'
-import { normalizePayeeAliasKey, normalizePayeeKey } from '../db'
+import { payeeAliasKey, payeeKey, tagKey } from '../../shared/text-keys'
 import type { Tag } from '../../shared/tags'
-import { hasTagSchema, getLineTags } from './profile-tags'
+import { getLineTags } from './profile-tags'
 import {
   createTransaction,
   duplicateTransaction,
@@ -23,8 +23,7 @@ interface StoredTransactionImage {
   totalMinor: number
   payeeId: string | null
   note: string
-  // Absent in pre-exclusion migration fixtures.
-  excluded?: number
+  excluded: number
   createdAt: string
   updatedAt: string
 }
@@ -34,28 +33,22 @@ interface StoredTransactionLineImage {
   transactionId: string
   amountMinor: number
   categoryId: string | null
-  note?: string
+  note: string
 }
 
 interface StoredPayeeImage {
   id: string
   name: string
-  normalizedName?: string
+  normalizedName: string
   createdAt: string
 }
 
-interface TransactionAggregateImage {
+export interface TransactionAggregateImage {
   transaction: StoredTransactionImage | null
   lines: StoredTransactionLineImage[]
   payees: StoredPayeeImage[]
   tags: Tag[]
   lineTags: { lineId: string; tagId: string }[]
-}
-
-function hasNormalizedPayeeNames(database: Database.Database): boolean {
-  return (database.pragma('table_info(payees)') as { name: string }[]).some(
-    (column) => column.name === 'normalized_name',
-  )
 }
 
 function findExistingPayeeId(
@@ -65,30 +58,15 @@ function findExistingPayeeId(
   if (typeof value !== 'string') return null
   const name = value.trim()
   if (name.length === 0 || name.length > 100) return null
-  const aliasesAvailable = Boolean(
-    database
-      .prepare(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'payee_aliases'",
-      )
-      .get(),
-  )
-  if (aliasesAvailable) {
-    const alias = database
-      .prepare(
-        'SELECT payee_id AS id FROM payee_aliases WHERE normalized_name = ?',
-      )
-      .get(normalizePayeeAliasKey(name)) as { id: string } | undefined
-    if (alias) return alias.id
-  }
-  const row = (
-    hasNormalizedPayeeNames(database)
-      ? database
-          .prepare('SELECT id FROM payees WHERE normalized_name = ?')
-          .get(normalizePayeeKey(name))
-      : database
-          .prepare('SELECT id FROM payees WHERE name = ? COLLATE NOCASE')
-          .get(name)
-  ) as { id: string } | undefined
+  const alias = database
+    .prepare(
+      'SELECT payee_id AS id FROM payee_aliases WHERE normalized_name = ?',
+    )
+    .get(payeeAliasKey(name)) as { id: string } | undefined
+  if (alias) return alias.id
+  const row = database
+    .prepare('SELECT id FROM payees WHERE normalized_name = ?')
+    .get(payeeKey(name)) as { id: string } | undefined
   return row?.id ?? null
 }
 
@@ -96,12 +74,12 @@ function existingInputTagIds(
   database: Database.Database,
   names: unknown,
 ): string[] {
-  if (!hasTagSchema(database) || !Array.isArray(names)) return []
+  if (!Array.isArray(names)) return []
   return names.flatMap((name) => {
     if (typeof name !== 'string') return []
     const tag = database
       .prepare('SELECT id FROM tags WHERE normalized_name = ?')
-      .get(normalizePayeeKey(name.trim())) as { id: string } | undefined
+      .get(tagKey(name.trim())) as { id: string } | undefined
     return tag ? [tag.id] : []
   })
 }
@@ -117,13 +95,7 @@ function inputTagNames(input: CreateTransactionInput): unknown[] {
   ]
 }
 
-function hasLineNotes(database: Database.Database): boolean {
-  return (
-    database.pragma('table_info(transaction_lines)') as { name: string }[]
-  ).some((column) => column.name === 'note')
-}
-
-function captureAggregate(
+export function captureTransactionAggregate(
   database: Database.Database,
   transactionId: string | null,
   additionalPayeeIds: readonly (string | null)[] = [],
@@ -139,13 +111,11 @@ function captureAggregate(
         )
         .get(transactionId) as StoredTransactionImage | undefined) ?? null)
     : null
-  const lineNotes = hasLineNotes(database)
   const lines = transaction
     ? (database
         .prepare(
           `SELECT id, transaction_id AS transactionId,
-            amount_minor AS amountMinor, category_id AS categoryId
-            ${lineNotes ? ', note' : ''}
+            amount_minor AS amountMinor, category_id AS categoryId, note
           FROM transaction_lines WHERE transaction_id = ? ORDER BY rowid`,
         )
         .all(transaction.id) as StoredTransactionLineImage[])
@@ -154,14 +124,11 @@ function captureAggregate(
     (id): id is string => id !== null && id !== undefined,
   )
   const uniquePayeeIds = [...new Set(payeeIds)]
-  const normalized = hasNormalizedPayeeNames(database)
   const payees = uniquePayeeIds.map((id) => {
     const payee = database
       .prepare(
-        normalized
-          ? `SELECT id, name, normalized_name AS normalizedName,
-              created_at AS createdAt FROM payees WHERE id = ?`
-          : 'SELECT id, name, created_at AS createdAt FROM payees WHERE id = ?',
+        `SELECT id, name, normalized_name AS normalizedName,
+          created_at AS createdAt FROM payees WHERE id = ?`,
       )
       .get(id) as StoredPayeeImage | undefined
     if (!payee) throw new Error('transactions.error.notFound')
@@ -190,7 +157,7 @@ function captureAggregate(
   return { transaction, lines, payees, tags, lineTags }
 }
 
-function restoreAggregate(
+export function restoreTransactionAggregate(
   database: Database.Database,
   before: TransactionAggregateImage,
   after: TransactionAggregateImage,
@@ -199,27 +166,16 @@ function restoreAggregate(
   if (transactionId) {
     database.prepare('DELETE FROM transactions WHERE id = ?').run(transactionId)
   }
-  const normalized = hasNormalizedPayeeNames(database)
   for (const payee of before.payees) {
-    if (normalized) {
-      database
-        .prepare(
-          `INSERT INTO payees (id, name, normalized_name, created_at)
-          VALUES (?, ?, ?, ?)
-          ON CONFLICT(id) DO UPDATE SET name = excluded.name,
-            normalized_name = excluded.normalized_name,
-            created_at = excluded.created_at`,
-        )
-        .run(payee.id, payee.name, payee.normalizedName, payee.createdAt)
-    } else {
-      database
-        .prepare(
-          `INSERT INTO payees (id, name, created_at) VALUES (?, ?, ?)
-          ON CONFLICT(id) DO UPDATE SET name = excluded.name,
-            created_at = excluded.created_at`,
-        )
-        .run(payee.id, payee.name, payee.createdAt)
-    }
+    database
+      .prepare(
+        `INSERT INTO payees (id, name, normalized_name, created_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET name = excluded.name,
+          normalized_name = excluded.normalized_name,
+          created_at = excluded.created_at`,
+      )
+      .run(payee.id, payee.name, payee.normalizedName, payee.createdAt)
   }
   for (const tag of before.tags) {
     database
@@ -227,15 +183,16 @@ function restoreAggregate(
         `INSERT INTO tags (id, name, normalized_name, created_at) VALUES (?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET name = excluded.name, normalized_name = excluded.normalized_name, created_at = excluded.created_at`,
       )
-      .run(tag.id, tag.name, normalizePayeeKey(tag.name), tag.createdAt)
+      .run(tag.id, tag.name, tagKey(tag.name), tag.createdAt)
   }
   if (before.transaction) {
     const transaction = before.transaction
     database
       .prepare(
         `INSERT INTO transactions
-          (id, account_id, kind, date, total_minor, payee_id, note, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (id, account_id, kind, date, total_minor, payee_id, note, excluded,
+           created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         transaction.id,
@@ -245,38 +202,23 @@ function restoreAggregate(
         transaction.totalMinor,
         transaction.payeeId,
         transaction.note,
+        transaction.excluded,
         transaction.createdAt,
         transaction.updatedAt,
       )
-    if (transaction.excluded !== undefined) {
-      database
-        .prepare('UPDATE transactions SET excluded = ? WHERE id = ?')
-        .run(transaction.excluded, transaction.id)
-    }
-    const lineNotes = hasLineNotes(database)
     const insertLine = database.prepare(
-      lineNotes
-        ? `INSERT INTO transaction_lines
-        (id, transaction_id, amount_minor, category_id, note) VALUES (?, ?, ?, ?, ?)`
-        : `INSERT INTO transaction_lines
-        (id, transaction_id, amount_minor, category_id) VALUES (?, ?, ?, ?)`,
+      `INSERT INTO transaction_lines
+        (id, transaction_id, amount_minor, category_id, note)
+       VALUES (?, ?, ?, ?, ?)`,
     )
     for (const line of before.lines) {
-      if (lineNotes)
-        insertLine.run(
-          line.id,
-          line.transactionId,
-          line.amountMinor,
-          line.categoryId,
-          line.note,
-        )
-      else
-        insertLine.run(
-          line.id,
-          line.transactionId,
-          line.amountMinor,
-          line.categoryId,
-        )
+      insertLine.run(
+        line.id,
+        line.transactionId,
+        line.amountMinor,
+        line.categoryId,
+        line.note,
+      )
     }
   }
   for (const association of before.lineTags) {
@@ -324,7 +266,7 @@ export function createTransactionUndoableCommand(
 > {
   return {
     captureBefore: () =>
-      captureAggregate(
+      captureTransactionAggregate(
         database,
         null,
         [findExistingPayeeId(database, input.payeeName)],
@@ -332,13 +274,14 @@ export function createTransactionUndoableCommand(
       ),
     execute: () => createTransaction(database, input, clock),
     captureAfter: (result, before) =>
-      captureAggregate(
+      captureTransactionAggregate(
         database,
         result.id,
         affectedPayeeIds(before),
         before.tags.map((tag) => tag.id),
       ),
-    restoreBefore: (before, after) => restoreAggregate(database, before, after),
+    restoreBefore: (before, after) =>
+      restoreTransactionAggregate(database, before, after),
   }
 }
 
@@ -353,8 +296,8 @@ export function updateTransactionUndoableCommand(
 > {
   return {
     captureBefore: () => {
-      const current = captureAggregate(database, input.id)
-      return captureAggregate(
+      const current = captureTransactionAggregate(database, input.id)
+      return captureTransactionAggregate(
         database,
         input.id,
         [
@@ -369,13 +312,14 @@ export function updateTransactionUndoableCommand(
     },
     execute: () => updateTransaction(database, input, clock),
     captureAfter: (result, before) =>
-      captureAggregate(
+      captureTransactionAggregate(
         database,
         result.id,
         affectedPayeeIds(before),
         before.tags.map((tag) => tag.id),
       ),
-    restoreBefore: (before, after) => restoreAggregate(database, before, after),
+    restoreBefore: (before, after) =>
+      restoreTransactionAggregate(database, before, after),
   }
 }
 
@@ -384,16 +328,17 @@ export function deleteTransactionUndoableCommand(
   id: string,
 ): UndoableCommand<TransactionAggregateImage, TransactionAggregateImage, void> {
   return {
-    captureBefore: () => captureAggregate(database, id),
+    captureBefore: () => captureTransactionAggregate(database, id),
     execute: () => deleteTransaction(database, id),
     captureAfter: (_result, before) =>
-      captureAggregate(
+      captureTransactionAggregate(
         database,
         null,
         affectedPayeeIds(before),
         before.tags.map((tag) => tag.id),
       ),
-    restoreBefore: (before, after) => restoreAggregate(database, before, after),
+    restoreBefore: (before, after) =>
+      restoreTransactionAggregate(database, before, after),
   }
 }
 
@@ -408,18 +353,19 @@ export function duplicateTransactionUndoableCommand(
 > {
   return {
     captureBefore: () => {
-      const source = captureAggregate(database, id)
+      const source = captureTransactionAggregate(database, id)
       if (!source.transaction) throw new Error('transactions.error.notFound')
       return { ...source, transaction: null, lines: [], lineTags: [] }
     },
     execute: () => duplicateTransaction(database, id, clock),
     captureAfter: (result, before) =>
-      captureAggregate(
+      captureTransactionAggregate(
         database,
         result,
         affectedPayeeIds(before),
         before.tags.map((tag) => tag.id),
       ),
-    restoreBefore: (before, after) => restoreAggregate(database, before, after),
+    restoreBefore: (before, after) =>
+      restoreTransactionAggregate(database, before, after),
   }
 }

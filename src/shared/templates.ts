@@ -9,6 +9,7 @@ export interface CreateTemplateInput {
   categoryId?: string | null
   tagNames?: string[]
   note?: string | null
+  excluded?: boolean
 }
 
 export interface TransactionTemplate {
@@ -21,6 +22,7 @@ export interface TransactionTemplate {
   categoryId: string | null
   tagNames: string[]
   note: string | null
+  excluded: boolean
   createdAt: string
   updatedAt: string
 }

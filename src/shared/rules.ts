@@ -1,5 +1,7 @@
 import type { TransactionKind } from './transactions'
 import type { Tag } from './tags'
+import { foldTextKey } from './text-keys'
+import type { Currency } from './accounts'
 
 export interface CategorisationRule {
   id: string
@@ -11,6 +13,9 @@ export interface CategorisationRule {
   accountId: string | null
   minAmountMinor: number | null
   maxAmountMinor: number | null
+  amountCurrency: Currency | null
+  actionPayeeId: string | null
+  actionPayeeName: string | null
   categoryId: string | null
   categoryKind: TransactionKind | null
   tags: Tag[]
@@ -25,6 +30,8 @@ export interface CreateCategorisationRuleInput {
   accountId: string | null
   minAmountMinor: number | null
   maxAmountMinor: number | null
+  amountCurrency?: Currency | null
+  actionPayeeId?: string | null
   categoryId: string | null
   tagIds: string[]
 }
@@ -53,12 +60,10 @@ export interface CategorisationRuleDraftInput {
 export interface CategorisationAutofill {
   source: 'rule' | 'lastUsed' | 'none'
   ruleId: string | null
+  payeeId?: string | null
+  payeeName?: string | null
   categoryId: string | null
   tags: Tag[]
-}
-
-export interface CategorisationRuleApplicationPreview {
-  count: number
 }
 
 /** The persistence-free shape consumed by the rule matcher. */
@@ -71,6 +76,8 @@ export interface CategorisationRuleMatch {
   accountId: string | null
   minAmountMinor: number | null
   maxAmountMinor: number | null
+  amountCurrency: Currency | null
+  actionPayeeId: string | null
   categoryId: string | null
   categoryKind: TransactionKind | null
   tagIds: readonly string[]
@@ -80,18 +87,14 @@ export interface CategorisationRuleDraft {
   accountId: string
   kind: TransactionKind
   totalMinor: number | null
+  currency: Currency
   canonicalPayeeId: string | null
   canonicalPayeeName: string | null
   note: string
 }
 
 export function ruleTextKey(value: string): string {
-  return value
-    .trim()
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .toLocaleLowerCase('und')
-    .normalize('NFC')
+  return foldTextKey(value.trim())
 }
 
 export function matchesCategorisationRule(
@@ -99,23 +102,36 @@ export function matchesCategorisationRule(
   draft: CategorisationRuleDraft,
 ): boolean {
   if (!rule.enabled) return false
-  if (rule.payeeId === null && rule.textContains === null) return false
+  if (
+    rule.payeeId === null &&
+    rule.textContains === null &&
+    rule.accountId === null &&
+    rule.minAmountMinor === null &&
+    rule.maxAmountMinor === null
+  )
+    return false
   if (rule.payeeId !== null && rule.payeeId !== draft.canonicalPayeeId)
     return false
   if (rule.textContains !== null) {
-    const searchedText = ruleTextKey(
-      `${draft.canonicalPayeeName ?? ''} ${draft.note}`,
-    )
+    const searchedText = ruleTextKey(draft.note)
     if (!searchedText.includes(ruleTextKey(rule.textContains))) return false
   }
   if (rule.accountId !== null && rule.accountId !== draft.accountId)
     return false
   if (rule.minAmountMinor !== null) {
-    if (draft.totalMinor === null || draft.totalMinor < rule.minAmountMinor)
+    if (
+      draft.currency !== rule.amountCurrency ||
+      draft.totalMinor === null ||
+      draft.totalMinor < rule.minAmountMinor
+    )
       return false
   }
   if (rule.maxAmountMinor !== null) {
-    if (draft.totalMinor === null || draft.totalMinor > rule.maxAmountMinor)
+    if (
+      draft.currency !== rule.amountCurrency ||
+      draft.totalMinor === null ||
+      draft.totalMinor > rule.maxAmountMinor
+    )
       return false
   }
   if (rule.categoryKind !== null && rule.categoryKind !== draft.kind)

@@ -41,6 +41,7 @@ interface MergePayeesImage {
   aliases: StoredAlias[]
   sourceTransactionIds: string[]
   sourceRuleIds: string[]
+  sourceActionRuleIds: string[]
 }
 
 function insertAlias(database: Database.Database, alias: StoredAlias): void {
@@ -118,23 +119,28 @@ export function mergePayeesUndoableCommand(
           )
           .all(source.id) as { id: string }[]
       ).map(({ id }) => id)
-      const rulesAvailable = Boolean(
+      const sourceRuleIds = (
         database
           .prepare(
-            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'categorisation_rules'",
+            'SELECT id FROM categorisation_rules WHERE payee_id = ? ORDER BY sort_order, rowid',
           )
-          .get(),
-      )
-      const sourceRuleIds = rulesAvailable
-        ? (
-            database
-              .prepare(
-                'SELECT id FROM categorisation_rules WHERE payee_id = ? ORDER BY sort_order, rowid',
-              )
-              .all(source.id) as { id: string }[]
-          ).map(({ id }) => id)
-        : []
-      return { source, aliases, sourceTransactionIds, sourceRuleIds }
+          .all(source.id) as { id: string }[]
+      ).map(({ id }) => id)
+      const sourceActionRuleIds = (
+        database
+          .prepare(
+            `SELECT id FROM categorisation_rules WHERE action_payee_id = ?
+             ORDER BY sort_order, rowid`,
+          )
+          .all(source.id) as { id: string }[]
+      ).map(({ id }) => id)
+      return {
+        source,
+        aliases,
+        sourceTransactionIds,
+        sourceRuleIds,
+        sourceActionRuleIds,
+      }
     },
     execute: () => mergePayees(database, input, clock),
     captureAfter: () => null,
@@ -166,6 +172,14 @@ export function mergePayeesUndoableCommand(
         )
         for (const ruleId of before.sourceRuleIds) {
           restoreRule.run(before.source.id, ruleId)
+        }
+      }
+      if (before.sourceActionRuleIds.length > 0) {
+        const restoreAction = database.prepare(
+          'UPDATE categorisation_rules SET action_payee_id = ? WHERE id = ?',
+        )
+        for (const ruleId of before.sourceActionRuleIds) {
+          restoreAction.run(before.source.id, ruleId)
         }
       }
     },

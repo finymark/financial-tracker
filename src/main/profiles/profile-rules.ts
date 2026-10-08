@@ -3,7 +3,6 @@ import type Database from 'better-sqlite3'
 import type {
   CategorisationAutofill,
   CategorisationRule,
-  CategorisationRuleApplicationPreview,
   CategorisationRuleDraft,
   CategorisationRuleDraftInput,
   CategorisationRuleMatch,
@@ -35,6 +34,9 @@ interface StoredRule {
   accountId: string | null
   minAmountMinor: number | null
   maxAmountMinor: number | null
+  amountCurrency: 'HUF' | 'CHF' | null
+  actionPayeeId: string | null
+  actionPayeeName: string | null
   categoryId: string | null
   categoryKind: TransactionKind | null
   createdAt: string
@@ -49,12 +51,17 @@ const RULE_SELECT = `
     categorisation_rules.account_id AS accountId,
     categorisation_rules.min_amount_minor AS minAmountMinor,
     categorisation_rules.max_amount_minor AS maxAmountMinor,
+    categorisation_rules.amount_currency AS amountCurrency,
+    categorisation_rules.action_payee_id AS actionPayeeId,
+    action_payees.name AS actionPayeeName,
     categorisation_rules.category_id AS categoryId,
     categories.kind AS categoryKind,
     categorisation_rules.created_at AS createdAt,
     categorisation_rules.updated_at AS updatedAt
   FROM categorisation_rules
   LEFT JOIN payees ON payees.id = categorisation_rules.payee_id
+  LEFT JOIN payees AS action_payees
+    ON action_payees.id = categorisation_rules.action_payee_id
   LEFT JOIN categories ON categories.id = categorisation_rules.category_id`
 
 function ruleTags(
@@ -121,11 +128,18 @@ function validateReferences(
   input: CreateCategorisationRuleInput,
 ): void {
   if (input.payeeId !== null) getPayee(database, input.payeeId)
+  if (input.actionPayeeId != null) getPayee(database, input.actionPayeeId)
   if (input.accountId !== null) {
     const account = database
-      .prepare('SELECT archived FROM accounts WHERE id = ?')
-      .get(input.accountId) as { archived: number } | undefined
+      .prepare('SELECT archived, currency FROM accounts WHERE id = ?')
+      .get(input.accountId) as
+      { archived: number; currency: 'HUF' | 'CHF' } | undefined
     if (!account || account.archived) throw new Error('rules.error.reference')
+    if (
+      input.amountCurrency !== null &&
+      input.amountCurrency !== account.currency
+    )
+      throw new Error('rules.error.amount')
   }
   if (input.categoryId !== null) {
     const category = getCategory(database, input.categoryId)
@@ -173,8 +187,9 @@ export function createCategorisationRule(
     .prepare(
       `INSERT INTO categorisation_rules
        (id, enabled, sort_order, payee_id, text_contains, account_id,
-        min_amount_minor, max_amount_minor, category_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        min_amount_minor, max_amount_minor, amount_currency, action_payee_id,
+        category_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       id,
@@ -185,6 +200,8 @@ export function createCategorisationRule(
       input.accountId,
       input.minAmountMinor,
       input.maxAmountMinor,
+      input.amountCurrency,
+      input.actionPayeeId,
       input.categoryId,
       timestamp,
       timestamp,
@@ -205,7 +222,8 @@ export function updateCategorisationRule(
     .prepare(
       `UPDATE categorisation_rules SET enabled = ?, payee_id = ?,
         text_contains = ?, account_id = ?, min_amount_minor = ?,
-        max_amount_minor = ?, category_id = ?, updated_at = ? WHERE id = ?`,
+        max_amount_minor = ?, amount_currency = ?, action_payee_id = ?,
+        category_id = ?, updated_at = ? WHERE id = ?`,
     )
     .run(
       Number(input.enabled),
@@ -214,6 +232,8 @@ export function updateCategorisationRule(
       input.accountId,
       input.minAmountMinor,
       input.maxAmountMinor,
+      input.amountCurrency,
+      input.actionPayeeId,
       input.categoryId,
       clock().toISOString(),
       input.id,
@@ -261,6 +281,7 @@ export function reorderCategorisationRule(
 
 interface MatchRule extends CategorisationRuleMatch {
   tags: Tag[]
+  actionPayeeName: string | null
 }
 
 function matchRules(database: Database.Database): MatchRule[] {
@@ -276,10 +297,15 @@ function resolvedDraft(
 ): CategorisationRuleDraft {
   const input = parseCategorisationRuleDraftInput(value)
   const payee = findPayeeByName(database, input.payeeName)
+  const account = database
+    .prepare('SELECT currency FROM accounts WHERE id = ?')
+    .get(input.accountId) as { currency: 'HUF' | 'CHF' } | undefined
+  if (!account) throw new Error('rules.error.reference')
   return {
     accountId: input.accountId,
     kind: input.kind,
     totalMinor: input.totalMinor,
+    currency: account.currency,
     canonicalPayeeId: payee?.id ?? null,
     canonicalPayeeName: payee?.name ?? input.payeeName,
     note: input.note,
@@ -287,7 +313,14 @@ function resolvedDraft(
 }
 
 function emptyAutofill(): CategorisationAutofill {
-  return { source: 'none', ruleId: null, categoryId: null, tags: [] }
+  return {
+    source: 'none',
+    ruleId: null,
+    payeeId: null,
+    payeeName: null,
+    categoryId: null,
+    tags: [],
+  }
 }
 
 export function getCategorisationAutofill(
@@ -300,6 +333,8 @@ export function getCategorisationAutofill(
     return {
       source: 'rule',
       ruleId: rule.id,
+      payeeId: rule.actionPayeeId,
+      payeeName: rule.actionPayeeName,
       categoryId: rule.categoryId,
       tags: rule.tags,
     }
@@ -326,86 +361,9 @@ export function getCategorisationAutofill(
   return {
     source: 'lastUsed',
     ruleId: null,
+    payeeId: null,
+    payeeName: null,
     categoryId: line.categoryId,
     tags: getLinesTags(database, [line.id]).get(line.id) ?? [],
   }
-}
-
-export interface PlannedRuleApplication {
-  lineId: string
-  categoryId: string | null
-  tagIds: string[]
-  previousCategoryId: string | null
-  previousTagIds: string[]
-}
-
-export function planCategorisationRuleApplication(
-  database: Database.Database,
-): PlannedRuleApplication[] {
-  const rules = matchRules(database)
-  const rows = database
-    .prepare(
-      `SELECT transactions.account_id AS accountId, transactions.kind,
-        transactions.total_minor AS totalMinor, transactions.note,
-        transactions.payee_id AS canonicalPayeeId, payees.name AS canonicalPayeeName,
-        transaction_lines.id AS lineId,
-        transaction_lines.category_id AS previousCategoryId
-       FROM transactions
-       JOIN transaction_lines ON transaction_lines.transaction_id = transactions.id
-       LEFT JOIN payees ON payees.id = transactions.payee_id
-       WHERE transaction_lines.category_id IS NULL
-         AND (SELECT COUNT(*) FROM transaction_lines AS counted
-              WHERE counted.transaction_id = transactions.id) = 1
-       ORDER BY transactions.date, transactions.created_at, transactions.id`,
-    )
-    .all() as (CategorisationRuleDraft & {
-    lineId: string
-    previousCategoryId: string | null
-  })[]
-  const existingTags = getLinesTags(
-    database,
-    rows.map((row) => row.lineId),
-  )
-  return rows.flatMap((row) => {
-    const rule = firstMatchingCategorisationRule(rules, row)
-    if (!rule) return []
-    const previousTagIds = (existingTags.get(row.lineId) ?? []).map(
-      (tag) => tag.id,
-    )
-    const tagIds = [...new Set([...previousTagIds, ...rule.tagIds])]
-    if (rule.categoryId === null && tagIds.length === previousTagIds.length)
-      return []
-    return [
-      {
-        lineId: row.lineId,
-        categoryId: rule.categoryId,
-        tagIds,
-        previousCategoryId: row.previousCategoryId,
-        previousTagIds,
-      },
-    ]
-  })
-}
-
-export function previewCategorisationRuleApplication(
-  database: Database.Database,
-): CategorisationRuleApplicationPreview {
-  return { count: planCategorisationRuleApplication(database).length }
-}
-
-export function applyPlannedCategorisationRules(
-  database: Database.Database,
-  plan: readonly PlannedRuleApplication[],
-): CategorisationRuleApplicationPreview {
-  const update = database.prepare(
-    'UPDATE transaction_lines SET category_id = ? WHERE id = ?',
-  )
-  const insertTag = database.prepare(
-    'INSERT OR IGNORE INTO transaction_line_tags (line_id, tag_id) VALUES (?, ?)',
-  )
-  for (const item of plan) {
-    if (item.categoryId !== null) update.run(item.categoryId, item.lineId)
-    for (const tagId of item.tagIds) insertTag.run(item.lineId, tagId)
-  }
-  return { count: plan.length }
 }

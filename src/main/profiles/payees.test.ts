@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import {
+  CURRENT_MIGRATIONS,
   openProfileApplication,
   type ProfileApplication,
 } from './profile-application'
@@ -40,7 +41,12 @@ async function setup() {
       categoryId: null,
       note: '',
     })
-  return { application, create }
+  return {
+    application,
+    create,
+    profile,
+    paths: registry.getProfilePaths(profile.id),
+  }
 }
 
 afterEach(() => {
@@ -178,6 +184,17 @@ test('merges transactions and aliases into the survivor and undoes the merge exa
     payeeId: sourceTransaction.payeeId!,
     name: 'Lidl 0123 Budapest',
   })
+  const rule = application.commands.createCategorisationRule({
+    enabled: true,
+    payeeId: survivorTransaction.payeeId,
+    textContains: null,
+    accountId: null,
+    minAmountMinor: null,
+    maxAmountMinor: null,
+    actionPayeeId: sourceTransaction.payeeId,
+    categoryId: null,
+    tagIds: [],
+  })
   const beforePayees = application.queries.listPayees()
   const beforeRows = application.queries.listTransactions().rows
 
@@ -202,6 +219,10 @@ test('merges transactions and aliases into the survivor and undoes the merge exa
   expect(
     application.queries.listPayeeAliases(survivor.id).map(({ name }) => name),
   ).toEqual(['Lidl 0001', 'Lidl 0123 Budapest', 'LIDL Magyarország'])
+  expect(application.queries.listCategorisationRules()[0]).toMatchObject({
+    id: rule.id,
+    actionPayeeId: survivor.id,
+  })
   expect(create('lidl magyarorszag', '2026-01-15').payeeId).toBe(survivor.id)
   expect(application.queries.listPayees()).toHaveLength(1)
 
@@ -216,6 +237,10 @@ test('merges transactions and aliases into the survivor and undoes the merge exa
   expect(
     application.queries.listPayeeAliases(sourceTransaction.payeeId!),
   ).toEqual([sourceAlias])
+  expect(application.queries.listCategorisationRules()[0]).toMatchObject({
+    id: rule.id,
+    actionPayeeId: sourceTransaction.payeeId,
+  })
 })
 
 test('keeps a diacritic-only merged name resolving to the survivor', async () => {
@@ -230,4 +255,53 @@ test('keeps a diacritic-only merged name resolving to the survivor', async () =>
 
   expect(create('CAFÉ', '2026-01-15').payeeId).toBe(survivor.payeeId)
   expect(application.queries.listPayees()).toHaveLength(1)
+})
+
+test('reports an alias conflict when merge cannot preserve the source name', async () => {
+  const { application, create, profile, paths } = await setup()
+  const source = create('Café branch', '2026-01-14')
+  const survivor = create('Survivor', '2026-01-15')
+
+  // A custom fixture migration is the supported seam for arranging a database
+  // state that older application versions could create.
+  application.close()
+  applications.splice(applications.indexOf(application), 1)
+
+  const migrated = await openProfileApplication({
+    profile,
+    paths,
+    clock: () => now,
+    migrations: [
+      ...CURRENT_MIGRATIONS,
+      {
+        version: CURRENT_MIGRATIONS.length + 1,
+        name: 'alias collision fixture',
+        checksum: 'a'.repeat(64),
+        apply(database) {
+          database
+            .prepare(
+              `INSERT INTO payee_aliases
+                (id, payee_id, name, normalized_name, created_at)
+               VALUES (?, ?, ?, payee_alias_key(?), ?)`,
+            )
+            .run(
+              '00000000-0000-4000-8000-000000000001',
+              survivor.payeeId,
+              'Cafe branch',
+              'Cafe branch',
+              now.toISOString(),
+            )
+        },
+      },
+    ],
+  })
+  applications.push(migrated)
+
+  expect(() =>
+    migrated.commands.mergePayees({
+      sourcePayeeId: source.payeeId!,
+      survivorPayeeId: survivor.payeeId!,
+    }),
+  ).toThrow('payees.error.aliasConflict')
+  expect(migrated.queries.listPayees()).toHaveLength(2)
 })

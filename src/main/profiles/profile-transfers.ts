@@ -11,6 +11,7 @@ import {
   createTransaction,
   deleteTransaction,
   getTransaction,
+  getTransactions,
   updateTransaction,
 } from './profile-transactions'
 import {
@@ -66,8 +67,8 @@ const TRANSFER_SELECT = `
   JOIN accounts AS to_account ON to_account.id = transfers.to_account_id`
 
 function transferView(
-  database: Database.Database,
   row: StoredTransfer | undefined,
+  fee: ReturnType<typeof getTransaction> | null,
 ): Transfer {
   if (!row) throw new Error('transfers.error.notFound')
   return {
@@ -90,22 +91,51 @@ function transferView(
             numerator: row.toAmountMinor,
             denominator: row.fromAmountMinor,
           },
-    fee: row.feeTransactionId
-      ? {
-          ...getTransaction(database, row.feeTransactionId),
-          linkedTransferId: row.id,
-        }
-      : null,
+    fee:
+      row.feeTransactionId && fee
+        ? {
+            ...fee,
+            linkedTransferId: row.id,
+          }
+        : null,
   }
 }
 
 export function getTransfer(database: Database.Database, id: string): Transfer {
-  return transferView(
-    database,
-    database
-      .prepare(`${TRANSFER_SELECT} WHERE transfers.id = ?`)
-      .get(validateTransactionId(id)) as StoredTransfer | undefined,
+  return getTransfers(database, [validateTransactionId(id)])[0]
+}
+
+export function getTransfers(
+  database: Database.Database,
+  ids: readonly string[],
+): Transfer[] {
+  if (ids.length === 0) return []
+  const rows = database
+    .prepare(
+      `${TRANSFER_SELECT}
+       WHERE transfers.id IN (${ids.map(() => '?').join(',')})`,
+    )
+    .all(...ids) as StoredTransfer[]
+  const feeIds = rows.flatMap((row) =>
+    row.feeTransactionId ? [row.feeTransactionId] : [],
   )
+  const fees = new Map(
+    getTransactions(database, feeIds).map((fee) => [fee.id, fee]),
+  )
+  const byId = new Map(
+    rows.map((row) => [
+      row.id,
+      transferView(
+        row,
+        row.feeTransactionId ? (fees.get(row.feeTransactionId) ?? null) : null,
+      ),
+    ]),
+  )
+  return ids.map((id) => {
+    const transfer = byId.get(id)
+    if (!transfer) throw new Error('transfers.error.notFound')
+    return transfer
+  })
 }
 
 function validateTransfer(

@@ -9,14 +9,6 @@ interface Movement {
   observedMinor?: number
 }
 
-function hasTable(database: Database.Database, name: string): boolean {
-  return Boolean(
-    database
-      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
-      .get(name),
-  )
-}
-
 function safe(value: bigint): number {
   const number = Number(value)
   if (!Number.isSafeInteger(number)) throw new Error('accounts.error.balance')
@@ -66,53 +58,49 @@ export function calculateAccountHistory(
     })),
   )
 
-  if (hasTable(database, 'transfers')) {
-    const transfers = database
-      .prepare(
-        `SELECT id, date,
+  const transfers = database
+    .prepare(
+      `SELECT id, date,
           CASE WHEN from_account_id = ? THEN -from_amount_minor
                ELSE to_amount_minor END AS amountMinor
          FROM transfers
          WHERE from_account_id = ? OR to_account_id = ?`,
-      )
-      .all(accountId, accountId, accountId) as {
-      id: string
-      date: string
-      amountMinor: number
-    }[]
-    movements.push(
-      ...transfers.map((movement) => ({
-        date: movement.date,
-        order: 1,
-        tieBreaker: `transfer:${movement.id}`,
-        amountMinor: movement.amountMinor,
-      })),
     )
-  }
+    .all(accountId, accountId, accountId) as {
+    id: string
+    date: string
+    amountMinor: number
+  }[]
+  movements.push(
+    ...transfers.map((movement) => ({
+      date: movement.date,
+      order: 1,
+      tieBreaker: `transfer:${movement.id}`,
+      amountMinor: movement.amountMinor,
+    })),
+  )
 
-  if (hasTable(database, 'balance_adjustments')) {
-    const adjustments = database
-      .prepare(
-        `SELECT id, date, observed_minor AS observedMinor,
+  const adjustments = database
+    .prepare(
+      `SELECT id, date, observed_minor AS observedMinor,
           created_at AS createdAt
          FROM balance_adjustments WHERE account_id = ?`,
-      )
-      .all(accountId) as {
-      id: string
-      date: string
-      observedMinor: number
-      createdAt: string
-    }[]
-    movements.push(
-      ...adjustments.map((adjustment) => ({
-        date: adjustment.date,
-        order: 2,
-        tieBreaker: `${adjustment.createdAt}:${adjustment.id}`,
-        adjustmentId: adjustment.id,
-        observedMinor: adjustment.observedMinor,
-      })),
     )
-  }
+    .all(accountId) as {
+    id: string
+    date: string
+    observedMinor: number
+    createdAt: string
+  }[]
+  movements.push(
+    ...adjustments.map((adjustment) => ({
+      date: adjustment.date,
+      order: 2,
+      tieBreaker: `${adjustment.createdAt}:${adjustment.id}`,
+      adjustmentId: adjustment.id,
+      observedMinor: adjustment.observedMinor,
+    })),
+  )
 
   movements.sort((left, right) => {
     const dateOrder =

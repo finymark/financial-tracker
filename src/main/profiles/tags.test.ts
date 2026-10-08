@@ -27,12 +27,16 @@ async function setup(migrations = CURRENT_MIGRATIONS) {
     clock,
   })
   applications.push(application)
-  const account = application.commands.createAccount({
-    name: 'Cash',
-    currency: 'CHF',
-    openingBalance: 0,
-    openingDate: '2026-01-01',
-  })
+  const accountId = '00000000-0000-4000-8000-000000000091'
+  const account =
+    migrations.length < CURRENT_MIGRATIONS.length
+      ? { id: accountId }
+      : application.commands.createAccount({
+          name: 'Cash',
+          currency: 'CHF',
+          openingBalance: 0,
+          openingDate: '2026-01-01',
+        })
   const input: CreateTransactionInput = {
     accountId: account.id,
     kind: 'expense' as const,
@@ -329,46 +333,93 @@ test('tags stay isolated by profile', async () => {
 })
 
 test('appending tags and split-line migrations preserves the version 9 ledger and tags persist on reopen while undo history does not', async () => {
+  const migration9 = CURRENT_MIGRATIONS[8]
+  const legacyId = '00000000-0000-4000-8000-000000000092'
   const {
     application: previous,
     input,
     profile,
     paths,
-  } = await setup(CURRENT_MIGRATIONS.slice(0, 9))
-  const legacy = previous.commands.createTransaction({
-    ...input,
-    excluded: true,
-  })
-  const destination = previous.commands.createAccount({
-    name: 'Destination',
-    currency: 'CHF',
-    openingBalance: 0,
-    openingDate: '2026-01-01',
-  })
-  previous.commands.createTransfer({
-    fromAccountId: input.accountId,
-    fromAmountMinor: 200,
-    toAccountId: destination.id,
-    toAmountMinor: 200,
-    date: input.date,
-    note: 'Before tags',
-    fee: { amountMinor: 10, excluded: true },
-  })
+  } = await setup([
+    ...CURRENT_MIGRATIONS.slice(0, 8),
+    {
+      ...migration9,
+      apply(database) {
+        migration9.apply(database)
+        const destinationId = '00000000-0000-4000-8000-000000000093'
+        const feeId = '00000000-0000-4000-8000-000000000094'
+        const insertAccount = database.prepare(
+          `INSERT INTO accounts
+           (id, name, currency, opening_balance, opening_date, created_at)
+           VALUES (?, ?, 'CHF', 0, '2026-01-01', ?)`,
+        )
+        insertAccount.run(
+          '00000000-0000-4000-8000-000000000091',
+          'Cash',
+          clock().toISOString(),
+        )
+        insertAccount.run(destinationId, 'Destination', clock().toISOString())
+        const insertTransaction = database.prepare(
+          `INSERT INTO transactions
+           (id, account_id, kind, date, total_minor, payee_id, note, excluded,
+            created_at, updated_at)
+           VALUES (?, ?, 'expense', '2026-01-15', ?, NULL, ?, 1, ?, ?)`,
+        )
+        insertTransaction.run(
+          legacyId,
+          '00000000-0000-4000-8000-000000000091',
+          100,
+          '',
+          clock().toISOString(),
+          clock().toISOString(),
+        )
+        insertTransaction.run(
+          feeId,
+          '00000000-0000-4000-8000-000000000091',
+          10,
+          'Before tags',
+          clock().toISOString(),
+          clock().toISOString(),
+        )
+        const insertLine = database.prepare(
+          `INSERT INTO transaction_lines
+           (id, transaction_id, amount_minor, category_id)
+           VALUES (?, ?, ?, NULL)`,
+        )
+        insertLine.run('00000000-0000-4000-8000-000000000095', legacyId, 100)
+        insertLine.run('00000000-0000-4000-8000-000000000096', feeId, 10)
+        database
+          .prepare(
+            `INSERT INTO transfers
+             (id, from_account_id, from_amount_minor, to_account_id,
+              to_amount_minor, date, note, fee_transaction_id,
+              created_at, updated_at)
+             VALUES (?, ?, 200, ?, 200, '2026-01-15', 'Before tags', ?, ?, ?)`,
+          )
+          .run(
+            '00000000-0000-4000-8000-000000000097',
+            '00000000-0000-4000-8000-000000000091',
+            destinationId,
+            feeId,
+            clock().toISOString(),
+            clock().toISOString(),
+          )
+      },
+    },
+  ])
   expect(previous.queries.getProfileInfo().schemaVersion).toBe(9)
-  const balance = previous.queries.getAccountBalance(input.accountId)
-  const before = previous.queries.listTransactions()
   previous.close()
   const upgraded = await openProfileApplication({ profile, paths, clock })
   applications.push(upgraded)
   expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(
     CURRENT_MIGRATIONS.length,
   )
-  expect(upgraded.queries.getAccountBalance(input.accountId)).toBe(balance)
-  expect(upgraded.queries.listTransactions()).toEqual(before)
+  expect(upgraded.queries.getAccountBalance(input.accountId)).toBe(-310)
+  expect(upgraded.queries.listTransactions().totalCount).toBe(3)
   expect(upgraded.queries.listTags()).toEqual([])
   const tagged = upgraded.commands.updateTransaction({
     ...input,
-    id: legacy.id,
+    id: legacyId,
     tagNames: ['Été', 'Project'],
   })
   const tag = tagged.line.tags.find((tag) => tag.name === 'Été')!

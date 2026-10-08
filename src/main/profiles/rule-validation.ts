@@ -6,6 +6,7 @@ import type {
 } from '../../shared/rules'
 import { UUID_PATTERN } from '../../shared/validation'
 import { validateTransactionKind } from './transaction-validation'
+import { currencies, type Currency } from '../../shared/accounts'
 
 export function validateCategorisationRuleId(value: unknown): string {
   if (typeof value !== 'string' || !UUID_PATTERN.test(value))
@@ -36,7 +37,8 @@ export function parseCategorisationRuleInput(
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new Error('rules.error.condition')
   const input = value as Record<string, unknown>
-  if (typeof input.enabled !== 'boolean') throw new Error('rules.error.enabled')
+  if (typeof input.enabled !== 'boolean')
+    throw new Error('rules.error.condition')
   const payeeId = optionalId(input.payeeId)
   const textContains = (() => {
     if (
@@ -53,8 +55,7 @@ export function parseCategorisationRuleInput(
       throw new Error('rules.error.text')
     return input.textContains.trim()
   })()
-  if (payeeId === null && textContains === null)
-    throw new Error('rules.error.condition')
+  const accountId = optionalId(input.accountId)
   const minAmountMinor = optionalAmount(input.minAmountMinor, true)
   const maxAmountMinor = optionalAmount(input.maxAmountMinor, false)
   if (
@@ -63,19 +64,36 @@ export function parseCategorisationRuleInput(
     minAmountMinor > maxAmountMinor
   )
     throw new Error('rules.error.amountRange')
+  const hasAmountCondition = minAmountMinor !== null || maxAmountMinor !== null
+  const amountCurrency = (() => {
+    if (!hasAmountCondition) return null
+    if (!currencies.includes(input.amountCurrency as Currency))
+      throw new Error('rules.error.amount')
+    return input.amountCurrency as Currency
+  })()
+  if (
+    payeeId === null &&
+    textContains === null &&
+    accountId === null &&
+    !hasAmountCondition
+  )
+    throw new Error('rules.error.condition')
   if (!Array.isArray(input.tagIds)) throw new Error('rules.error.action')
   const tagIds = [...new Set(input.tagIds.map(optionalId))]
   if (tagIds.includes(null)) throw new Error('rules.error.reference')
   const categoryId = optionalId(input.categoryId)
-  if (categoryId === null && tagIds.length === 0)
+  const actionPayeeId = optionalId(input.actionPayeeId)
+  if (actionPayeeId === null && categoryId === null && tagIds.length === 0)
     throw new Error('rules.error.action')
   return {
     enabled: input.enabled,
     payeeId,
     textContains,
-    accountId: optionalId(input.accountId),
+    accountId,
     minAmountMinor,
     maxAmountMinor,
+    amountCurrency,
+    actionPayeeId,
     categoryId,
     tagIds: tagIds as string[],
   }
@@ -111,19 +129,19 @@ export function parseCategorisationRuleDraftInput(
   value: unknown,
 ): CategorisationRuleDraftInput {
   if (!value || typeof value !== 'object' || Array.isArray(value))
-    throw new Error('rules.error.draft')
+    throw new Error('rules.error.condition')
   const input = value as Record<string, unknown>
   const accountId = optionalId(input.accountId)
-  if (accountId === null) throw new Error('rules.error.draft')
+  if (accountId === null) throw new Error('rules.error.condition')
   const totalMinor =
     input.totalMinor === null ? null : optionalAmount(input.totalMinor, false)
   if (
     input.payeeName !== null &&
     (typeof input.payeeName !== 'string' || input.payeeName.length > 100)
   )
-    throw new Error('rules.error.draft')
+    throw new Error('rules.error.condition')
   if (typeof input.note !== 'string' || input.note.length > 1000)
-    throw new Error('rules.error.draft')
+    throw new Error('rules.error.condition')
   return {
     accountId,
     kind: validateTransactionKind(input.kind),

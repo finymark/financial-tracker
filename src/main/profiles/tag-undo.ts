@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import type { RenameTagInput, Tag } from '../../shared/tags'
-import { normalizePayeeKey } from '../db'
+import { tagKey } from '../../shared/text-keys'
 import { validateTagId, validateTagName } from './tag-validation'
 import type { UndoableCommand } from './undo-history'
 import {
@@ -25,7 +25,7 @@ export function renameTagUndoableCommand(
     captureBefore: () => captureTag(database, input.id),
     execute: () => {
       const name = validateTagName(input.name)
-      const normalizedName = normalizePayeeKey(name)
+      const normalizedName = tagKey(name)
       const duplicate = database
         .prepare('SELECT id FROM tags WHERE normalized_name = ? AND id <> ?')
         .get(normalizedName, input.id)
@@ -39,7 +39,7 @@ export function renameTagUndoableCommand(
     restoreBefore: (before) => {
       database
         .prepare('UPDATE tags SET name = ?, normalized_name = ? WHERE id = ?')
-        .run(before.name, normalizePayeeKey(before.name), before.id)
+        .run(before.name, tagKey(before.name), before.id)
     },
   }
 }
@@ -47,6 +47,7 @@ export function renameTagUndoableCommand(
 interface DeletedTagImage {
   tag: Tag
   lineIds: string[]
+  templateIds: string[]
   rules: CategorisationRulesImage | null
 }
 
@@ -64,28 +65,29 @@ export function deleteTagUndoableCommand(
           )
           .all(id) as { lineId: string }[]
       ).map((association) => association.lineId),
+      templateIds: (
+        database
+          .prepare(
+            `SELECT template_id AS templateId
+             FROM transaction_template_tags WHERE tag_id = ?
+             ORDER BY template_id`,
+          )
+          .all(id) as { templateId: string }[]
+      ).map((association) => association.templateId),
       rules: captureCategorisationRules(database),
     }),
     execute: () => {
-      const rulesAvailable = Boolean(
-        database
-          .prepare(
-            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'categorisation_rules'",
-          )
-          .get(),
-      )
-      if (rulesAvailable) {
-        database
-          .prepare(
-            `DELETE FROM categorisation_rules
+      database
+        .prepare(
+          `DELETE FROM categorisation_rules
              WHERE category_id IS NULL
+               AND action_payee_id IS NULL
                AND 1 = (SELECT COUNT(*) FROM categorisation_rule_tags
                         WHERE rule_id = categorisation_rules.id)
                AND EXISTS (SELECT 1 FROM categorisation_rule_tags
                            WHERE rule_id = categorisation_rules.id AND tag_id = ?)`,
-          )
-          .run(id)
-      }
+        )
+        .run(id)
       database.prepare('DELETE FROM tags WHERE id = ?').run(id)
     },
     // Cascading foreign keys remove the associations with the tag; capture the
@@ -96,16 +98,22 @@ export function deleteTagUndoableCommand(
           'SELECT id, name, created_at AS createdAt FROM tags WHERE id = ?',
         )
         .get(id) as Tag | undefined) ?? null,
-    restoreBefore: ({ tag, lineIds, rules }) => {
+    restoreBefore: ({ tag, lineIds, templateIds, rules }) => {
       database
         .prepare(
           'INSERT INTO tags (id, name, normalized_name, created_at) VALUES (?, ?, ?, ?)',
         )
-        .run(tag.id, tag.name, normalizePayeeKey(tag.name), tag.createdAt)
+        .run(tag.id, tag.name, tagKey(tag.name), tag.createdAt)
       const insert = database.prepare(
         'INSERT INTO transaction_line_tags (line_id, tag_id) VALUES (?, ?)',
       )
       for (const lineId of lineIds) insert.run(lineId, tag.id)
+      const insertTemplate = database.prepare(
+        `INSERT INTO transaction_template_tags (template_id, tag_id)
+         VALUES (?, ?)`,
+      )
+      for (const templateId of templateIds)
+        insertTemplate.run(templateId, tag.id)
       restoreCategorisationRules(database, rules)
     },
   }

@@ -40,11 +40,13 @@ interface RuleForm {
   accountId: string
   minAmount: string
   maxAmount: string
+  amountCurrency: Currency
+  actionPayeeId: string
   categoryId: string
   tagIds: string[]
 }
 
-function emptyRuleForm(): RuleForm {
+function emptyRuleForm(baseCurrency: Currency): RuleForm {
   return {
     id: null,
     enabled: true,
@@ -53,6 +55,8 @@ function emptyRuleForm(): RuleForm {
     accountId: '',
     minAmount: '',
     maxAmount: '',
+    amountCurrency: baseCurrency,
+    actionPayeeId: '',
     categoryId: '',
     tagIds: [],
   }
@@ -92,7 +96,6 @@ export function RuleSettings({
   const [payees, setPayees] = useState<Payee[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [form, setForm] = useState<RuleForm | null>(null)
-  const [previewCount, setPreviewCount] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<MessageKey | null>(null)
@@ -136,7 +139,6 @@ export function RuleSettings({
       await action()
       await load()
       setForm(null)
-      setPreviewCount(null)
       if (offerUndo) onChanged()
     } catch (caught) {
       setError(
@@ -148,24 +150,9 @@ export function RuleSettings({
     }
   }
 
-  async function previewApplication() {
-    setBusy(true)
-    onBusyChange(true)
-    setError(null)
-    setPreviewCount(null)
-    try {
-      const preview = await window.app.rules.previewApplication()
-      setPreviewCount(preview.count)
-    } catch {
-      setError('rules.error')
-    } finally {
-      setBusy(false)
-      onBusyChange(false)
-    }
-  }
-
   const accountCurrency =
     accounts.find((account) => account.id === form?.accountId)?.currency ??
+    form?.amountCurrency ??
     baseCurrency
 
   function inputFromForm(current: RuleForm): CreateCategorisationRuleInput {
@@ -189,6 +176,9 @@ export function RuleSettings({
             'rules.error.amount',
           )
         : null,
+      amountCurrency:
+        current.minAmount || current.maxAmount ? accountCurrency : null,
+      actionPayeeId: current.actionPayeeId || null,
       categoryId: current.categoryId || null,
       tagIds: current.tagIds,
     }
@@ -214,6 +204,8 @@ export function RuleSettings({
       accountId: rule.accountId ?? '',
       minAmount: amountText(rule.minAmountMinor),
       maxAmount: amountText(rule.maxAmountMinor),
+      amountCurrency: rule.amountCurrency ?? baseCurrency,
+      actionPayeeId: rule.actionPayeeId ?? '',
       categoryId: rule.categoryId ?? '',
       tagIds: rule.tags.map((tag) => tag.id),
     })
@@ -255,7 +247,12 @@ export function RuleSettings({
               <li key={rule.id} className="space-y-2 rounded-lg border p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <strong className="mr-auto">
-                    {index + 1}. {rule.payeeName ?? rule.textContains}
+                    {index + 1}.{' '}
+                    {rule.payeeName ??
+                      rule.textContains ??
+                      (rule.accountId
+                        ? accountName(rule.accountId)
+                        : t('rules.amountCondition'))}
                   </strong>
                   {!rule.enabled && (
                     <span className="text-sm text-muted-foreground">
@@ -320,6 +317,8 @@ export function RuleSettings({
                     `${t('rules.minimum')}: ${amountText(rule.minAmountMinor)}; `}
                   {rule.maxAmountMinor !== null &&
                     `${t('rules.maximum')}: ${amountText(rule.maxAmountMinor)}; `}
+                  {rule.actionPayeeName &&
+                    `${t('rules.payeeAction')}: ${rule.actionPayeeName}; `}
                   {t('rules.action')}: {categoryName(rule.categoryId)}
                   {rule.tags.length > 0 &&
                     `; ${t('tags.title')}: ${rule.tags.map((tag) => tag.name).join(', ')}`}
@@ -331,7 +330,7 @@ export function RuleSettings({
 
         <Button
           disabled={locked || form !== null}
-          onClick={() => setForm(emptyRuleForm())}
+          onClick={() => setForm(emptyRuleForm(baseCurrency))}
         >
           {t('rules.create')}
         </Button>
@@ -414,7 +413,42 @@ export function RuleSettings({
                   ))}
                 </NativeSelect>
               </label>
+              <label className="space-y-1 text-sm font-medium">
+                {t('rules.payeeAction')}
+                <NativeSelect
+                  value={form.actionPayeeId}
+                  disabled={locked}
+                  onChange={(event) =>
+                    setForm({ ...form, actionPayeeId: event.target.value })
+                  }
+                >
+                  <option value="">{t('rules.noPayeeAction')}</option>
+                  {payees.map((payee) => (
+                    <option key={payee.id} value={payee.id}>
+                      {payee.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </label>
             </div>
+            {!form.accountId && (
+              <label className="block space-y-1 text-sm font-medium">
+                {t('rules.amountCurrency')}
+                <NativeSelect
+                  value={form.amountCurrency}
+                  disabled={locked}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      amountCurrency: event.target.value as Currency,
+                    })
+                  }
+                >
+                  <option value="HUF">HUF</option>
+                  <option value="CHF">CHF</option>
+                </NativeSelect>
+              </label>
+            )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-sm font-medium" htmlFor="rule-minimum">
@@ -502,35 +536,6 @@ export function RuleSettings({
             </div>
           </form>
         )}
-
-        <section className="space-y-3 border-t pt-5">
-          <h3 className="font-semibold">{t('rules.applyExisting')}</h3>
-          <p className="text-sm text-muted-foreground">
-            {t('rules.applyExistingDescription')}
-          </p>
-          {previewCount !== null && (
-            <p role="status" className="text-sm font-medium">
-              {t('rules.previewCount')}: {previewCount}
-            </p>
-          )}
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              disabled={locked}
-              onClick={() => void previewApplication()}
-            >
-              {t('rules.preview')}
-            </Button>
-            {previewCount !== null && previewCount > 0 && (
-              <Button
-                disabled={locked}
-                onClick={() => void run(() => window.app.rules.apply())}
-              >
-                {t('rules.apply')}
-              </Button>
-            )}
-          </div>
-        </section>
       </CardContent>
     </Card>
   )

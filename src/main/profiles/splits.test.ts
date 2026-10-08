@@ -243,3 +243,63 @@ test('editing, un-splitting, and undo restore exact line identities, notes, and 
     expect.arrayContaining(split.lines.flatMap((line) => line.tags)),
   )
 })
+
+test('editing split header fields without lines preserves every stored part', async () => {
+  const { application, account } = await setup()
+  const categories = application.queries.listCategoryOptions('expense')
+  const split = application.commands.createTransaction({
+    accountId: account.id,
+    kind: 'expense',
+    date: '2026-01-15',
+    totalMinor: 1_000,
+    payeeName: 'Original payee',
+    categoryId: null,
+    note: 'Original header note',
+    lines: [
+      {
+        amountMinor: 400,
+        categoryId: categories[0].id,
+        note: 'First part',
+        tagNames: ['First tag'],
+      },
+      {
+        amountMinor: 600,
+        categoryId: categories[1].id,
+        note: 'Second part',
+        tagNames: ['Second tag'],
+      },
+    ],
+  })
+
+  const updated = application.commands.updateTransaction({
+    id: split.id,
+    accountId: split.accountId,
+    kind: split.kind,
+    date: '2026-01-14',
+    totalMinor: split.totalMinor,
+    payeeName: 'Updated payee',
+    categoryId: null,
+    note: 'Updated header note',
+  })
+
+  expect(updated).toMatchObject({
+    date: '2026-01-14',
+    payeeName: 'Updated payee',
+    note: 'Updated header note',
+  })
+  expect(updated.lines).toEqual(split.lines)
+
+  expect(() =>
+    application.commands.updateTransaction({
+      id: split.id,
+      accountId: split.accountId,
+      kind: split.kind,
+      date: split.date,
+      totalMinor: 1_100,
+      payeeName: split.payeeName,
+      categoryId: null,
+      note: split.note,
+    }),
+  ).toThrow('transactions.error.lines')
+  expect(application.queries.listTransactions().rows).toEqual([updated])
+})

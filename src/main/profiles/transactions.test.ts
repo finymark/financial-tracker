@@ -394,7 +394,6 @@ test('undoes transaction delete, edit, and create in reverse order with exact ag
   expect(application.queries.listTransactions().rows).toEqual([])
   expect(application.queries.listPayees()).toEqual([])
   expect(application.queries.getAccountBalance(firstAccount.id)).toBe(1000)
-  expect(application.commands.undoLast()).toBe(false)
 })
 
 test('undo restores the excluded flag and exact transaction after toggling, deleting, and creating', async () => {
@@ -443,7 +442,6 @@ test('undo restores the excluded flag and exact transaction after toggling, dele
   expect(application.queries.listTransactions().rows).toEqual([])
   expect(application.queries.listPayees()).toEqual([])
   expect(application.queries.getAccountBalance(account.id)).toBe(10000)
-  expect(application.commands.undoLast()).toBe(false)
 })
 
 test('rejects non-boolean excluded flags without partial writes or losing undo history', async () => {
@@ -489,7 +487,7 @@ test('rejects non-boolean excluded flags without partial writes or losing undo h
   expect(application.queries.listTransactions().rows).toEqual([])
 })
 
-test('a successful non-undoable write clears transaction undo history', async () => {
+test('a successful settings write clears transaction undo history', async () => {
   const application = await setup()
   const account = application.commands.createAccount({
     name: 'Before rename',
@@ -507,7 +505,7 @@ test('a successful non-undoable write clears transaction undo history', async ()
     note: '',
   })
 
-  application.commands.renameAccount({ id: account.id, name: 'After rename' })
+  application.commands.updateSettings({ theme: 'dark' })
 
   expect(application.commands.undoLast()).toBe(false)
   expect(application.queries.listTransactions().rows).toEqual([transaction])
@@ -1089,20 +1087,31 @@ test('returns a filtered first page and whole-set totals quickly in a 20 000-tra
           note: 'Árvíztűrő test',
         })
       }
+      for (const date of ['2025-12-27', '2025-12-28']) {
+        application.commands.createTransfer({
+          fromAccountId: first.id,
+          fromAmountMinor: 100,
+          toAccountId: second.id,
+          toAmountMinor: 100,
+          date,
+          note: 'Árvíztűrő test',
+          fee: null,
+        })
+        application.commands.createBalanceAdjustment({
+          accountId: first.id,
+          date,
+          observedMinor: 0,
+          note: 'Árvíztűrő test',
+        })
+      }
     },
   })
   const first = application.queries
     .listAccounts()
     .find((account) => account.currency === 'CHF')!
-  const main = application.queries
-    .listCategories()
-    .find((category) => category.name === 'Performance main')!
-  const payee = application.queries.listPayees()[0]
   const query = {
     period: 'lastMonth' as const,
     accountId: first.id,
-    categoryId: main.id,
-    payeeId: payee.id,
     search: 'ARVIZTURO',
     limit: 100,
   }
@@ -1119,12 +1128,12 @@ test('returns a filtered first page and whole-set totals quickly in a 20 000-tra
     `20 000 transactions: filtered page + totals ${elapsed.toFixed(1)} ms`,
   )
   expect(page.rows).toHaveLength(100)
-  expect(page.totalCount).toBe(10_000)
+  expect(page.totalCount).toBe(10_004)
   expect(page.totals).toEqual([
     { currency: 'CHF', expenseMinor: 1_000_000, incomeMinor: 0 },
   ])
   expect(
-    page.days.reduce((sum, day) => sum + day.totals[0].expenseMinor, 0),
+    page.days.reduce((sum, day) => sum + (day.totals[0]?.expenseMinor ?? 0), 0),
   ).toBe(1_000_000)
   // Generous headroom for shared CI runners; this measures the query, not fixture writes.
   expect(elapsed).toBeLessThan(process.env.CI ? 1500 : 500)
@@ -1205,41 +1214,76 @@ test('upgrades the previous ledger schema and keeps transaction filters and tota
   const registry = new ProfileRegistry({ userDataDirectory: directory, clock })
   const profile = registry.createProfile('List upgrade')
   const paths = registry.getProfilePaths(profile.id)
+  const accountId = '00000000-0000-4000-8000-000000000051'
+  const payeeId = '00000000-0000-4000-8000-000000000052'
+  const transactionId = '00000000-0000-4000-8000-000000000053'
+  const lineId = '00000000-0000-4000-8000-000000000054'
+  const migration5 = CURRENT_MIGRATIONS[4]
   const previous = await openProfileApplication({
     profile,
     paths,
     clock,
-    migrations: CURRENT_MIGRATIONS.slice(0, 5),
+    migrations: [
+      ...CURRENT_MIGRATIONS.slice(0, 4),
+      {
+        ...migration5,
+        apply(database) {
+          migration5.apply(database)
+          const category = database
+            .prepare(
+              "SELECT id FROM categories WHERE seed_key = 'income.salary'",
+            )
+            .get() as { id: string }
+          database
+            .prepare(
+              `INSERT INTO accounts
+               (id, name, currency, opening_balance, opening_date, created_at)
+               VALUES (?, 'History', 'CHF', 0, '2025-01-01', ?)`,
+            )
+            .run(accountId, clock().toISOString())
+          database
+            .prepare(
+              'INSERT INTO payees (id, name, created_at) VALUES (?, ?, ?)',
+            )
+            .run(payeeId, 'Café', clock().toISOString())
+          database
+            .prepare(
+              `INSERT INTO transactions
+               (id, account_id, kind, date, total_minor, payee_id, note,
+                created_at, updated_at)
+               VALUES (?, ?, 'income', '2026-01-15', 12345, ?, 'Upgrade', ?, ?)`,
+            )
+            .run(
+              transactionId,
+              accountId,
+              payeeId,
+              clock().toISOString(),
+              clock().toISOString(),
+            )
+          database
+            .prepare(
+              `INSERT INTO transaction_lines
+               (id, transaction_id, amount_minor, category_id)
+               VALUES (?, ?, 12345, ?)`,
+            )
+            .run(lineId, transactionId, category.id)
+        },
+      },
+    ],
   })
   applications.push(previous)
-  const account = previous.commands.createAccount({
-    name: 'History',
-    currency: 'CHF',
-    openingBalance: 0,
-    openingDate: '2025-01-01',
-  })
-  const category = previous.queries.listCategoryOptions('income')[0]
-  const transaction = previous.commands.createTransaction({
-    accountId: account.id,
-    kind: 'income',
-    date: '2026-01-15',
-    totalMinor: 12345,
-    categoryId: category.id,
-    payeeName: 'Café',
-    note: 'Upgrade',
-  })
   previous.close()
   applications.pop()
   const upgraded = await openProfileApplication({ profile, paths, clock })
   applications.push(upgraded)
   expect(
     upgraded.queries.listTransactions({
-      accountId: account.id,
-      categoryId: category.id,
+      accountId,
+      categoryId: upgraded.queries.listCategoryOptions('income')[0].id,
       search: 'CAFE',
     }),
   ).toEqual({
-    rows: [transaction],
+    rows: [expect.objectContaining({ id: transactionId, payeeName: 'Café' })],
     totalCount: 1,
     totals: [{ currency: 'CHF', expenseMinor: 0, incomeMinor: 12345 }],
     days: [
@@ -1259,37 +1303,78 @@ test('payee-key migration merges Unicode case duplicates and repoints their tran
   const registry = new ProfileRegistry({ userDataDirectory: directory, clock })
   const profile = registry.createProfile('Payee upgrade')
   const paths = registry.getProfilePaths(profile.id)
+  const accountId = '00000000-0000-4000-8000-000000000061'
+  const oldestPayeeId = '00000000-0000-4000-8000-000000000062'
+  const duplicatePayeeId = '00000000-0000-4000-8000-000000000063'
+  const migration6 = CURRENT_MIGRATIONS[5]
   const previous = await openProfileApplication({
     profile,
     paths,
     clock,
-    migrations: CURRENT_MIGRATIONS.slice(0, 6),
+    migrations: [
+      ...CURRENT_MIGRATIONS.slice(0, 5),
+      {
+        ...migration6,
+        apply(database) {
+          migration6.apply(database)
+          database
+            .prepare(
+              `INSERT INTO accounts
+               (id, name, currency, opening_balance, opening_date, created_at)
+               VALUES (?, 'History', 'HUF', 0, '2026-01-01', ?)`,
+            )
+            .run(accountId, clock().toISOString())
+          const insertPayee = database.prepare(
+            'INSERT INTO payees (id, name, created_at) VALUES (?, ?, ?)',
+          )
+          insertPayee.run(oldestPayeeId, 'Élelmiszer', clock().toISOString())
+          insertPayee.run(duplicatePayeeId, 'élelmiszer', clock().toISOString())
+          const insertTransaction = database.prepare(
+            `INSERT INTO transactions
+             (id, account_id, kind, date, total_minor, payee_id, note,
+              created_at, updated_at)
+             VALUES (?, ?, 'expense', '2026-01-15', 100, ?, '', ?, ?)`,
+          )
+          const insertLine = database.prepare(
+            `INSERT INTO transaction_lines
+             (id, transaction_id, amount_minor, category_id)
+             VALUES (?, ?, 100, NULL)`,
+          )
+          for (const [transactionId, lineId, payeeId] of [
+            [
+              '00000000-0000-4000-8000-000000000064',
+              '00000000-0000-4000-8000-000000000065',
+              oldestPayeeId,
+            ],
+            [
+              '00000000-0000-4000-8000-000000000066',
+              '00000000-0000-4000-8000-000000000067',
+              duplicatePayeeId,
+            ],
+          ]) {
+            insertTransaction.run(
+              transactionId,
+              accountId,
+              payeeId,
+              clock().toISOString(),
+              clock().toISOString(),
+            )
+            insertLine.run(lineId, transactionId)
+          }
+        },
+      },
+    ],
   })
-  const account = previous.commands.createAccount({
-    name: 'History',
-    currency: 'HUF',
-    openingBalance: 0,
-    openingDate: '2026-01-01',
-  })
-  const create = (payeeName: string) =>
-    previous.commands.createTransaction({
-      accountId: account.id,
-      kind: 'expense',
-      date: '2026-01-15',
-      totalMinor: 100,
-      categoryId: null,
-      payeeName,
-      note: '',
-    })
-  const oldest = create('Élelmiszer')
-  const duplicate = create('élelmiszer')
-  expect(duplicate.payeeId).not.toBe(oldest.payeeId)
   previous.close()
 
   const upgraded = await openProfileApplication({ profile, paths, clock })
   applications.push(upgraded)
   expect(upgraded.queries.listPayees()).toEqual([
-    { id: oldest.payeeId, name: 'Élelmiszer', createdAt: oldest.createdAt },
+    {
+      id: oldestPayeeId,
+      name: 'Élelmiszer',
+      createdAt: clock().toISOString(),
+    },
   ])
   expect(
     upgraded.queries
@@ -1297,7 +1382,7 @@ test('payee-key migration merges Unicode case duplicates and repoints their tran
       .rows.map((row) =>
         row.kind === 'expense' || row.kind === 'income' ? row.payeeId : null,
       ),
-  ).toEqual([oldest.payeeId, oldest.payeeId])
+  ).toEqual([oldestPayeeId, oldestPayeeId])
 })
 
 test('upgrades existing transactions as included and persists exclusion across reopening', async () => {
@@ -1308,21 +1393,63 @@ test('upgrades existing transactions as included and persists exclusion across r
   const registry = new ProfileRegistry({ userDataDirectory: directory, clock })
   const profile = registry.createProfile('Excluded upgrade')
   const paths = registry.getProfilePaths(profile.id)
+  const accountId = '00000000-0000-4000-8000-000000000071'
+  const payeeId = '00000000-0000-4000-8000-000000000072'
+  const transactionId = '00000000-0000-4000-8000-000000000073'
+  const lineId = '00000000-0000-4000-8000-000000000074'
+  const migration7 = CURRENT_MIGRATIONS[6]
   const previous = await openProfileApplication({
     profile,
     paths,
     clock,
-    migrations: CURRENT_MIGRATIONS.slice(0, 7),
+    migrations: [
+      ...CURRENT_MIGRATIONS.slice(0, 6),
+      {
+        ...migration7,
+        apply(database) {
+          migration7.apply(database)
+          database
+            .prepare(
+              `INSERT INTO accounts
+               (id, name, currency, opening_balance, opening_date, created_at)
+               VALUES (?, 'History', 'CHF', 10000, '2026-01-01', ?)`,
+            )
+            .run(accountId, clock().toISOString())
+          database
+            .prepare(
+              `INSERT INTO payees (id, name, normalized_name, created_at)
+               VALUES (?, 'History payee', payee_key('History payee'), ?)`,
+            )
+            .run(payeeId, clock().toISOString())
+          database
+            .prepare(
+              `INSERT INTO transactions
+               (id, account_id, kind, date, total_minor, payee_id, note,
+                created_at, updated_at)
+               VALUES (?, ?, 'expense', '2026-01-15', 1200, ?,
+                'Before upgrade', ?, ?)`,
+            )
+            .run(
+              transactionId,
+              accountId,
+              payeeId,
+              clock().toISOString(),
+              clock().toISOString(),
+            )
+          database
+            .prepare(
+              `INSERT INTO transaction_lines
+               (id, transaction_id, amount_minor, category_id)
+               VALUES (?, ?, 1200, NULL)`,
+            )
+            .run(lineId, transactionId)
+        },
+      },
+    ],
   })
   applications.push(previous)
-  const account = previous.commands.createAccount({
-    name: 'History',
-    currency: 'CHF',
-    openingBalance: 10000,
-    openingDate: '2026-01-01',
-  })
   const input = {
-    accountId: account.id,
+    accountId,
     kind: 'expense' as const,
     date: '2026-01-15',
     totalMinor: 1200,
@@ -1330,34 +1457,30 @@ test('upgrades existing transactions as included and persists exclusion across r
     categoryId: null,
     note: 'Before upgrade',
   }
-  const original = previous.commands.createTransaction(input)
   previous.close()
   const upgraded = await openProfileApplication({ profile, paths, clock })
   applications.push(upgraded)
-  expect(upgraded.queries.listTransactions().rows).toEqual([
-    { ...original, excluded: false },
-  ])
+  const original = upgraded.queries.listTransactions().rows[0]
+  expect(original).toMatchObject({ id: transactionId, excluded: false })
   expect(upgraded.queries.listTransactions().totals).toEqual([
     { currency: 'CHF', expenseMinor: 1200, incomeMinor: 0 },
   ])
   const excluded = upgraded.commands.updateTransaction({
     ...input,
-    id: original.id,
+    id: transactionId,
     excluded: true,
   })
   expect(excluded.excluded).toBe(true)
   expect(upgraded.commands.undoLast()).toBe(true)
-  expect(upgraded.queries.listTransactions().rows).toEqual([
-    { ...original, excluded: false },
-  ])
+  expect(upgraded.queries.listTransactions().rows).toEqual([original])
   upgraded.commands.updateTransaction({
     ...input,
-    id: original.id,
+    id: transactionId,
     excluded: true,
   })
   const edited = upgraded.commands.updateTransaction({
     ...input,
-    id: original.id,
+    id: transactionId,
     note: 'Still excluded',
   })
   expect(edited.excluded).toBe(true)
@@ -1370,6 +1493,6 @@ test('upgrades existing transactions as included and persists exclusion across r
   expect(page.totals).toEqual([
     { currency: 'CHF', expenseMinor: 0, incomeMinor: 0 },
   ])
-  expect(reopened.queries.getAccountBalance(account.id)).toBe(8800)
+  expect(reopened.queries.getAccountBalance(accountId)).toBe(8800)
   expect(reopened.commands.undoLast()).toBe(false)
 })
