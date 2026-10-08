@@ -266,6 +266,13 @@ export const de = {
     'Die Transaktion wurde nicht gefunden. Aktualisiere die Liste.',
   'transactions.error.lines':
     'Die Transaktionszeilen entsprechen nicht dem Gesamtbetrag.',
+  'splits.split': 'Aufteilen',
+  'splits.unsplit': 'Auf einen Teil zurücksetzen',
+  'splits.remaining': 'Verbleibender Betrag',
+  'splits.part': 'Teil',
+  'splits.remove': 'Teil entfernen',
+  'splits.addPart': 'Teil hinzufügen',
+  'splits.indicator': 'Aufgeteilt',
   'tags.title': 'Tags',
   'tags.all': 'Alle Tags',
   'tags.manage': 'Tags verwalten',

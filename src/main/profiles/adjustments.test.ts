@@ -281,7 +281,7 @@ test('appends the balance adjustment migration to an existing tagged transfer pr
 
   const upgraded = await openProfileApplication({ profile, paths, clock })
   applications.push(upgraded)
-  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(12)
+  expect(upgraded.queries.getProfileInfo().schemaVersion).toBe(13)
   expect(upgraded.queries.getAccountBalance(account.id)).toBe(690)
   expect(upgraded.queries.getAccountBalance(other.id)).toBe(200)
   expect(upgraded.queries.listTransactions()).toEqual(before)
@@ -296,7 +296,7 @@ test('appends the balance adjustment migration to an existing tagged transfer pr
   upgraded.close()
   const reopened = await openProfileApplication({ profile, paths, clock })
   applications.push(reopened)
-  expect(reopened.queries.getProfileInfo().schemaVersion).toBe(12)
+  expect(reopened.queries.getProfileInfo().schemaVersion).toBe(13)
   expect(reopened.queries.listTransactions().rows).toEqual([
     saved,
     ...before.rows,

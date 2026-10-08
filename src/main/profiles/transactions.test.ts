@@ -688,6 +688,10 @@ test('detects category use and delete-with-replacement reassigns transaction lin
   })
   expect(application.queries.listTransactions().rows[0]).toEqual({
     ...transaction,
+    lines: transaction.lines.map((line) => ({
+      ...line,
+      categoryId: replacement.id,
+    })),
     line: { ...transaction.line, categoryId: replacement.id },
   })
   expect(application.queries.hasCategoryTransactions(replacement.id)).toBe(true)

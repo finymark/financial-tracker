@@ -33,6 +33,7 @@ interface StoredTransactionLineImage {
   transactionId: string
   amountMinor: number
   categoryId: string | null
+  note?: string
 }
 
 interface StoredPayeeImage {
@@ -104,6 +105,23 @@ function existingInputTagIds(
   })
 }
 
+function inputTagNames(input: CreateTransactionInput): unknown[] {
+  return [
+    ...(Array.isArray(input.tagNames) ? input.tagNames : []),
+    ...(Array.isArray(input.lines)
+      ? input.lines.flatMap((line) =>
+          Array.isArray(line?.tagNames) ? line.tagNames : [],
+        )
+      : []),
+  ]
+}
+
+function hasLineNotes(database: Database.Database): boolean {
+  return (
+    database.pragma('table_info(transaction_lines)') as { name: string }[]
+  ).some((column) => column.name === 'note')
+}
+
 function captureAggregate(
   database: Database.Database,
   transactionId: string | null,
@@ -120,11 +138,13 @@ function captureAggregate(
         )
         .get(transactionId) as StoredTransactionImage | undefined) ?? null)
     : null
+  const lineNotes = hasLineNotes(database)
   const lines = transaction
     ? (database
         .prepare(
           `SELECT id, transaction_id AS transactionId,
             amount_minor AS amountMinor, category_id AS categoryId
+            ${lineNotes ? ', note' : ''}
           FROM transaction_lines WHERE transaction_id = ? ORDER BY rowid`,
         )
         .all(transaction.id) as StoredTransactionLineImage[])
@@ -232,17 +252,30 @@ function restoreAggregate(
         .prepare('UPDATE transactions SET excluded = ? WHERE id = ?')
         .run(transaction.excluded, transaction.id)
     }
+    const lineNotes = hasLineNotes(database)
     const insertLine = database.prepare(
-      `INSERT INTO transaction_lines
+      lineNotes
+        ? `INSERT INTO transaction_lines
+        (id, transaction_id, amount_minor, category_id, note) VALUES (?, ?, ?, ?, ?)`
+        : `INSERT INTO transaction_lines
         (id, transaction_id, amount_minor, category_id) VALUES (?, ?, ?, ?)`,
     )
     for (const line of before.lines) {
-      insertLine.run(
-        line.id,
-        line.transactionId,
-        line.amountMinor,
-        line.categoryId,
-      )
+      if (lineNotes)
+        insertLine.run(
+          line.id,
+          line.transactionId,
+          line.amountMinor,
+          line.categoryId,
+          line.note,
+        )
+      else
+        insertLine.run(
+          line.id,
+          line.transactionId,
+          line.amountMinor,
+          line.categoryId,
+        )
     }
   }
   for (const association of before.lineTags) {
@@ -294,7 +327,7 @@ export function createTransactionUndoableCommand(
         database,
         null,
         [findExistingPayeeId(database, input.payeeName)],
-        existingInputTagIds(database, input.tagNames),
+        existingInputTagIds(database, inputTagNames(input)),
       ),
     execute: () => createTransaction(database, input, clock),
     captureAfter: (result, before) =>
@@ -329,7 +362,7 @@ export function updateTransactionUndoableCommand(
         ],
         [
           ...current.tags.map((tag) => tag.id),
-          ...existingInputTagIds(database, input.tagNames),
+          ...existingInputTagIds(database, inputTagNames(input)),
         ],
       )
     },
