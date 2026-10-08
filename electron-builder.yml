@@ -14,8 +14,11 @@ asar: true
 asarUnpack:
   - out/main/receipt-preprocessing-worker.js
   - node_modules/better-sqlite3/**/*.node
+  # The preprocessing worker loads sharp from app.asar.unpacked, so its
+  # runtime dependencies must be unpacked too.
   - node_modules/sharp/**/*
   - node_modules/@img/**/*
+  - node_modules/detect-libc/**/*
   # Tesseract starts its Node adapter with worker_threads; worker code, WASM,
   # and its runtime dependency graph must be addressable outside app.asar.
   - node_modules/tesseract.js/**/*
@@ -44,6 +47,9 @@ nsis:
   oneClick: true
   perMachine: false
   deleteAppDataOnUninstall: false
+  # No spaces: gh uploads assets under their file names, and latest.yml must
+  # reference the same name for electron-updater.
+  artifactName: Financial-Tracker-Setup-${version}.${ext}
 publish:
   provider: github
   owner: finymark

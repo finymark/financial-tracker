@@ -1,6 +1,6 @@
 {
   "name": "financial-tracker",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "description": "A local-first personal expense tracker for Windows.",
   "private": true,
   "type": "module",
