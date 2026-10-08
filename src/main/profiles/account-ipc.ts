@@ -1,6 +1,7 @@
 import type { IpcMain } from 'electron'
 import { IPC_CHANNELS, type AppBridge } from '../../shared/ipc'
 import {
+  parseListAccountOptionsInput,
   validateAccountCurrency,
   validateAccountId,
   validateAccountName,
@@ -23,8 +24,13 @@ export function registerAccountIpc(
   registerIpcHandler(
     ipcMain,
     IPC_CHANNELS.accountsListOptions,
-    (): Awaited<ReturnType<AppBridge['accounts']['listOptions']>> =>
-      controller.getActiveApplication().queries.listAccountOptions(),
+    (
+      _event,
+      value: unknown,
+    ): Awaited<ReturnType<AppBridge['accounts']['listOptions']>> =>
+      controller
+        .getActiveApplication()
+        .queries.listAccountOptions(parseListAccountOptionsInput(value)),
   )
   registerIpcHandler(
     ipcMain,
@@ -81,6 +87,19 @@ export function registerAccountIpc(
       controller
         .getActiveApplication()
         .commands.archiveAccount(validateAccountId(input.id))
+    },
+  )
+  registerIpcHandler(
+    ipcMain,
+    IPC_CHANNELS.accountsUnarchive,
+    (
+      _event,
+      value: unknown,
+    ): Awaited<ReturnType<AppBridge['accounts']['unarchive']>> => {
+      const input = inputRecord(value)
+      controller
+        .getActiveApplication()
+        .commands.unarchiveAccount(validateAccountId(input.id))
     },
   )
   registerIpcHandler(

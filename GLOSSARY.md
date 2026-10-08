@@ -46,12 +46,16 @@ A transaction divided into parts, each part with its own category and amount.
 _Avoid_: Sub-transaction
 
 **Tag**:
-A free-form label on a transaction that cuts across categories (e.g. a trip or a project).
+A free-form label on a transaction, or on one part of a split, that cuts across categories (e.g. a trip or a project).
 _Avoid_: Label
 
 **Payee**:
 The normalized name of the counterparty of a transaction (e.g. "Lidl"), regardless of how the raw description reads.
 _Avoid_: Merchant, vendor, counterparty
+
+**Payee alias**:
+Another name for a payee, such as a raw bank description or a spelling variant, that resolves to that payee when entered.
+_Avoid_: Synonym, mapping
 
 **Excluded transaction**:
 A transaction kept in its account but left out of expense and income totals, such as an expense that will be reimbursed.

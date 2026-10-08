@@ -18,6 +18,17 @@ export interface Account extends CreateAccountInput {
   hasTransactions: boolean
 }
 
+export interface AccountOption {
+  id: string
+  name: string
+  currency: Currency
+  archived: boolean
+}
+
+export interface ListAccountOptionsInput {
+  includeArchived?: boolean
+}
+
 export interface AccountIdInput {
   id: string
 }

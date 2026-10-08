@@ -5,7 +5,8 @@ import { CardContent } from './components/ui/card'
 import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
 import { createFormatters, type Language, type MessageKey } from './i18n'
-import { parseAmountInput } from './lib/amount-input'
+import { parseAmountExpression } from '../../shared/amount-expression'
+import { AmountInput } from './components/amount-input'
 
 const errorKeys = [
   'accounts.error.name',
@@ -20,11 +21,18 @@ const errorKeys = [
 interface AccountsPageProps {
   language: Language
   t(key: MessageKey): string
+  onBusyChange(busy: boolean): void
+  onChanged(): void
 }
 
 type Editing = { id: string; kind: 'rename' | 'currency' | 'delete' } | null
 
-export function AccountsPage({ language, t }: AccountsPageProps) {
+export function AccountsPage({
+  language,
+  t,
+  onChanged,
+  onBusyChange,
+}: AccountsPageProps) {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -56,13 +64,15 @@ export function AccountsPage({ language, t }: AccountsPageProps) {
     }
   }, [])
 
-  async function run(action: () => Promise<unknown>) {
+  async function run(action: () => Promise<unknown>, offerUndo = true) {
     setBusy(true)
+    onBusyChange(true)
     setError(null)
     try {
       await action()
       setAccounts(await window.app.accounts.list())
       setEditing(null)
+      if (offerUndo) onChanged()
     } catch (error) {
       setError(
         errorKeys.find((key) => String(error).includes(key)) ??
@@ -70,6 +80,7 @@ export function AccountsPage({ language, t }: AccountsPageProps) {
       )
     } finally {
       setBusy(false)
+      onBusyChange(false)
     }
   }
 
@@ -79,8 +90,9 @@ export function AccountsPage({ language, t }: AccountsPageProps) {
       await window.app.accounts.create({
         name,
         currency,
-        openingBalance: parseAmountInput(
+        openingBalance: parseAmountExpression(
           openingBalance,
+          currency,
           'accounts.error.balance',
           {
             allowNegative: true,
@@ -103,7 +115,7 @@ export function AccountsPage({ language, t }: AccountsPageProps) {
           <Button
             variant="ghost"
             disabled={busy || loading}
-            onClick={() => void run(async () => {})}
+            onClick={() => void run(async () => {}, false)}
           >
             {t('accounts.refresh')}
           </Button>
@@ -167,7 +179,7 @@ export function AccountsPage({ language, t }: AccountsPageProps) {
                 >
                   {t('accounts.changeCurrency')}
                 </Button>
-                {!account.archived && (
+                {!account.archived ? (
                   <Button
                     variant="ghost"
                     disabled={busy}
@@ -178,6 +190,18 @@ export function AccountsPage({ language, t }: AccountsPageProps) {
                     }
                   >
                     {t('accounts.archive')}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() =>
+                      void run(() =>
+                        window.app.accounts.unarchive({ id: account.id }),
+                      )
+                    }
+                  >
+                    {t('accounts.unarchive')}
                   </Button>
                 )}
                 <Button
@@ -336,19 +360,19 @@ export function AccountsPage({ language, t }: AccountsPageProps) {
               >
                 {t('accounts.openingBalance')}
               </label>
-              <Input
+              <AmountInput
                 id="account-opening-balance"
-                inputMode="decimal"
                 value={openingBalance}
-                maxLength={22}
-                required
+                currency={currency}
+                language={language}
+                t={t}
+                errorKey="accounts.error.balance"
+                hintKey="accounts.balanceHint"
+                allowNegative
+                allowZero
                 disabled={busy || loading}
-                aria-describedby="balance-hint"
-                onChange={(event) => setOpeningBalance(event.target.value)}
+                onChange={setOpeningBalance}
               />
-              <p id="balance-hint" className="text-xs text-muted-foreground">
-                {t('accounts.balanceHint')}
-              </p>
             </div>
             <div className="space-y-2">
               <label

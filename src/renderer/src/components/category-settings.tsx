@@ -32,6 +32,7 @@ interface CategorySettingsProps {
   disabled: boolean
   t(key: MessageKey): string
   onBusyChange(busy: boolean): void
+  onChanged(): void
 }
 
 type Editing = { id: string; kind: 'rename' | 'delete' } | null
@@ -40,6 +41,7 @@ export function CategorySettings({
   disabled,
   t,
   onBusyChange,
+  onChanged,
 }: CategorySettingsProps) {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -78,7 +80,7 @@ export function CategorySettings({
     }
   }, [])
 
-  async function run(action: () => Promise<unknown>) {
+  async function run(action: () => Promise<unknown>, offerUndo = true) {
     setBusy(true)
     onBusyChange(true)
     setError(null)
@@ -86,6 +88,7 @@ export function CategorySettings({
       await action()
       setCategories(await window.app.categories.list())
       setEditing(null)
+      if (offerUndo) onChanged()
     } catch (error) {
       setError(
         errorKeys.find((key) => String(error).includes(key)) ??
@@ -122,7 +125,7 @@ export function CategorySettings({
             <Button
               variant="ghost"
               disabled={locked}
-              onClick={() => void run(async () => {})}
+              onClick={() => void run(async () => {}, false)}
             >
               {t('categories.refresh')}
             </Button>

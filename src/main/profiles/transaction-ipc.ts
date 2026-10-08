@@ -11,11 +11,29 @@ import {
   validateTransactionNote,
   validateTransactionPayeeName,
   validateTransactionTotal,
+  validateTransactionExcluded,
 } from './transaction-validation'
 import { inputRecord, registerIpcHandler } from '../ipc'
+import { validateTagNames } from './tag-validation'
 
 function transactionFields(value: unknown) {
   const input = inputRecord(value)
+  const lines = (() => {
+    if (input.lines === undefined) return undefined
+    if (!Array.isArray(input.lines)) throw new Error('transactions.error.lines')
+    return input.lines.map((value) => {
+      const line = inputRecord(value)
+      return {
+        amountMinor: validateTransactionTotal(line.amountMinor),
+        categoryId: validateTransactionCategoryId(line.categoryId),
+        note: validateTransactionNote(line.note),
+        tagNames:
+          line.tagNames === undefined
+            ? undefined
+            : validateTagNames(line.tagNames),
+      }
+    })
+  })()
   return {
     accountId: validateTransactionAccountId(input.accountId),
     kind: validateTransactionKind(input.kind),
@@ -24,6 +42,12 @@ function transactionFields(value: unknown) {
     payeeName: validateTransactionPayeeName(input.payeeName),
     categoryId: validateTransactionCategoryId(input.categoryId),
     note: validateTransactionNote(input.note),
+    tagNames:
+      input.tagNames === undefined
+        ? undefined
+        : validateTagNames(input.tagNames),
+    excluded: validateTransactionExcluded(input.excluded),
+    lines,
   }
 }
 
@@ -31,6 +55,19 @@ export function registerTransactionIpc(
   ipcMain: IpcMain,
   controller: ProfileController,
 ): void {
+  registerIpcHandler(
+    ipcMain,
+    IPC_CHANNELS.transactionsDuplicate,
+    (
+      _event,
+      value,
+    ): Awaited<ReturnType<AppBridge['transactions']['duplicate']>> =>
+      controller
+        .getActiveApplication()
+        .commands.duplicateTransaction(
+          validateTransactionId(inputRecord(value).id),
+        ),
+  )
   registerIpcHandler(
     ipcMain,
     IPC_CHANNELS.transactionsList,
@@ -41,12 +78,6 @@ export function registerTransactionIpc(
       controller
         .getActiveApplication()
         .queries.listTransactions(parseTransactionListInput(value)),
-  )
-  registerIpcHandler(
-    ipcMain,
-    IPC_CHANNELS.payeesList,
-    (): Awaited<ReturnType<AppBridge['payees']['list']>> =>
-      controller.getActiveApplication().queries.listPayees(),
   )
   registerIpcHandler(
     ipcMain,

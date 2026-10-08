@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import {
   ArrowLeftRight,
   LayoutDashboard,
@@ -13,9 +13,14 @@ import type {
   ActiveProfileInfo,
   ProfileRegistrySnapshot,
 } from '../../shared/profiles'
+import { ShortcutHelp } from './components/shortcut-help'
+import { matchShortcut } from './lib/shortcuts'
+import { shortcutTargetContext } from './lib/shortcut-context'
 import { UpdateNotice } from './components/update-notice'
 import { BackupSettings } from './components/backup-settings'
 import { CategorySettings } from './components/category-settings'
+import { PayeeSettings } from './components/payee-settings'
+import { RuleSettings } from './components/rule-settings'
 import { AccountsPage } from './AccountsPage'
 import { TransactionsPage } from './TransactionsPage'
 import { Button } from './components/ui/button'
@@ -352,14 +357,100 @@ function Shell({
   onRestored,
 }: ShellProps) {
   const [page, setPage] = useState<Page>('overview')
+  const [newTransactionRequested, setNewTransactionRequested] = useState(false)
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false)
+  const transactionRequestHandled = useCallback(
+    () => setNewTransactionRequested(false),
+    [],
+  )
   const [collapsed, setCollapsed] = useState(false)
   const { language, theme, baseCurrency } = active.settings
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsError, setSettingsError] = useState(false)
   const [backupBusy, setBackupBusy] = useState(false)
+  const [accountBusy, setAccountBusy] = useState(false)
   const [categoryBusy, setCategoryBusy] = useState(false)
+  const [payeeBusy, setPayeeBusy] = useState(false)
+  const [ruleBusy, setRuleBusy] = useState(false)
   const [categoryRevision, setCategoryRevision] = useState(0)
+  const [undoRevision, setUndoRevision] = useState(0)
+  const [undoOffered, setUndoOffered] = useState(false)
+  const [undoBusy, setUndoBusy] = useState(false)
+  const [undoError, setUndoError] = useState(false)
   const format = createFormatters(language)
+
+  const undoLast = useCallback(async () => {
+    if (undoBusy || accountBusy) return
+    setUndoBusy(true)
+    setUndoError(false)
+    try {
+      const undone = await window.app.undo.last()
+      setUndoOffered(false)
+      if (undone) {
+        setUndoRevision((revision) => revision + 1)
+        setCategoryRevision((revision) => revision + 1)
+      }
+    } catch {
+      setUndoError(true)
+      setUndoOffered(true)
+    } finally {
+      setUndoBusy(false)
+    }
+  }, [undoBusy, accountBusy])
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      const action = matchShortcut(event, {
+        scope: 'app',
+        ...shortcutTargetContext(event.target),
+      })
+      if (!action || showShortcutHelp) return
+      // Do not open a second drawer or undo the ledger beneath a modal.
+      if (action !== 'help' && document.querySelector('[role="dialog"]')) return
+      if (action === 'newTransaction') {
+        if (
+          savingSettings ||
+          accountBusy ||
+          backupBusy ||
+          categoryBusy ||
+          payeeBusy ||
+          ruleBusy ||
+          undoBusy
+        )
+          return
+        event.preventDefault()
+        setNewTransactionRequested(true)
+        setPage('transactions')
+      } else if (action === 'help') {
+        event.preventDefault()
+        setShowShortcutHelp(true)
+      } else if (action === 'undo') {
+        if (
+          savingSettings ||
+          accountBusy ||
+          backupBusy ||
+          categoryBusy ||
+          payeeBusy ||
+          ruleBusy
+        )
+          return
+        event.preventDefault()
+        void undoLast()
+      }
+    }
+    window.addEventListener('keydown', handleShortcut)
+    return () => window.removeEventListener('keydown', handleShortcut)
+  }, [
+    undoLast,
+    undoBusy,
+    savingSettings,
+    accountBusy,
+    backupBusy,
+    categoryBusy,
+    payeeBusy,
+    ruleBusy,
+    showShortcutHelp,
+  ])
 
   async function saveSettings(changes: ProfileSettingsChanges) {
     setSavingSettings(true)
@@ -424,7 +515,13 @@ function Shell({
               aria-label={t(`navigation.${id}`)}
               aria-current={page === id ? 'page' : undefined}
               title={collapsed ? t(`navigation.${id}`) : undefined}
-              disabled={backupBusy || categoryBusy}
+              disabled={
+                accountBusy ||
+                backupBusy ||
+                categoryBusy ||
+                payeeBusy ||
+                ruleBusy
+              }
               onClick={() => setPage(id)}
             >
               <Icon aria-hidden="true" />
@@ -443,7 +540,9 @@ function Shell({
           title={
             collapsed ? `${active.name} — ${t('profile.switch')}` : undefined
           }
-          disabled={backupBusy || categoryBusy}
+          disabled={
+            accountBusy || backupBusy || categoryBusy || payeeBusy || ruleBusy
+          }
           onClick={onSwitchProfile}
         >
           <UsersRound className="size-5 shrink-0" aria-hidden="true" />
@@ -464,6 +563,13 @@ function Shell({
       >
         <div className="mx-auto max-w-4xl space-y-8">
           <header>
+            <Button
+              className="float-right"
+              variant="ghost"
+              onClick={() => setShowShortcutHelp(true)}
+            >
+              {t('shortcuts.help')}
+            </Button>
             <p className="mb-2 text-sm text-muted-foreground">
               {t('app.tagline')}
             </p>
@@ -480,10 +586,31 @@ function Shell({
               <CardDescription>{t(`${page}.description`)}</CardDescription>
             </CardHeader>
             {page === 'accounts' && (
-              <AccountsPage key={active.id} language={language} t={t} />
+              <AccountsPage
+                key={`${active.id}:${undoRevision}`}
+                language={language}
+                t={t}
+                onBusyChange={setAccountBusy}
+                onChanged={() => {
+                  setUndoError(false)
+                  setUndoOffered(true)
+                }}
+              />
             )}
             {page === 'transactions' && (
-              <TransactionsPage key={active.id} language={language} t={t} />
+              <TransactionsPage
+                key={active.id}
+                baseCurrency={baseCurrency}
+                language={language}
+                t={t}
+                undoRevision={undoRevision}
+                newTransactionRequested={newTransactionRequested}
+                onNewTransactionHandled={transactionRequestHandled}
+                onTransactionChanged={() => {
+                  setUndoError(false)
+                  setUndoOffered(true)
+                }}
+              />
             )}
             {page === 'settings' && (
               <CardContent className="space-y-6">
@@ -495,7 +622,14 @@ function Shell({
                     <NativeSelect
                       id="language"
                       value={language}
-                      disabled={savingSettings || backupBusy || categoryBusy}
+                      disabled={
+                        savingSettings ||
+                        accountBusy ||
+                        backupBusy ||
+                        categoryBusy ||
+                        payeeBusy ||
+                        ruleBusy
+                      }
                       onChange={(event) => {
                         const value = languages.find(
                           (item) => item === event.target.value,
@@ -517,7 +651,14 @@ function Shell({
                     <NativeSelect
                       id="theme"
                       value={theme}
-                      disabled={savingSettings || backupBusy || categoryBusy}
+                      disabled={
+                        savingSettings ||
+                        accountBusy ||
+                        backupBusy ||
+                        categoryBusy ||
+                        payeeBusy ||
+                        ruleBusy
+                      }
                       onChange={(event) => {
                         const value = themeModes.find(
                           (item) => item === event.target.value,
@@ -542,7 +683,14 @@ function Shell({
                     <NativeSelect
                       id="base-currency"
                       value={baseCurrency}
-                      disabled={savingSettings || backupBusy || categoryBusy}
+                      disabled={
+                        savingSettings ||
+                        accountBusy ||
+                        backupBusy ||
+                        categoryBusy ||
+                        payeeBusy ||
+                        ruleBusy
+                      }
                       onChange={(event) => {
                         const value = baseCurrencies.find(
                           (item) => item === event.target.value,
@@ -599,11 +747,59 @@ function Shell({
             )}
           </Card>
           {page === 'settings' && (
-            <CategorySettings
-              key={`${active.id}:${categoryRevision}`}
+            <PayeeSettings
+              key={`${active.id}:${undoRevision}`}
               t={t}
-              disabled={savingSettings || backupBusy}
+              disabled={
+                savingSettings ||
+                accountBusy ||
+                backupBusy ||
+                categoryBusy ||
+                ruleBusy
+              }
+              onBusyChange={setPayeeBusy}
+              onChanged={() => {
+                setUndoError(false)
+                setUndoOffered(true)
+              }}
+            />
+          )}
+          {page === 'settings' && (
+            <RuleSettings
+              key={`${active.id}:${undoRevision}`}
+              language={language}
+              baseCurrency={baseCurrency}
+              t={t}
+              disabled={
+                savingSettings ||
+                accountBusy ||
+                backupBusy ||
+                categoryBusy ||
+                payeeBusy
+              }
+              onBusyChange={setRuleBusy}
+              onChanged={() => {
+                setUndoError(false)
+                setUndoOffered(true)
+              }}
+            />
+          )}
+          {page === 'settings' && (
+            <CategorySettings
+              key={`${active.id}:${categoryRevision}:${undoRevision}`}
+              t={t}
+              disabled={
+                savingSettings ||
+                accountBusy ||
+                backupBusy ||
+                payeeBusy ||
+                ruleBusy
+              }
               onBusyChange={setCategoryBusy}
+              onChanged={() => {
+                setUndoError(false)
+                setUndoOffered(true)
+              }}
             />
           )}
           {page === 'settings' && (
@@ -616,11 +812,31 @@ function Shell({
                 setCategoryRevision((revision) => revision + 1)
               }}
               onBusyChange={setBackupBusy}
-              disabled={savingSettings || categoryBusy}
+              disabled={savingSettings || categoryBusy || payeeBusy || ruleBusy}
             />
           )}
         </div>
       </main>
+      {showShortcutHelp && (
+        <ShortcutHelp t={t} onClose={() => setShowShortcutHelp(false)} />
+      )}
+      {undoOffered && (
+        <aside
+          role="status"
+          className="fixed right-4 bottom-4 z-50 flex max-w-sm items-center gap-3 rounded-lg border bg-card p-4 text-card-foreground shadow-lg"
+        >
+          <p className="text-sm">
+            {t(undoError ? 'undo.error' : 'undo.available')}
+          </p>
+          <Button
+            variant="ghost"
+            disabled={undoBusy || accountBusy}
+            onClick={undoLast}
+          >
+            {t('undo.action')}
+          </Button>
+        </aside>
+      )}
     </div>
   )
 }

@@ -42,6 +42,8 @@ import {
 } from './profile-backups'
 import type {
   Account,
+  AccountOption,
+  ListAccountOptionsInput,
   CreateAccountInput,
   RenameAccountInput,
   ChangeAccountCurrencyInput,
@@ -54,30 +56,103 @@ import type { ProfilePaths } from './profile-registry'
 import { parseSettingsChanges } from './profile-settings'
 import type {
   CreateTransactionInput,
-  Payee,
   TransactionListInput,
   TransactionPage,
   Transaction,
   UpdateTransactionInput,
 } from '../../shared/transactions'
+import type {
+  AddPayeeAliasInput,
+  Payee,
+  PayeeAlias,
+  PayeeSuggestion,
+  PayeeSuggestionInput,
+  MergePayeesInput,
+} from '../../shared/payees'
+import type {
+  CreateTransferInput,
+  Transfer,
+  UpdateTransferInput,
+} from '../../shared/transfers'
+import type {
+  BalanceAdjustment,
+  CreateBalanceAdjustmentInput,
+  UpdateBalanceAdjustmentInput,
+} from '../../shared/adjustments'
+import { listTransactions } from './profile-transactions'
+import { listPayeeAliases, listPayees, suggestPayees } from './profile-payees'
 import {
-  createTransaction,
-  deleteTransaction,
-  listPayees,
-  listTransactions,
-  updateTransaction,
-} from './profile-transactions'
+  addPayeeAliasUndoableCommand,
+  mergePayeesUndoableCommand,
+  removePayeeAliasUndoableCommand,
+} from './payee-undo'
+import type { Tag, RenameTagInput } from '../../shared/tags'
+import { renameTagUndoableCommand, deleteTagUndoableCommand } from './tag-undo'
+import { listTags } from './profile-tags'
+import type {
+  CreateTemplateInput,
+  TransactionTemplate,
+  UpdateTemplateInput,
+  SaveTransactionAsTemplateInput,
+} from '../../shared/templates'
+import { listTemplates } from './profile-templates'
 import {
-  archiveAccount,
-  changeAccountCurrency,
-  createAccount,
-  deleteAccount,
+  createTemplateUndoableCommand,
+  updateTemplateUndoableCommand,
+  deleteTemplateUndoableCommand,
+  saveTransactionAsTemplateUndoableCommand,
+} from './template-undo'
+import {
+  createTransactionUndoableCommand,
+  duplicateTransactionUndoableCommand,
+  deleteTransactionUndoableCommand,
+  updateTransactionUndoableCommand,
+} from './transaction-undo'
+import {
   getAccountBalance,
   hasAccountTransactions,
+  listAccountOptions,
   listAccounts,
-  renameAccount,
 } from './profile-accounts'
+import {
+  archiveAccountUndoableCommand,
+  changeAccountCurrencyUndoableCommand,
+  createAccountUndoableCommand,
+  deleteAccountUndoableCommand,
+  renameAccountUndoableCommand,
+  unarchiveAccountUndoableCommand,
+} from './account-undo'
+import { categoryUndoableCommand } from './category-undo'
 import { formatBackupTimestamp } from './backup-timestamp'
+import { UndoHistory, type UndoableCommand } from './undo-history'
+import {
+  createTransferUndoableCommand,
+  deleteTransferUndoableCommand,
+  updateTransferUndoableCommand,
+} from './transfer-undo'
+import {
+  createBalanceAdjustmentUndoableCommand,
+  deleteBalanceAdjustmentUndoableCommand,
+  updateBalanceAdjustmentUndoableCommand,
+} from './adjustment-undo'
+import type {
+  CategorisationAutofill,
+  CategorisationRule,
+  CategorisationRuleDraftInput,
+  CreateCategorisationRuleInput,
+  ReorderCategorisationRuleInput,
+  UpdateCategorisationRuleInput,
+} from '../../shared/rules'
+import {
+  getCategorisationAutofill,
+  listCategorisationRules,
+} from './profile-rules'
+import {
+  createCategorisationRuleUndoableCommand,
+  deleteCategorisationRuleUndoableCommand,
+  reorderCategorisationRuleUndoableCommand,
+  updateCategorisationRuleUndoableCommand,
+} from './rule-undo'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -132,24 +207,63 @@ export interface OpenProfileApplicationOptions {
 }
 
 export interface ProfileQueries {
+  listTemplates(): TransactionTemplate[]
+  listCategorisationRules(): CategorisationRule[]
+  getCategorisationAutofill(
+    input: CategorisationRuleDraftInput,
+  ): CategorisationAutofill
   listTransactions(input?: TransactionListInput): TransactionPage
   listPayees(): Payee[]
+  listPayeeAliases(payeeId: string): PayeeAlias[]
+  suggestPayees(input: PayeeSuggestionInput): PayeeSuggestion[]
+  listTags(): Tag[]
   hasCategoryTransactions(id: string): boolean
   listCategories(): Category[]
   listCategoryOptions(kind: CategoryKind): Category[]
   listBackups(): ProfileBackup[]
   getProfileInfo(): ProfileInfo
   listAccounts(): Account[]
-  listAccountOptions(): Account[]
+  listAccountOptions(input?: ListAccountOptionsInput): AccountOption[]
   getAccountBalance(id: string): number
   hasAccountTransactions(id: string): boolean
   getSettings(): ProfileSettings
 }
 
 export interface ProfileCommands {
+  updateTemplate(input: UpdateTemplateInput): TransactionTemplate
+  deleteTemplate(id: string): void
+  saveTransactionAsTemplate(
+    input: SaveTransactionAsTemplateInput,
+  ): TransactionTemplate
+  createTemplate(input: CreateTemplateInput): TransactionTemplate
+  duplicateTransaction(id: string): string
+  createCategorisationRule(
+    input: CreateCategorisationRuleInput,
+  ): CategorisationRule
+  updateCategorisationRule(
+    input: UpdateCategorisationRuleInput,
+  ): CategorisationRule
+  reorderCategorisationRule(input: ReorderCategorisationRuleInput): void
+  deleteCategorisationRule(id: string): void
   createTransaction(input: CreateTransactionInput): Transaction
   updateTransaction(input: UpdateTransactionInput): Transaction
   deleteTransaction(id: string): void
+  renameTag(input: RenameTagInput): Tag
+  deleteTag(id: string): void
+  createTransfer(input: CreateTransferInput): Transfer
+  updateTransfer(input: UpdateTransferInput): Transfer
+  deleteTransfer(id: string): void
+  addPayeeAlias(input: AddPayeeAliasInput): PayeeAlias
+  removePayeeAlias(id: string): void
+  mergePayees(input: MergePayeesInput): Payee
+  createBalanceAdjustment(
+    input: CreateBalanceAdjustmentInput,
+  ): BalanceAdjustment
+  updateBalanceAdjustment(
+    input: UpdateBalanceAdjustmentInput,
+  ): BalanceAdjustment
+  deleteBalanceAdjustment(id: string): void
+  undoLast(): boolean
   createCategory(input: CreateCategoryInput): Category
   renameCategory(input: RenameCategoryInput): Category
   archiveCategory(id: string): void
@@ -162,6 +276,7 @@ export interface ProfileCommands {
   renameAccount(input: RenameAccountInput): Account
   changeAccountCurrency(input: ChangeAccountCurrencyInput): Account
   archiveAccount(id: string): void
+  unarchiveAccount(id: string): void
   deleteAccount(id: string): void
   updateSettings(changes: ProfileSettingsChanges): ProfileSettings
 }
@@ -324,6 +439,307 @@ export const CURRENT_MIGRATIONS: readonly SchemaMigration[] = [
       BEGIN SELECT RAISE(ABORT, 'Invalid normalized payee name'); END;
   `,
   ),
+  defineSqlMigration(
+    8,
+    'excluded transactions',
+    `
+    ALTER TABLE transactions ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0 CHECK (excluded IN (0, 1));
+  `,
+  ),
+  defineSqlMigration(
+    9,
+    'one-record transfers with linked fees',
+    `
+    CREATE TABLE transfers (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      from_account_id TEXT NOT NULL REFERENCES accounts(id),
+      from_amount_minor INTEGER NOT NULL CHECK (
+        typeof(from_amount_minor) = 'integer' AND
+        from_amount_minor BETWEEN 1 AND 9007199254740991
+      ),
+      to_account_id TEXT NOT NULL REFERENCES accounts(id),
+      to_amount_minor INTEGER NOT NULL CHECK (
+        typeof(to_amount_minor) = 'integer' AND
+        to_amount_minor BETWEEN 1 AND 9007199254740991
+      ),
+      date TEXT NOT NULL CHECK (date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+      note TEXT NOT NULL CHECK (length(note) <= 1000),
+      fee_transaction_id TEXT UNIQUE REFERENCES transactions(id) ON DELETE RESTRICT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      CHECK (from_account_id <> to_account_id)
+    );
+    CREATE INDEX transfers_newest ON transfers(date DESC, created_at DESC, id DESC);
+    CREATE INDEX transfers_from_account_newest
+      ON transfers(from_account_id, date DESC, created_at DESC, id DESC);
+    CREATE INDEX transfers_to_account_newest
+      ON transfers(to_account_id, date DESC, created_at DESC, id DESC);
+  `,
+  ),
+  defineSqlMigration(
+    10,
+    'tags on transaction lines',
+    `
+    CREATE TABLE tags (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 100),
+      normalized_name TEXT NOT NULL UNIQUE CHECK (normalized_name = payee_key(name)),
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE transaction_line_tags (
+      line_id TEXT NOT NULL REFERENCES transaction_lines(id) ON DELETE CASCADE,
+      tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (line_id, tag_id)
+    );
+    CREATE INDEX transaction_line_tags_tag_id ON transaction_line_tags(tag_id, line_id);
+  `,
+  ),
+  defineSqlMigration(
+    11,
+    'target-based balance adjustments',
+    `
+    CREATE TABLE balance_adjustments (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      account_id TEXT NOT NULL REFERENCES accounts(id),
+      date TEXT NOT NULL CHECK (date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+      observed_minor INTEGER NOT NULL CHECK (
+        typeof(observed_minor) = 'integer' AND
+        observed_minor BETWEEN -9007199254740991 AND 9007199254740991
+      ),
+      note TEXT NOT NULL CHECK (length(note) <= 1000),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX balance_adjustments_newest
+      ON balance_adjustments(date DESC, created_at DESC, id DESC);
+    CREATE INDEX balance_adjustments_account_history
+      ON balance_adjustments(account_id, date, created_at, id);
+  `,
+  ),
+  defineSqlMigration(
+    12,
+    'payee aliases',
+    `
+    CREATE TABLE payee_aliases (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      payee_id TEXT NOT NULL REFERENCES payees(id) ON DELETE CASCADE,
+      name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 100),
+      normalized_name TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX payee_aliases_normalized_name
+      ON payee_aliases(normalized_name);
+    CREATE INDEX payee_aliases_payee_id ON payee_aliases(payee_id);
+    CREATE TRIGGER payee_aliases_normalized_name_insert
+    BEFORE INSERT ON payee_aliases
+    WHEN NEW.normalized_name <> payee_alias_key(NEW.name)
+      BEGIN SELECT RAISE(ABORT, 'Invalid normalized payee alias'); END;
+    CREATE TRIGGER payee_aliases_normalized_name_update
+    BEFORE UPDATE OF name, normalized_name ON payee_aliases
+    WHEN NEW.normalized_name <> payee_alias_key(NEW.name)
+      BEGIN SELECT RAISE(ABORT, 'Invalid normalized payee alias'); END;
+  `,
+  ),
+  defineSqlMigration(
+    13,
+    'notes on transaction lines for splits',
+    `
+    ALTER TABLE transaction_lines
+      ADD COLUMN note TEXT NOT NULL DEFAULT '' CHECK (length(note) <= 1000);
+    UPDATE transaction_lines
+    SET note = (
+      SELECT transactions.note FROM transactions
+      WHERE transactions.id = transaction_lines.transaction_id
+    );
+  `,
+  ),
+  defineSqlMigration(
+    14,
+    'transaction templates',
+    `
+    CREATE TABLE transaction_templates (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 100),
+      kind TEXT CHECK (kind IN ('expense', 'income')),
+      account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+      total_minor INTEGER CHECK (
+        total_minor IS NULL OR (typeof(total_minor) = 'integer' AND
+        total_minor BETWEEN 1 AND 9007199254740991)
+      ),
+      payee_name TEXT CHECK (payee_name IS NULL OR length(trim(payee_name)) BETWEEN 1 AND 100),
+      category_id TEXT REFERENCES categories(id) ON DELETE SET NULL,
+      tag_names TEXT NOT NULL CHECK (json_valid(tag_names) AND json_type(tag_names) = 'array'),
+      note TEXT CHECK (note IS NULL OR length(note) <= 1000),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `,
+  ),
+  defineSqlMigration(
+    15,
+    'categorisation rules',
+    `
+    CREATE TABLE categorisation_rules (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+      sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
+      payee_id TEXT REFERENCES payees(id) ON DELETE RESTRICT,
+      text_contains TEXT CHECK (
+        text_contains IS NULL OR length(trim(text_contains)) BETWEEN 1 AND 1000
+      ),
+      account_id TEXT REFERENCES accounts(id) ON DELETE RESTRICT,
+      min_amount_minor INTEGER CHECK (
+        min_amount_minor IS NULL OR
+        (typeof(min_amount_minor) = 'integer' AND min_amount_minor >= 0)
+      ),
+      max_amount_minor INTEGER CHECK (
+        max_amount_minor IS NULL OR
+        (typeof(max_amount_minor) = 'integer' AND max_amount_minor > 0)
+      ),
+      category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      CHECK (payee_id IS NOT NULL OR text_contains IS NOT NULL),
+      CHECK (
+        min_amount_minor IS NULL OR max_amount_minor IS NULL OR
+        min_amount_minor <= max_amount_minor
+      )
+    );
+    CREATE INDEX categorisation_rules_priority
+      ON categorisation_rules(sort_order);
+    CREATE INDEX categorisation_rules_payee_id
+      ON categorisation_rules(payee_id);
+    CREATE INDEX categorisation_rules_account_id
+      ON categorisation_rules(account_id);
+    CREATE INDEX categorisation_rules_category_id
+      ON categorisation_rules(category_id);
+    CREATE TABLE categorisation_rule_tags (
+      rule_id TEXT NOT NULL REFERENCES categorisation_rules(id) ON DELETE CASCADE,
+      tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (rule_id, tag_id)
+    );
+    CREATE INDEX categorisation_rule_tags_tag_id
+      ON categorisation_rule_tags(tag_id, rule_id);
+  `,
+  ),
+  defineSqlMigration(
+    16,
+    'currency-aware rules and tag-linked templates',
+    `
+    CREATE TEMP TABLE migrated_rule_tags AS
+      SELECT rule_id, tag_id FROM categorisation_rule_tags;
+    DROP TABLE categorisation_rule_tags;
+    ALTER TABLE categorisation_rules RENAME TO old_categorisation_rules;
+    CREATE TABLE categorisation_rules (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+      sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
+      payee_id TEXT REFERENCES payees(id) ON DELETE RESTRICT,
+      text_contains TEXT CHECK (
+        text_contains IS NULL OR length(trim(text_contains)) BETWEEN 1 AND 1000
+      ),
+      account_id TEXT REFERENCES accounts(id) ON DELETE RESTRICT,
+      min_amount_minor INTEGER CHECK (
+        min_amount_minor IS NULL OR
+        (typeof(min_amount_minor) = 'integer' AND min_amount_minor >= 0)
+      ),
+      max_amount_minor INTEGER CHECK (
+        max_amount_minor IS NULL OR
+        (typeof(max_amount_minor) = 'integer' AND max_amount_minor > 0)
+      ),
+      amount_currency TEXT CHECK (amount_currency IN ('HUF', 'CHF')),
+      action_payee_id TEXT REFERENCES payees(id) ON DELETE RESTRICT,
+      category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      CHECK (
+        payee_id IS NOT NULL OR text_contains IS NOT NULL OR
+        account_id IS NOT NULL OR min_amount_minor IS NOT NULL OR
+        max_amount_minor IS NOT NULL
+      ),
+      CHECK (
+        min_amount_minor IS NULL OR max_amount_minor IS NULL OR
+        min_amount_minor <= max_amount_minor
+      ),
+      CHECK (
+        (min_amount_minor IS NULL AND max_amount_minor IS NULL AND amount_currency IS NULL) OR
+        ((min_amount_minor IS NOT NULL OR max_amount_minor IS NOT NULL) AND amount_currency IS NOT NULL)
+      )
+    );
+    INSERT INTO categorisation_rules
+      (id, enabled, sort_order, payee_id, text_contains, account_id,
+       min_amount_minor, max_amount_minor, amount_currency, action_payee_id,
+       category_id, created_at, updated_at)
+    SELECT old.id, old.enabled, old.sort_order, old.payee_id,
+      old.text_contains, old.account_id, old.min_amount_minor,
+      old.max_amount_minor,
+      CASE WHEN old.min_amount_minor IS NOT NULL OR old.max_amount_minor IS NOT NULL
+        THEN COALESCE(accounts.currency, profile_settings.base_currency)
+        ELSE NULL END,
+      NULL, old.category_id, old.created_at, old.updated_at
+    FROM old_categorisation_rules AS old
+    LEFT JOIN accounts ON accounts.id = old.account_id
+    CROSS JOIN profile_settings;
+    DROP TABLE old_categorisation_rules;
+    CREATE INDEX categorisation_rules_priority
+      ON categorisation_rules(sort_order);
+    CREATE INDEX categorisation_rules_payee_id
+      ON categorisation_rules(payee_id);
+    CREATE INDEX categorisation_rules_action_payee_id
+      ON categorisation_rules(action_payee_id);
+    CREATE INDEX categorisation_rules_account_id
+      ON categorisation_rules(account_id);
+    CREATE INDEX categorisation_rules_category_id
+      ON categorisation_rules(category_id);
+    CREATE TABLE categorisation_rule_tags (
+      rule_id TEXT NOT NULL REFERENCES categorisation_rules(id) ON DELETE CASCADE,
+      tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (rule_id, tag_id)
+    );
+    INSERT INTO categorisation_rule_tags (rule_id, tag_id)
+      SELECT rule_id, tag_id FROM migrated_rule_tags;
+    DROP TABLE migrated_rule_tags;
+    CREATE INDEX categorisation_rule_tags_tag_id
+      ON categorisation_rule_tags(tag_id, rule_id);
+
+    ALTER TABLE transaction_templates RENAME TO old_transaction_templates;
+    CREATE TABLE transaction_templates (
+      id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+      name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 100),
+      kind TEXT CHECK (kind IN ('expense', 'income')),
+      account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+      total_minor INTEGER CHECK (
+        total_minor IS NULL OR (typeof(total_minor) = 'integer' AND
+        total_minor BETWEEN 1 AND 9007199254740991)
+      ),
+      payee_name TEXT CHECK (payee_name IS NULL OR length(trim(payee_name)) BETWEEN 1 AND 100),
+      category_id TEXT REFERENCES categories(id) ON DELETE SET NULL,
+      note TEXT CHECK (note IS NULL OR length(note) <= 1000),
+      excluded INTEGER NOT NULL DEFAULT 0 CHECK (excluded IN (0, 1)),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    INSERT INTO transaction_templates
+      (id, name, kind, account_id, total_minor, payee_name, category_id,
+       note, excluded, created_at, updated_at)
+    SELECT id, name, kind, account_id, total_minor, payee_name, category_id,
+      note, 0, created_at, updated_at
+    FROM old_transaction_templates;
+    CREATE TABLE transaction_template_tags (
+      template_id TEXT NOT NULL REFERENCES transaction_templates(id) ON DELETE CASCADE,
+      tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (template_id, tag_id)
+    );
+    INSERT OR IGNORE INTO transaction_template_tags (template_id, tag_id)
+      SELECT templates.id, tags.id
+      FROM old_transaction_templates AS templates,
+        json_each(templates.tag_names) AS names
+      JOIN tags ON tags.normalized_name = payee_key(names.value);
+    DROP TABLE old_transaction_templates;
+    CREATE INDEX transaction_template_tags_tag_id
+      ON transaction_template_tags(tag_id, template_id);
+  `,
+  ),
 ]
 
 function validateMigrations(
@@ -453,6 +869,7 @@ class OpenProfileApplication implements ProfileApplication {
   #restoring = false
   readonly #profile: ProfileSummary
   readonly #clock: () => Date
+  readonly #undoHistory = new UndoHistory()
 
   constructor(
     database: Database.Database,
@@ -463,64 +880,234 @@ class OpenProfileApplication implements ProfileApplication {
     this.#options = options
     this.#clock = options.clock ?? (() => new Date())
     this.commands = {
+      updateTemplate: (input) =>
+        this.#executeUndoableCommand(
+          updateTemplateUndoableCommand(this.#database, input, this.#clock),
+        ),
+      deleteTemplate: (id) =>
+        this.#executeUndoableCommand(
+          deleteTemplateUndoableCommand(this.#database, id),
+        ),
+      saveTransactionAsTemplate: (input) =>
+        this.#executeUndoableCommand(
+          saveTransactionAsTemplateUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+          ),
+        ),
+      createTemplate: (input) =>
+        this.#executeUndoableCommand(
+          createTemplateUndoableCommand(this.#database, input, this.#clock),
+        ),
+      duplicateTransaction: (id) =>
+        this.#executeUndoableCommand(
+          duplicateTransactionUndoableCommand(this.#database, id, this.#clock),
+        ),
+      createCategorisationRule: (input) =>
+        this.#executeUndoableCommand(
+          createCategorisationRuleUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+          ),
+        ),
+      updateCategorisationRule: (input) =>
+        this.#executeUndoableCommand(
+          updateCategorisationRuleUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+          ),
+        ),
+      reorderCategorisationRule: (input) =>
+        this.#executeUndoableCommand(
+          reorderCategorisationRuleUndoableCommand(this.#database, input),
+        ),
+      deleteCategorisationRule: (id) =>
+        this.#executeUndoableCommand(
+          deleteCategorisationRuleUndoableCommand(this.#database, id),
+        ),
       createTransaction: (input) =>
-        this.#executeCommand(() =>
-          createTransaction(this.#database, input, this.#clock),
+        this.#executeUndoableCommand(
+          createTransactionUndoableCommand(this.#database, input, this.#clock),
         ),
       updateTransaction: (input) =>
-        this.#executeCommand(() =>
-          updateTransaction(this.#database, input, this.#clock),
+        this.#executeUndoableCommand(
+          updateTransactionUndoableCommand(this.#database, input, this.#clock),
         ),
       deleteTransaction: (id) =>
-        this.#executeCommand(() => deleteTransaction(this.#database, id)),
+        this.#executeUndoableCommand(
+          deleteTransactionUndoableCommand(this.#database, id),
+        ),
+      deleteTag: (id) =>
+        this.#executeUndoableCommand(
+          deleteTagUndoableCommand(this.#database, id),
+        ),
+      renameTag: (input) =>
+        this.#executeUndoableCommand(
+          renameTagUndoableCommand(this.#database, input),
+        ),
+      createTransfer: (input) =>
+        this.#executeUndoableCommand(
+          createTransferUndoableCommand(this.#database, input, this.#clock),
+        ),
+      updateTransfer: (input) =>
+        this.#executeUndoableCommand(
+          updateTransferUndoableCommand(this.#database, input, this.#clock),
+        ),
+      deleteTransfer: (id) =>
+        this.#executeUndoableCommand(
+          deleteTransferUndoableCommand(this.#database, id),
+        ),
+      addPayeeAlias: (input) =>
+        this.#executeUndoableCommand(
+          addPayeeAliasUndoableCommand(this.#database, input, this.#clock),
+        ),
+      removePayeeAlias: (id) =>
+        this.#executeUndoableCommand(
+          removePayeeAliasUndoableCommand(this.#database, id),
+        ),
+      mergePayees: (input) =>
+        this.#executeUndoableCommand(
+          mergePayeesUndoableCommand(this.#database, input, this.#clock),
+        ),
+      createBalanceAdjustment: (input) =>
+        this.#executeUndoableCommand(
+          createBalanceAdjustmentUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+          ),
+        ),
+      updateBalanceAdjustment: (input) =>
+        this.#executeUndoableCommand(
+          updateBalanceAdjustmentUndoableCommand(
+            this.#database,
+            input,
+            this.#clock,
+          ),
+        ),
+      deleteBalanceAdjustment: (id) =>
+        this.#executeUndoableCommand(
+          deleteBalanceAdjustmentUndoableCommand(this.#database, id),
+        ),
+      undoLast: () => {
+        this.#assertAvailable()
+        return this.#undoHistory.undoLast(this.#database)
+      },
       deleteCategory: (input) =>
-        this.#executeCommand(() => deleteCategory(this.#database, input)),
+        this.#executeUndoableCommand(
+          categoryUndoableCommand(
+            this.#database,
+            { kind: 'delete', id: input.id },
+            () => deleteCategory(this.#database, input),
+          ),
+        ),
       reorderCategory: (input) =>
-        this.#executeCommand(() => reorderCategory(this.#database, input)),
+        this.#executeUndoableCommand(
+          categoryUndoableCommand(
+            this.#database,
+            { kind: 'reorder', id: input.id },
+            () => reorderCategory(this.#database, input),
+          ),
+        ),
       archiveCategory: (id) =>
-        this.#executeCommand(() => archiveCategory(this.#database, id)),
+        this.#executeUndoableCommand(
+          categoryUndoableCommand(this.#database, { kind: 'edit', id }, () =>
+            archiveCategory(this.#database, id),
+          ),
+        ),
       unarchiveCategory: (id) =>
-        this.#executeCommand(() => unarchiveCategory(this.#database, id)),
+        this.#executeUndoableCommand(
+          categoryUndoableCommand(this.#database, { kind: 'edit', id }, () =>
+            unarchiveCategory(this.#database, id),
+          ),
+        ),
       createCategory: (input) =>
-        this.#executeCommand(() => {
-          const id = createCategory(this.#database, input)
+        (() => {
+          const id = this.#executeUndoableCommand(
+            categoryUndoableCommand(this.#database, { kind: 'create' }, () =>
+              createCategory(this.#database, input),
+            ),
+          )
           return this.queries
             .listCategories()
             .find((category) => category.id === id)!
-        }),
+        })(),
       renameCategory: (input) =>
-        this.#executeCommand(() => {
-          const id = renameCategory(this.#database, input)
+        (() => {
+          const id = this.#executeUndoableCommand(
+            categoryUndoableCommand(
+              this.#database,
+              { kind: 'edit', id: input.id },
+              () => renameCategory(this.#database, input),
+            ),
+          )
           return this.queries
             .listCategories()
             .find((category) => category.id === id)!
-        }),
+        })(),
       restoreBackup: (input) => this.#restoreBackup(input),
       ensureProfileIdentity: () => this.#ensureProfileIdentity(),
       createAccount: (input) =>
-        this.#executeCommand(() =>
-          createAccount(this.#database, input, this.#clock),
+        this.#executeUndoableCommand(
+          createAccountUndoableCommand(this.#database, input, this.#clock),
         ),
       renameAccount: (input) =>
-        this.#executeCommand(() => renameAccount(this.#database, input)),
+        this.#executeUndoableCommand(
+          renameAccountUndoableCommand(this.#database, input),
+        ),
       changeAccountCurrency: (input) =>
-        this.#executeCommand(() =>
-          changeAccountCurrency(this.#database, input),
+        this.#executeUndoableCommand(
+          changeAccountCurrencyUndoableCommand(this.#database, input),
         ),
       archiveAccount: (id) =>
-        this.#executeCommand(() => archiveAccount(this.#database, id)),
+        this.#executeUndoableCommand(
+          archiveAccountUndoableCommand(this.#database, id),
+        ),
+      unarchiveAccount: (id) =>
+        this.#executeUndoableCommand(
+          unarchiveAccountUndoableCommand(this.#database, id),
+        ),
       deleteAccount: (id) =>
-        this.#executeCommand(() => deleteAccount(this.#database, id)),
+        this.#executeUndoableCommand(
+          deleteAccountUndoableCommand(this.#database, id),
+        ),
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      listTemplates: () => {
+        this.#assertAvailable()
+        return listTemplates(this.#database)
+      },
+      listCategorisationRules: () => {
+        this.#assertAvailable()
+        return listCategorisationRules(this.#database)
+      },
+      getCategorisationAutofill: (input) => {
+        this.#assertAvailable()
+        return getCategorisationAutofill(this.#database, input)
+      },
       listTransactions: (input) => {
         this.#assertAvailable()
         return listTransactions(this.#database, input, this.#clock)
       },
+      listTags: () => {
+        this.#assertAvailable()
+        return listTags(this.#database)
+      },
       listPayees: () => {
         this.#assertAvailable()
         return listPayees(this.#database)
+      },
+      listPayeeAliases: (payeeId) => {
+        this.#assertAvailable()
+        return listPayeeAliases(this.#database, payeeId)
+      },
+      suggestPayees: (input) => {
+        this.#assertAvailable()
+        return suggestPayees(this.#database, input)
       },
       hasCategoryTransactions: (id) => {
         this.#assertAvailable()
@@ -554,9 +1141,9 @@ class OpenProfileApplication implements ProfileApplication {
         this.#assertAvailable()
         return listAccounts(this.#database)
       },
-      listAccountOptions: () => {
+      listAccountOptions: (input) => {
         this.#assertAvailable()
-        return listAccounts(this.#database, true)
+        return listAccountOptions(this.#database, input)
       },
       getAccountBalance: (id) => {
         this.#assertAvailable()
@@ -616,6 +1203,9 @@ class OpenProfileApplication implements ProfileApplication {
       (candidate) => candidate.id === input.backupId,
     )
     if (!backup) throw new Error('backups.error.notFound')
+    // File replacement bypasses the in-database command boundary, so even a
+    // later restore failure invalidates images tied to the previous connection.
+    this.#undoHistory.clear()
     const migrations = validateMigrations(
       this.#options.migrations ?? CURRENT_MIGRATIONS,
     )
@@ -687,12 +1277,24 @@ class OpenProfileApplication implements ProfileApplication {
 
   close(): void {
     if (this.#restoring) throw new Error('Profile restore is in progress')
+    this.#undoHistory.clear()
     if (this.#database.open) this.#database.close()
   }
 
   #executeCommand<Result>(command: () => Result): Result {
     this.#assertAvailable()
-    return this.#database.transaction(command)()
+    const result = this.#database.transaction(command)()
+    // Commands without an aggregate declaration cannot safely be crossed by
+    // undo. New undoable command families should use UndoHistory.execute.
+    this.#undoHistory.clear()
+    return result
+  }
+
+  #executeUndoableCommand<BeforeImage, AfterImage, Result>(
+    command: UndoableCommand<BeforeImage, AfterImage, Result>,
+  ): Result {
+    this.#assertAvailable()
+    return this.#undoHistory.execute(this.#database, command)
   }
 
   #updateSettings(changes: ProfileSettingsChanges): ProfileSettings {

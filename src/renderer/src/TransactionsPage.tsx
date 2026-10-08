@@ -1,77 +1,51 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { X } from 'lucide-react'
-import type { Account } from '../../shared/accounts'
-import type { Category } from '../../shared/categories'
+import type { Currency } from '../../shared/accounts'
+import type { CreateCategorisationRuleInput } from '../../shared/rules'
+import { CreateRuleDialog } from './components/create-rule-dialog'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import type {
-  Payee,
   Transaction,
-  TransactionKind,
   TransactionPage,
   TransactionListInput,
   TransactionPeriod,
+  TransactionExclusionFilter,
 } from '../../shared/transactions'
+import type { Transfer } from '../../shared/transfers'
+import type { BalanceAdjustment } from '../../shared/adjustments'
 import { Button } from './components/ui/button'
 import { CardContent } from './components/ui/card'
 import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
-import { type Language, type MessageKey } from './i18n'
+import type { Language, MessageKey } from './i18n'
 import { TransactionTable, Totals } from './components/transaction-table'
-import { parseAmountInput } from './lib/amount-input'
-import { today } from '../../shared/date'
-
-const errorKeys = [
-  'transactions.error.account',
-  'transactions.error.kind',
-  'transactions.error.date',
-  'transactions.error.futureDate',
-  'transactions.error.amount',
-  'transactions.error.payee',
-  'transactions.error.category',
-  'transactions.error.note',
-  'transactions.error.notFound',
-  'transactions.error.lines',
-  'transactions.error.filters',
-  'transactions.error.totals',
-] as const satisfies readonly MessageKey[]
-
-function amountInput(minor: number): string {
-  const value = BigInt(minor)
-  const fraction = String(value % 100n).padStart(2, '0')
-  return fraction === '00'
-    ? String(value / 100n)
-    : `${value / 100n}.${fraction}`
-}
-
+import { TransactionDrawer } from './components/transactions/transaction-drawer'
+import { TagManager } from './components/transactions/tag-manager'
+import {
+  emptyForm,
+  emptyAdjustmentForm,
+  movementForm,
+  transactionError,
+  type DrawerForm,
+} from './components/transactions/transaction-form'
+import { useTransactionReferenceData } from './components/transactions/use-transaction-reference-data'
 interface TransactionsPageProps {
   language: Language
+  baseCurrency: Currency
   t(key: MessageKey): string
+  undoRevision: number
+  newTransactionRequested: boolean
+  onNewTransactionHandled(): void
+  onTransactionChanged(): void
 }
 
-interface FormState {
-  id: string | null
-  kind: TransactionKind
-  date: string
-  accountId: string
-  amount: string
-  payeeName: string
-  categoryId: string
-  note: string
-}
-
-function emptyForm(accountId = ''): FormState {
-  return {
-    id: null,
-    kind: 'expense',
-    date: today(),
-    accountId,
-    amount: '',
-    payeeName: '',
-    categoryId: '',
-    note: '',
-  }
-}
-
-export function TransactionsPage({ language, t }: TransactionsPageProps) {
+export function TransactionsPage({
+  language,
+  baseCurrency,
+  t,
+  undoRevision,
+  newTransactionRequested,
+  onNewTransactionHandled,
+  onTransactionChanged,
+}: TransactionsPageProps) {
   const [page, setPage] = useState<TransactionPage>({
     rows: [],
     totals: [],
@@ -90,70 +64,89 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
     accountId: '',
     categoryId: '',
     payeeId: '',
+    tagId: '',
     search: '',
+    exclusion: 'all' as TransactionExclusionFilter,
   })
   const [revision, setRevision] = useState(0)
-  const [accounts, setAccounts] = useState<Account[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [accountOptions, setAccountOptions] = useState<Account[]>([])
-  const [categoryOptions, setCategoryOptions] = useState<
-    Record<TransactionKind, Category[]>
-  >({ expense: [], income: [] })
-  const [payees, setPayees] = useState<Payee[]>([])
-  const [loading, setLoading] = useState(true)
+  const references = useTransactionReferenceData(
+    revision,
+    language,
+    undoRevision,
+  )
+  const { accounts, categories, accountOptions, payees, tags } = references
+  const pageKey = useMemo(
+    () => ({ request, revision, language, undoRevision }),
+    [request, revision, language, undoRevision],
+  )
+  const [loadedPageKey, setLoadedPageKey] = useState<typeof pageKey | null>(
+    null,
+  )
+  const pageLoading = loadedPageKey !== pageKey
+  const loading = pageLoading || references.loading
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<MessageKey | null>(null)
-  const [form, setForm] = useState<FormState | null>(null)
-  const [deleting, setDeleting] = useState<Transaction | null>(null)
+  const [commandError, setError] = useState<MessageKey | null>(null)
+  const [previousPageKey, setPreviousPageKey] = useState(pageKey)
+  if (previousPageKey !== pageKey) {
+    setPreviousPageKey(pageKey)
+    setError(null)
+  }
+  const error = commandError ?? references.error
+  const [ruleOffer, setRuleOffer] =
+    useState<CreateCategorisationRuleInput | null>(null)
+  const [editingRule, setEditingRule] =
+    useState<CreateCategorisationRuleInput | null>(null)
+  const [previousUndoRevision, setPreviousUndoRevision] = useState(undoRevision)
+  if (previousUndoRevision !== undoRevision) {
+    setPreviousUndoRevision(undoRevision)
+    setRuleOffer(null)
+    setEditingRule(null)
+  }
+  const [form, setForm] = useState<DrawerForm | null>(null)
+  const createRef = useRef<HTMLButtonElement>(null)
+  const [deleting, setDeleting] = useState<
+    Transaction | Transfer | BalanceAdjustment | null
+  >(null)
+  useEffect(() => {
+    if (!newTransactionRequested || loading || busy) return
+    let ignore = false
+    queueMicrotask(() => {
+      if (ignore) return
+      if (accountOptions.length > 0) {
+        setError(null)
+        setDeleting(null)
+        setForm(emptyForm(accountOptions[0].id))
+      }
+      onNewTransactionHandled()
+    })
+    return () => {
+      ignore = true
+    }
+  }, [
+    newTransactionRequested,
+    loading,
+    busy,
+    accountOptions,
+    onNewTransactionHandled,
+  ])
 
   useEffect(() => {
     let ignore = false
-    setLoading(true)
-    setError(null)
-    void Promise.all([
-      window.app.transactions.list(request),
-      window.app.accounts.list(),
-      window.app.categories.list(),
-      window.app.accounts.listOptions(),
-      Promise.all([
-        window.app.categories.listOptions({ kind: 'expense' }),
-        window.app.categories.listOptions({ kind: 'income' }),
-      ]),
-      window.app.payees.list(),
-    ])
-      .then(
-        ([
-          nextPage,
-          nextAccounts,
-          nextCategories,
-          nextAccountOptions,
-          [expenseOptions, incomeOptions],
-          nextPayees,
-        ]) => {
-          if (ignore) return
-          setPage(nextPage)
-          setAccounts(nextAccounts)
-          setCategories(nextCategories)
-          setAccountOptions(nextAccountOptions)
-          setCategoryOptions({ expense: expenseOptions, income: incomeOptions })
-          setPayees(nextPayees)
-        },
-      )
+    void window.app.transactions
+      .list(request)
+      .then((nextPage) => {
+        if (!ignore) setPage(nextPage)
+      })
       .catch((error: unknown) => {
-        if (!ignore)
-          setError(
-            errorKeys.find((key) => String(error).includes(key)) ??
-              'transactions.error',
-          )
+        if (!ignore) setError(transactionError(error))
       })
       .finally(() => {
-        if (!ignore) setLoading(false)
+        if (!ignore) setLoadedPageKey(pageKey)
       })
     return () => {
       ignore = true
     }
-  }, [request, revision, language])
-
+  }, [request, revision, language, undoRevision, pageKey])
   function applyFilters(event: FormEvent) {
     event.preventDefault()
     setRequest({
@@ -164,65 +157,36 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
       accountId: filters.accountId || undefined,
       categoryId: filters.categoryId || undefined,
       payeeId: filters.payeeId || undefined,
+      tagId: filters.tagId || undefined,
       search: filters.search,
+      exclusion: filters.exclusion,
       limit: 200,
       offset: 0,
     })
   }
 
-  async function run(action: () => Promise<unknown>) {
+  async function run(
+    action: () => Promise<unknown>,
+    offerUndo = false,
+    nextForm: DrawerForm | null = null,
+  ) {
     setBusy(true)
     setError(null)
+    setRuleOffer(null)
     try {
       await action()
+      if (offerUndo) onTransactionChanged()
       setRequest((current) => ({ ...current, offset: 0 }))
       setRevision((current) => current + 1)
-      setForm(null)
+      setForm(nextForm)
+      setEditingRule(null)
       setDeleting(null)
     } catch (error) {
-      setError(
-        errorKeys.find((key) => String(error).includes(key)) ??
-          'transactions.error',
-      )
+      setError(transactionError(error))
     } finally {
       setBusy(false)
     }
   }
-
-  function submit(event: FormEvent) {
-    event.preventDefault()
-    if (!form) return
-    void run(() => {
-      const input = {
-        accountId: form.accountId,
-        kind: form.kind,
-        date: form.date,
-        totalMinor: parseAmountInput(form.amount, 'transactions.error.amount'),
-        payeeName: form.payeeName,
-        categoryId: form.categoryId || null,
-        note: form.note,
-      }
-      return form.id
-        ? window.app.transactions.update({ id: form.id, ...input })
-        : window.app.transactions.create(input)
-    })
-  }
-
-  const selectedAccount = form
-    ? accounts.find((account) => account.id === form.accountId)
-    : undefined
-  const selectedCategory = form
-    ? categories.find((category) => category.id === form.categoryId)
-    : undefined
-  const drawerAccounts = selectedAccount?.archived
-    ? [selectedAccount, ...accountOptions]
-    : accountOptions
-  const drawerCategories = form
-    ? selectedCategory &&
-      !categoryOptions[form.kind].some(({ id }) => id === selectedCategory.id)
-      ? [selectedCategory, ...categoryOptions[form.kind]]
-      : categoryOptions[form.kind]
-    : []
 
   return (
     <CardContent className="space-y-6">
@@ -230,19 +194,40 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
         <p className="text-sm text-muted-foreground">
           {t('transactions.listDescription')}
         </p>
-        <Button
-          disabled={busy || loading || accountOptions.length === 0}
-          onClick={() => setForm(emptyForm(accountOptions[0]?.id))}
-        >
-          {t('transactions.create')}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="ghost"
+            disabled={busy || loading}
+            onClick={() => setForm(emptyForm(accountOptions[0]?.id))}
+          >
+            {t('templates.title')}
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={busy || loading || accountOptions.length === 0}
+            onClick={() => setForm(emptyAdjustmentForm(accountOptions[0]?.id))}
+          >
+            {t('adjustments.setRealBalance')}
+          </Button>
+          <Button
+            ref={createRef}
+            disabled={busy || loading || accountOptions.length === 0}
+            onClick={() => {
+              setError(null)
+              setDeleting(null)
+              setForm(emptyForm(accountOptions[0]?.id))
+            }}
+          >
+            {t('transactions.create')}
+          </Button>
+        </div>
       </div>
       {accountOptions.length === 0 && !loading && (
         <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
           {t('transactions.noAccounts')}
         </p>
       )}
-      {error && (
+      {error && !form && (
         <div role="alert" className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-medium text-error">{t(error)}</p>
           <Button
@@ -357,6 +342,22 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
           </NativeSelect>
         </label>
         <label className="space-y-1 text-xs font-medium">
+          {t('tags.title')}
+          <NativeSelect
+            value={filters.tagId}
+            onChange={(event) =>
+              setFilters({ ...filters, tagId: event.target.value })
+            }
+          >
+            <option value="">{t('tags.all')}</option>
+            {tags.map((tag) => (
+              <option key={tag.id} value={tag.id}>
+                {tag.name}
+              </option>
+            ))}
+          </NativeSelect>
+        </label>
+        <label className="space-y-1 text-xs font-medium">
           {t('transactions.search')}
           <Input
             value={filters.search}
@@ -365,6 +366,26 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
               setFilters({ ...filters, search: event.target.value })
             }
           />
+        </label>
+        <label className="space-y-1 text-xs font-medium">
+          {t('transactions.exclusion')}
+          <NativeSelect
+            value={filters.exclusion}
+            onChange={(event) =>
+              setFilters({
+                ...filters,
+                exclusion: event.target.value as TransactionExclusionFilter,
+              })
+            }
+          >
+            {(['all', 'onlyExcluded', 'hideExcluded'] as const).map(
+              (exclusion) => (
+                <option key={exclusion} value={exclusion}>
+                  {t(`transactions.exclusion.${exclusion}`)}
+                </option>
+              ),
+            )}
+          </NativeSelect>
         </label>
         <Button type="submit" disabled={busy || loading} className="self-end">
           {t('transactions.applyFilters')}
@@ -400,17 +421,13 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
                 language={language}
                 t={t}
                 busy={busy}
-                onEdit={(transaction) =>
-                  setForm({
-                    id: transaction.id,
-                    kind: transaction.kind,
-                    date: transaction.date,
-                    accountId: transaction.accountId,
-                    amount: amountInput(transaction.totalMinor),
-                    payeeName: transaction.payeeName ?? '',
-                    categoryId: transaction.line.categoryId ?? '',
-                    note: transaction.note,
-                  })
+                onEdit={(transaction) => setForm(movementForm(transaction))}
+                onDuplicate={(transaction) =>
+                  void run(
+                    () =>
+                      window.app.transactions.duplicate({ id: transaction.id }),
+                    true,
+                  )
                 }
                 onDelete={setDeleting}
               />
@@ -453,19 +470,51 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
           </>
         )
       )}
+      <TagManager
+        revision={revision}
+        tags={tags}
+        busy={busy}
+        loading={loading}
+        t={t}
+        run={run}
+        onDeleted={(id) => {
+          if (filters.tagId === id) setFilters({ ...filters, tagId: '' })
+          setRequest((current) =>
+            current.tagId === id
+              ? { ...current, tagId: undefined, offset: 0 }
+              : current,
+          )
+        }}
+      />
       {deleting && (
         <section role="alert" className="space-y-3 rounded-lg bg-muted p-4">
-          <p className="text-sm">{t('transactions.deleteConfirmation')}</p>
+          <p className="text-sm">
+            {t(
+              deleting.kind === 'adjustment'
+                ? 'adjustments.deleteConfirmation'
+                : 'transactions.deleteConfirmation',
+            )}
+          </p>
           <div className="flex gap-2">
             <Button
               disabled={busy || loading}
               onClick={() =>
-                void run(() =>
-                  window.app.transactions.delete({ id: deleting.id }),
+                void run(
+                  () =>
+                    deleting.kind === 'transfer'
+                      ? window.app.transfers.delete({ id: deleting.id })
+                      : deleting.kind === 'adjustment'
+                        ? window.app.adjustments.delete({ id: deleting.id })
+                        : window.app.transactions.delete({ id: deleting.id }),
+                  true,
                 )
               }
             >
-              {t('transactions.confirmDelete')}
+              {t(
+                deleting.kind === 'adjustment'
+                  ? 'adjustments.confirmDelete'
+                  : 'transactions.confirmDelete',
+              )}
             </Button>
             <Button
               variant="ghost"
@@ -479,211 +528,67 @@ export function TransactionsPage({ language, t }: TransactionsPageProps) {
       )}
 
       {form && (
-        <div
-          className="fixed inset-0 z-50 bg-foreground/20"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !busy) setForm(null)
-          }}
+        <TransactionDrawer
+          draft={form}
+          references={references}
+          rows={page.rows}
+          language={language}
+          t={t}
+          busy={busy}
+          error={error}
+          clearError={() => setError(null)}
+          run={run}
+          onClose={() => setForm(null)}
+          onRuleOffer={setRuleOffer}
+          createRef={createRef}
+        />
+      )}
+      {ruleOffer && (
+        <aside
+          role="status"
+          className="fixed right-4 bottom-24 z-40 max-w-sm space-y-2 rounded-lg border bg-card p-4 shadow-lg"
         >
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="transaction-drawer-title"
-            className="ml-auto h-full w-full max-w-lg overflow-y-auto border-l bg-background p-6 shadow-xl"
-          >
-            <div className="mb-6 flex items-center justify-between gap-3">
-              <h2
-                id="transaction-drawer-title"
-                className="text-xl font-semibold"
-              >
-                {t(form.id ? 'transactions.edit' : 'transactions.create')}
-              </h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={t('transactions.close')}
-                disabled={busy}
-                onClick={() => setForm(null)}
-              >
-                <X aria-hidden="true" />
-              </Button>
-            </div>
-            <form className="space-y-4" onSubmit={submit}>
-              <div className="space-y-2">
-                <label
-                  htmlFor="transaction-kind"
-                  className="text-sm font-medium"
-                >
-                  {t('transactions.kind')}
-                </label>
-                <NativeSelect
-                  id="transaction-kind"
-                  value={form.kind}
-                  disabled={busy}
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      kind: event.target.value as TransactionKind,
-                      categoryId: '',
-                    })
-                  }
-                >
-                  <option value="expense">{t('transactions.expense')}</option>
-                  <option value="income">{t('transactions.income')}</option>
-                </NativeSelect>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label
-                    htmlFor="transaction-date"
-                    className="text-sm font-medium"
-                  >
-                    {t('transactions.date')}
-                  </label>
-                  <Input
-                    id="transaction-date"
-                    type="date"
-                    max={today()}
-                    value={form.date}
-                    required
-                    disabled={busy}
-                    onChange={(event) =>
-                      setForm({ ...form, date: event.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label
-                    htmlFor="transaction-amount"
-                    className="text-sm font-medium"
-                  >
-                    {t('transactions.amount')}
-                  </label>
-                  <Input
-                    id="transaction-amount"
-                    inputMode="decimal"
-                    value={form.amount}
-                    placeholder="0.00"
-                    maxLength={20}
-                    required
-                    disabled={busy}
-                    onChange={(event) =>
-                      setForm({ ...form, amount: event.target.value })
-                    }
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {t('transactions.amountHint')}
-                  </p>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label
-                  htmlFor="transaction-account"
-                  className="text-sm font-medium"
-                >
-                  {t('transactions.account')}
-                </label>
-                <NativeSelect
-                  id="transaction-account"
-                  value={form.accountId}
-                  required
-                  disabled={busy}
-                  onChange={(event) =>
-                    setForm({ ...form, accountId: event.target.value })
-                  }
-                >
-                  <option value="" disabled>
-                    {t('transactions.chooseAccount')}
-                  </option>
-                  {drawerAccounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.name} ({account.currency})
-                    </option>
-                  ))}
-                </NativeSelect>
-              </div>
-              <div className="space-y-2">
-                <label
-                  htmlFor="transaction-payee"
-                  className="text-sm font-medium"
-                >
-                  {t('transactions.payee')}
-                </label>
-                <Input
-                  id="transaction-payee"
-                  list="transaction-payees"
-                  value={form.payeeName}
-                  maxLength={100}
-                  disabled={busy}
-                  onChange={(event) =>
-                    setForm({ ...form, payeeName: event.target.value })
-                  }
-                />
-                <datalist id="transaction-payees">
-                  {payees.map((payee) => (
-                    <option key={payee.id} value={payee.name} />
-                  ))}
-                </datalist>
-                <p className="text-xs text-muted-foreground">
-                  {t('transactions.payeeHint')}
-                </p>
-              </div>
-              <div className="space-y-2">
-                <label
-                  htmlFor="transaction-category"
-                  className="text-sm font-medium"
-                >
-                  {t('transactions.category')}
-                </label>
-                <NativeSelect
-                  id="transaction-category"
-                  value={form.categoryId}
-                  disabled={busy}
-                  onChange={(event) =>
-                    setForm({ ...form, categoryId: event.target.value })
-                  }
-                >
-                  <option value="">{t('transactions.noCategory')}</option>
-                  {drawerCategories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.parentId ? `— ${category.name}` : category.name}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </div>
-              <div className="space-y-2">
-                <label
-                  htmlFor="transaction-note"
-                  className="text-sm font-medium"
-                >
-                  {t('transactions.note')}
-                </label>
-                <textarea
-                  id="transaction-note"
-                  className="min-h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  value={form.note}
-                  maxLength={1000}
-                  disabled={busy}
-                  onChange={(event) =>
-                    setForm({ ...form, note: event.target.value })
-                  }
-                />
-              </div>
-              <div className="flex gap-2 pt-2">
-                <Button type="submit" disabled={busy}>
-                  {t('transactions.save')}
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => setForm(null)}
-                >
-                  {t('transactions.cancel')}
-                </Button>
-              </div>
-            </form>
-          </section>
-        </div>
+          <p className="text-sm">{t('rules.offer')}</p>
+          <div className="flex gap-2">
+            <Button
+              disabled={busy || loading}
+              onClick={() => {
+                setEditingRule(ruleOffer)
+                setRuleOffer(null)
+                setForm(null)
+                setError(null)
+              }}
+            >
+              {t('rules.create')}
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() => setRuleOffer(null)}
+            >
+              {t('rules.offerDismiss')}
+            </Button>
+          </div>
+        </aside>
+      )}
+      {editingRule && (
+        <CreateRuleDialog
+          prefill={editingRule}
+          references={references}
+          baseCurrency={baseCurrency}
+          language={language}
+          t={t}
+          busy={busy}
+          error={error}
+          createRef={createRef}
+          onClose={() => {
+            setEditingRule(null)
+            setError(null)
+          }}
+          onSave={(input) =>
+            void run(() => window.app.rules.create(input), true)
+          }
+        />
       )}
     </CardContent>
   )

@@ -2,17 +2,21 @@ import { randomUUID } from 'node:crypto'
 import type Database from 'better-sqlite3'
 import type {
   Account,
+  AccountOption,
+  ListAccountOptionsInput,
   ChangeAccountCurrencyInput,
   CreateAccountInput,
   RenameAccountInput,
 } from '../../shared/accounts'
 import {
+  parseListAccountOptionsInput,
   validateAccountCurrency,
   validateAccountId,
   validateAccountName,
   validateOpeningBalance,
   validateOpeningDate,
 } from './account-validation'
+import { calculateAccountHistory } from './profile-account-movements'
 
 interface StoredAccount extends CreateAccountInput {
   id: string
@@ -36,9 +40,24 @@ export function hasAccountTransactions(
   id: string,
 ): boolean {
   const account = getAccount(database, id)
-  return Boolean(
+  const transaction = Boolean(
     database
       .prepare('SELECT 1 FROM transactions WHERE account_id = ? LIMIT 1')
+      .get(account.id),
+  )
+  if (transaction) return true
+  const transfer = Boolean(
+    database
+      .prepare(
+        `SELECT 1 FROM transfers
+         WHERE from_account_id = ? OR to_account_id = ? LIMIT 1`,
+      )
+      .get(account.id, account.id),
+  )
+  if (transfer) return true
+  return Boolean(
+    database
+      .prepare('SELECT 1 FROM balance_adjustments WHERE account_id = ? LIMIT 1')
       .get(account.id),
   )
 }
@@ -48,16 +67,7 @@ export function getAccountBalance(
   id: string,
 ): number {
   const account = getAccount(database, id)
-  const totals = database
-    .prepare(
-      `SELECT COALESCE(SUM(
-        CASE kind WHEN 'income' THEN total_minor ELSE -total_minor END
-      ), 0) AS total FROM transactions WHERE account_id = ?`,
-    )
-    .get(account.id) as { total: number }
-  const balance = account.openingBalance + totals.total
-  if (!Number.isSafeInteger(balance)) throw new Error('accounts.error.balance')
-  return balance
+  return calculateAccountHistory(database, account.id).balance
 }
 
 function accountView(
@@ -72,16 +82,35 @@ function accountView(
   }
 }
 
-export function listAccounts(
-  database: Database.Database,
-  activeOnly = false,
-): Account[] {
+export function listAccounts(database: Database.Database): Account[] {
   const accounts = database
     .prepare(
-      `SELECT ${ACCOUNT_COLUMNS} FROM accounts ${activeOnly ? 'WHERE archived = 0' : ''} ORDER BY created_at, rowid`,
+      `SELECT ${ACCOUNT_COLUMNS} FROM accounts ORDER BY created_at, rowid`,
     )
     .all() as StoredAccount[]
   return accounts.map((account) => accountView(database, account))
+}
+
+export function listAccountOptions(
+  database: Database.Database,
+  value?: ListAccountOptionsInput,
+): AccountOption[] {
+  const input = parseListAccountOptionsInput(value)
+  const accounts = database
+    .prepare(
+      `SELECT id, name, currency, archived FROM accounts
+       WHERE (? = 1 OR archived = 0) ORDER BY created_at, rowid`,
+    )
+    .all(Number(input.includeArchived === true)) as (Omit<
+    AccountOption,
+    'archived'
+  > & {
+    archived: number
+  })[]
+  return accounts.map((account) => ({
+    ...account,
+    archived: Boolean(account.archived),
+  }))
 }
 
 export function createAccount(
@@ -133,6 +162,12 @@ export function changeAccountCurrency(
   database
     .prepare('UPDATE accounts SET currency = ? WHERE id = ?')
     .run(currency, account.id)
+  database
+    .prepare(
+      `UPDATE categorisation_rules SET amount_currency = ?
+    WHERE account_id = ? AND amount_currency IS NOT NULL`,
+    )
+    .run(currency, account.id)
   return accountView(database, getAccount(database, account.id))
 }
 
@@ -143,10 +178,23 @@ export function archiveAccount(database: Database.Database, id: string): void {
     .run(account.id)
 }
 
+export function unarchiveAccount(
+  database: Database.Database,
+  id: string,
+): void {
+  const account = getAccount(database, id)
+  database
+    .prepare('UPDATE accounts SET archived = 0 WHERE id = ?')
+    .run(account.id)
+}
+
 export function deleteAccount(database: Database.Database, id: string): void {
   const account = getAccount(database, id)
   if (hasAccountTransactions(database, account.id)) {
     throw new Error('accounts.error.notEmpty')
   }
+  database
+    .prepare('DELETE FROM categorisation_rules WHERE account_id = ?')
+    .run(account.id)
   database.prepare('DELETE FROM accounts WHERE id = ?').run(account.id)
 }

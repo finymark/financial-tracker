@@ -1,4 +1,8 @@
-import { currencies, type Currency } from '../../shared/accounts'
+import {
+  currencies,
+  type Currency,
+  type ListAccountOptionsInput,
+} from '../../shared/accounts'
 import { UUID_PATTERN } from '../../shared/validation'
 
 export function validateAccountId(value: unknown): string {
@@ -44,4 +48,19 @@ export function validateOpeningDate(value: unknown): string {
     throw new Error('accounts.error.date')
   }
   return value
+}
+
+export function parseListAccountOptionsInput(
+  value: unknown,
+): ListAccountOptionsInput {
+  if (value === undefined) return {}
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new Error('accounts.error')
+  const input = value as Record<string, unknown>
+  if (
+    input.includeArchived !== undefined &&
+    typeof input.includeArchived !== 'boolean'
+  )
+    throw new Error('accounts.error')
+  return { includeArchived: input.includeArchived as boolean | undefined }
 }

@@ -2,7 +2,91 @@ import { categoryNames } from '../../../shared/category-translations'
 import type { MessageCatalog } from './en'
 
 export const hu = {
+  'shortcuts.closeHelp': 'Billentyűsúgó bezárása',
+  'transactions.saveAndAddAnother': 'Mentés és újabb hozzáadása',
+  'shortcuts.scope':
+    'Nyitott profilban: az új tranzakció és a visszavonás szövegbevitelen kívül működik. A típusváltás és a mentés a tranzakcióablakban használható.',
+  'shortcuts.navigation':
+    'A Tab / Shift+Tab a mezők között lépked, és a nyitott párbeszédablakban marad.',
+  'shortcuts.undo': 'Legutóbbi módosítás visszavonása (szövegbevitelen kívül)',
+  'shortcuts.close': 'Mégse / tranzakcióablak vagy billentyűsúgó bezárása',
+  'shortcuts.help': 'Billentyűparancsok',
+  'shortcuts.save':
+    'Mentés (többsoros jegyzetben nem; a gombok saját művelete megmarad)',
+  'shortcuts.saveAndAddAnother':
+    'Mentés és újabb hozzáadása (dátum, számlák és típus megtartása)',
+  'shortcuts.newTransaction': 'Új tranzakció (szövegbevitelen kívül)',
   ...categoryNames.hu,
+  'rules.title': 'Kategorizálási szabályok',
+  'rules.description':
+    'A szabályokat sorrendben ellenőrizzük. Az első egyező szabály nyer, és a kedvezményezettet, a kategóriát, valamint a címkéket az utoljára használt értékek előtt töltheti ki.',
+  'rules.loading': 'Szabályok betöltése…',
+  'rules.empty': 'Még nincs kategorizálási szabály.',
+  'rules.offer': 'Létrehozol egy szabályt ehhez a besoroláshoz?',
+  'rules.offerDismiss': 'Elvetés',
+  'rules.create': 'Szabály létrehozása',
+  'rules.edit': 'Szerkesztés',
+  'rules.delete': 'Törlés',
+  'rules.save': 'Szabály mentése',
+  'rules.enabled': 'Engedélyezve',
+  'rules.disabled': 'Letiltva',
+  'rules.up': 'Szabály feljebb',
+  'rules.down': 'Szabály lejjebb',
+  'rules.anyPayee': 'Bármely kedvezményezett',
+  'rules.textContains': 'A jegyzet tartalmazza',
+  'rules.account': 'Számlafeltétel',
+  'rules.anyAccount': 'Bármely számla',
+  'rules.minimum': 'Legkisebb összeg',
+  'rules.maximum': 'Legnagyobb összeg',
+  'rules.amountCurrency': 'Összeg pénzneme',
+  'rules.amountCondition': 'Összegfeltétel',
+  'rules.payeeAction': 'Kedvezményezett beállítása',
+  'rules.noPayeeAction': 'Ne állítson be kedvezményezettet',
+  'rules.noCategory': 'Ne állítson be kategóriát',
+  'rules.noTags': 'Előbb hozzon létre címkét egy tranzakcióban.',
+  'rules.action': 'Művelet',
+  'rules.formHint':
+    'Válasszon legalább egy feltételt és egy műveletet: kedvezményezettet, kategóriát vagy címkét.',
+  'rules.amountHint':
+    'Nem kötelező, zárt összeghatár a szabály kiválasztott pénznemében.',
+  'rules.error': 'A szabályművelet nem hajtható végre. Próbálja újra.',
+  'rules.error.notFound': 'A szabály nem található. Frissítse a listát.',
+  'rules.error.condition': 'Válasszon legalább egy szabályfeltételt.',
+  'rules.error.text': 'Legfeljebb 1000 karakter keresett szöveget adjon meg.',
+  'rules.error.amount': 'Adjon meg érvényes, nem negatív összeget.',
+  'rules.error.amountRange':
+    'A legkisebb összeg nem lehet nagyobb a legnagyobb összegnél.',
+  'rules.error.action':
+    'Válasszon kedvezményezettet, kategóriát és/vagy legalább egy címkét.',
+  'rules.error.reference':
+    'Létező, aktív kedvezményezettet, számlát, kategóriát és címkét válasszon.',
+  'rules.error.order': 'Válasszon érvényes szabálypozíciót.',
+  'payees.title': 'Kedvezményezettek',
+  'payees.description':
+    'Az álnevek a nyers neveket egy kedvezményezetthez rendelik. Az egyezés nem tesz különbséget kis- és nagybetűk, illetve ékezetek között. Az összevonás a tranzakciókat és álneveket a megmaradó kedvezményezetthez helyezi át.',
+  'payees.loading': 'Kedvezményezettek betöltése…',
+  'payees.empty':
+    'A kedvezményezettek egy tranzakció rögzítése után jelennek meg itt.',
+  'payees.aliases': 'Álnevek',
+  'payees.noAliases': 'Nincs álnév.',
+  'payees.aliasName': 'Nyers kedvezményezettnév',
+  'payees.addAlias': 'Álnév hozzáadása',
+  'payees.removeAlias': 'Eltávolítás',
+  'payees.mergeInto': 'Kedvezményezett összevonása ezzel:',
+  'payees.chooseSurvivor': 'Válaszd ki a megmaradó kedvezményezettet',
+  'payees.merge': 'Kedvezményezettek összevonása',
+  'payees.mergeHint':
+    'Minden tranzakció és álnév a megmaradó kedvezményezetthez kerül. A módosítás visszavonható.',
+  'payees.refresh': 'Frissítés',
+  'payees.error': 'A kedvezményezettművelet nem sikerült. Próbáld újra.',
+  'payees.error.notFound':
+    'A kedvezményezett nem található. Frissítsd a listát.',
+  'payees.error.aliasNotFound': 'Az álnév nem található. Frissítsd a listát.',
+  'payees.error.aliasName': 'Adj meg egy 1–100 karakter hosszú álnevet.',
+  'payees.error.aliasConflict':
+    'Ez a nyers név már egy kedvezményezetthez vagy álnévhez tartozik.',
+  'payees.error.samePayee': 'Válassz másik megmaradó kedvezményezettet.',
+  'payees.error.query': 'A kedvezményezett keresése érvénytelen.',
   'categories.title': 'Kategóriák',
   'categories.description':
     'A kiadási és bevételi kategóriák legfeljebb kétszintűek. Az alapértelmezett nevek követik a nyelvet; az egyéni nevek változatlanok maradnak. A főkategória archiválása az alkategóriáit is elrejti a választókból.',
@@ -99,9 +183,39 @@ export const hu = {
     'A pénzügyek összesített áttekintése később lesz itt elérhető.',
   'transactions.title': 'Tranzakcióid egy helyen',
   'transactions.description':
-    'Rögzítsd kiadásaidat és bevételeidet, hogy a számlaegyenlegek naprakészek legyenek.',
+    'Rögzítsd kiadásaidat, bevételeidet és átvezetéseidet, hogy a számlaegyenlegek naprakészek legyenek.',
   'transactions.listDescription':
-    'Szűrd a tranzakciókat időszak, számla, kategória, partner vagy megjegyzés szerint.',
+    'Szűrd a tranzakciókat időszak, számla, kategória, partner, címke vagy megjegyzés szerint.',
+  'adjustments.setRealBalance': 'Valós egyenleg beállítása',
+  'adjustments.edit': 'Egyenlegkorrekció szerkesztése',
+  'adjustments.save': 'Egyenlegkorrekció mentése',
+  'adjustments.deleteConfirmation':
+    'Végleg törlöd ezt az egyenlegkorrekciót? A számlaegyenleg frissülni fog.',
+  'adjustments.confirmDelete': 'Egyenlegkorrekció törlése',
+  'adjustments.rowType': 'Egyenlegkorrekció',
+  'adjustments.observedBalance': 'Megfigyelt egyenleg',
+  'adjustments.difference': 'Aktuális eltérés',
+  'adjustments.zeroDifference': 'Nincs szükség korrekcióra',
+  'adjustments.zeroDifferenceHint':
+    'Ez a korrekció már semmit sem korrigál, ezért törölhető.',
+  'adjustments.error.account': 'Válassz aktív számlát.',
+  'adjustments.error.date': 'Adj meg érvényes naptári dátumot.',
+  'adjustments.error.futureDate':
+    'Az egyenleg megfigyelésének dátuma nem lehet jövőbeli.',
+  'adjustments.error.balance':
+    'Adj meg érvényes egyenleget ±90 071 992 547 409,91 határon belül.',
+  'adjustments.error.note':
+    'Legfeljebb 1000 karakter hosszú megjegyzést adj meg.',
+  'adjustments.error.notFound':
+    'Az egyenlegkorrekció nem található. Frissítsd a listát.',
+  'transactions.excluded': 'Kizárt',
+  'transactions.excludedHint':
+    'A számla egyenlegébe beleszámít, de a kiadások és bevételek összesítéséből kimarad.',
+  'transactions.exclusion': 'Kizárt tranzakciók',
+  'transactions.exclusion.all': 'Minden tranzakció',
+  'transactions.exclusion.onlyExcluded': 'Csak a kizártak',
+  'transactions.exclusion.hideExcluded': 'Kizártak elrejtése',
+  'transactions.error.excluded': 'Válaszd ki, hogy a tranzakció kizárt-e.',
   'transactions.filters': 'Tranzakciószűrők',
   'transactions.period': 'Időszak',
   'transactions.period.all': 'Összes dátum',
@@ -126,6 +240,29 @@ export const hu = {
     'Válassz érvényes szűrőket és helyes dátumtartományt.',
   'transactions.error.totals':
     'A szűrt összeg túl nagy a pontos megjelenítéshez.',
+  'transactions.duplicate': 'Tranzakció másolása',
+  'templates.title': 'Tranzakciós sablonok',
+  'templates.choose': 'Válassz sablont',
+  'templates.use': 'Sablon használata',
+  'templates.create': 'Sablon létrehozása',
+  'templates.edit': 'Sablon szerkesztése',
+  'templates.delete': 'Sablon törlése',
+  'templates.save': 'Sablon mentése',
+  'templates.name': 'Sablon neve',
+  'templates.saveTransaction': 'Mentés sablonként',
+  'templates.savedTransactionHint':
+    'A mentett tranzakciót használja, nem az űrlap nem mentett módosításait.',
+  'templates.optionalHint':
+    'Csak a név kötelező. A többi mezőt üresen hagyhatod, és a sablon használatakor töltheted ki.',
+  'templates.tagsHint':
+    'Soronként egy címkenév. A hiányzó címkék a sablon mentésekor jönnek létre.',
+  'templates.deleteConfirmation': 'Törlöd ezt a tranzakciós sablont?',
+  'templates.amountRequired':
+    'A tranzakció mentése előtt adj meg egy összeget.',
+  'templates.error.name': 'Adj meg egy 1–100 karakter hosszú sablonnevet.',
+  'templates.error.split': 'Felosztott tranzakció nem menthető sablonként.',
+  'templates.error.notFound':
+    'A tranzakciós sablon nem található. Frissítsd a listát.',
   'transactions.create': 'Tranzakció rögzítése',
   'transactions.edit': 'Tranzakció szerkesztése',
   'transactions.delete': 'Törlés',
@@ -140,14 +277,24 @@ export const hu = {
   'transactions.noAccounts':
     'Tranzakció rögzítése előtt hozz létre egy aktív számlát.',
   'transactions.refresh': 'Frissítés',
-  'transactions.kind': 'Kiadás vagy bevétel',
+  'transactions.kind': 'Tranzakció típusa',
   'transactions.expense': 'Kiadás',
   'transactions.income': 'Bevétel',
+  'transactions.transfer': 'Átvezetés',
   'transactions.date': 'Dátum',
   'transactions.amount': 'Összeg',
+  'amount.result': 'Kiszámított összeg',
   'transactions.amountHint':
-    'Adj meg pozitív összeget ponttal vagy vesszővel és legfeljebb két tizedesjeggyel.',
+    'Használhatsz + - * / műveleteket, zárójeleket, pontot vagy vesszőt tizedesjelként és ezres tagolást (pl. 1 234,50). A mező elhagyása vagy Enter kiszámítja a századokra kerekített végeredményt.',
   'transactions.account': 'Számla',
+  'transactions.fromAccount': 'Forrásszámla',
+  'transactions.toAccount': 'Célszámla',
+  'transactions.fromAmount': 'Küldött összeg',
+  'transactions.toAmount': 'Fogadott összeg',
+  'transactions.actualRate': 'Tényleges árfolyam',
+  'transactions.fee': 'Díj összege',
+  'transactions.feeCategory': 'Díj kategóriája',
+  'transactions.optional': 'Nem kötelező',
   'transactions.chooseAccount': 'Válassz aktív számlát',
   'transactions.payee': 'Kedvezményezett',
   'transactions.payeeHint':
@@ -164,7 +311,7 @@ export const hu = {
   'transactions.error.date': 'Adj meg érvényes naptári dátumot.',
   'transactions.error.futureDate': 'A tranzakció dátuma nem lehet jövőbeli.',
   'transactions.error.amount':
-    'Adj meg pozitív összeget legfeljebb két tizedesjeggyel.',
+    'Adj meg érvényes kifejezést, amely pozitív összeget ad, legfeljebb 90 071 992 547 409,91 értékig. Nullával nem lehet osztani.',
   'transactions.error.payee':
     'Adj meg legfeljebb 100 karakter hosszú kedvezményezettnevet.',
   'transactions.error.category':
@@ -175,9 +322,42 @@ export const hu = {
     'A tranzakció nem található. Frissítsd a listát.',
   'transactions.error.lines':
     'A tranzakció sorainak összege nem egyezik a végösszeggel.',
+  'splits.split': 'Felosztás',
+  'splits.unsplit': 'Vissza egy részre',
+  'splits.remaining': 'Fennmaradó összeg',
+  'splits.part': 'Rész',
+  'splits.remove': 'Rész eltávolítása',
+  'splits.addPart': 'Rész hozzáadása',
+  'splits.indicator': 'Felosztott',
+  'tags.title': 'Címkék',
+  'tags.all': 'Minden címke',
+  'tags.manage': 'Címkék kezelése',
+  'tags.empty': 'Címkéket a tranzakció űrlapján hozhatsz létre.',
+  'tags.name': 'Címke neve',
+  'tags.rename': 'Átnevezés',
+  'tags.delete': 'Címke törlése',
+  'tags.save': 'Címke mentése',
+  'tags.add': 'Címke hozzáadása',
+  'tags.remove': 'Címke eltávolítása',
+  'tags.hint':
+    'Válassz meglévő címkét, vagy írj be újat. Nyomj Entert vagy kattints a hozzáadásra; az új címkék mentéskor jönnek létre.',
+  'tags.deleteConfirmation':
+    'Törlöd ezt a címkét, és eltávolítod minden tranzakcióról?',
+  'tags.error.name': 'A címkék neve 1–100 karakter hosszú lehet.',
+  'tags.error.notFound': 'A címke nem található. Frissítsd a listát.',
+  'tags.error.duplicate': 'Már létezik ilyen nevű címke.',
+  'undo.available': 'Módosítás mentve.',
+  'transfers.error.accountsDiffer': 'Válassz két különböző számlát.',
+  'transfers.error.equalAmounts':
+    'Azonos pénznemű számláknál a két összegnek egyeznie kell.',
+  'transfers.error.notFound': 'Az átvezetés nem található. Frissítsd a listát.',
+  'transfers.error.linkedFee':
+    'Ezt a díjat a hozzá tartozó átvezetésen keresztül módosítsd vagy töröld.',
+  'undo.action': 'Visszavonás',
+  'undo.error': 'A módosítást nem sikerült visszavonni.',
   'accounts.title': 'Minden számlának saját hely',
   'accounts.description':
-    'Minden egyenleg a nyitó egyenleget, valamint a számla pénznemében rögzített bevételeket és kiadásokat összesíti.',
+    'Minden egyenleg a számla pénznemében rögzített, dátumozott pénzmozgásokat és egyenlegkorrekciókat összesíti.',
   'accounts.create': 'Számla létrehozása',
   'accounts.name': 'Számla neve',
   'accounts.currency': 'Pénznem',
@@ -185,12 +365,13 @@ export const hu = {
   'accounts.openingDate': 'Nyitás dátuma',
   'accounts.balance': 'Egyenleg',
   'accounts.balanceHint':
-    'Pontot vagy vesszőt és legfeljebb két tizedesjegyet használj, ezres tagolás nélkül. Negatív egyenleg is megadható.',
+    'Használhatsz + - * / műveleteket, zárójeleket, pontot vagy vesszőt tizedesjelként és ezres tagolást. A mező elhagyása vagy Enter századokra kerekíti a végeredményt. Negatív és nulla egyenleg is megadható.',
   'accounts.empty': 'Hozz létre egy számlát az egyenleg követéséhez.',
   'accounts.loading': 'Számlák betöltése…',
   'accounts.rename': 'Átnevezés',
   'accounts.changeCurrency': 'Pénznem módosítása',
   'accounts.archive': 'Archiválás',
+  'accounts.unarchive': 'Visszaállítás az archívumból',
   'accounts.archived': 'Archivált — nem jelenik meg a számlaválasztókban',
   'accounts.delete': 'Törlés',
   'accounts.deleteConfirmation': 'Végleg törlöd ezt a számlát?',
@@ -205,7 +386,7 @@ export const hu = {
   'accounts.error.name': 'Adj meg egy 1–100 karakter hosszú számlanevet.',
   'accounts.error.currency': 'Válaszd a HUF vagy CHF pénznemet.',
   'accounts.error.balance':
-    'Adj meg érvényes egyenleget legfeljebb két tizedesjeggyel, tagolás nélkül, ±90 071 992 547 409,91 határon belül.',
+    'Adj meg érvényes kifejezést, amely ±90 071 992 547 409,91 határon belüli egyenleget ad. Nullával nem lehet osztani.',
   'accounts.error.date': 'Adj meg érvényes nyitási dátumot.',
   'accounts.error.notFound': 'A számla nem található. Frissítsd a listát.',
   'accounts.error.currencyLocked':

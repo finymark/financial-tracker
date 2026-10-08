@@ -1,6 +1,89 @@
 import { categoryNames } from '../../../shared/category-translations'
 export const en = {
+  'shortcuts.closeHelp': 'Close shortcut help',
+  'transactions.saveAndAddAnother': 'Save and add another',
+  'shortcuts.scope':
+    'With an open profile: new transaction and undo work outside text editing controls. Type and save shortcuts work in the transaction drawer.',
+  'shortcuts.navigation':
+    'Tab / Shift+Tab move between fields and stay inside the open dialog.',
+  'shortcuts.undo': 'Undo last change (outside text editing controls)',
+  'shortcuts.close': 'Cancel / close drawer or shortcut help',
+  'shortcuts.help': 'Keyboard shortcuts',
+  'shortcuts.save':
+    'Save (except in multiline notes; buttons keep their own action)',
+  'shortcuts.saveAndAddAnother':
+    'Save and add another (keep date, accounts and type)',
+  'shortcuts.newTransaction': 'New transaction (outside text editing controls)',
   ...categoryNames.en,
+  'rules.title': 'Categorisation rules',
+  'rules.description':
+    'Rules are checked in order. The first matching rule wins and can prefill payee, category, and tags before last-used payee values.',
+  'rules.loading': 'Loading rules…',
+  'rules.empty': 'No categorisation rules yet.',
+  'rules.offer': 'Create a rule for this categorisation?',
+  'rules.offerDismiss': 'Dismiss',
+  'rules.create': 'Create rule',
+  'rules.edit': 'Edit',
+  'rules.delete': 'Delete',
+  'rules.save': 'Save rule',
+  'rules.enabled': 'Enabled',
+  'rules.disabled': 'Disabled',
+  'rules.up': 'Move rule up',
+  'rules.down': 'Move rule down',
+  'rules.anyPayee': 'Any payee',
+  'rules.textContains': 'Note contains',
+  'rules.account': 'Account condition',
+  'rules.anyAccount': 'Any account',
+  'rules.minimum': 'Minimum amount',
+  'rules.maximum': 'Maximum amount',
+  'rules.amountCurrency': 'Amount currency',
+  'rules.amountCondition': 'Amount condition',
+  'rules.payeeAction': 'Set payee',
+  'rules.noPayeeAction': 'Do not set a payee',
+  'rules.noCategory': 'Do not set a category',
+  'rules.noTags': 'Create a tag in a transaction before using it in a rule.',
+  'rules.action': 'Action',
+  'rules.formHint':
+    'Choose at least one condition and one action: payee, category, or tags.',
+  'rules.amountHint':
+    'Optional inclusive amount boundary in the selected rule currency.',
+  'rules.error':
+    'The rule operation could not be completed. Refresh and try again.',
+  'rules.error.notFound': 'The rule could not be found. Refresh the list.',
+  'rules.error.condition': 'Choose at least one rule condition.',
+  'rules.error.text': 'Enter at most 1,000 characters of text to find.',
+  'rules.error.amount': 'Enter a valid non-negative amount.',
+  'rules.error.amountRange':
+    'The minimum amount must not exceed the maximum amount.',
+  'rules.error.action': 'Choose a payee, category, and/or at least one tag.',
+  'rules.error.reference':
+    'Choose existing active payees, accounts, categories, and tags.',
+  'rules.error.order': 'Choose a valid rule position.',
+  'payees.title': 'Payees',
+  'payees.description':
+    'Aliases map raw names to one payee. Matching ignores case and diacritics. Merging moves transactions and aliases to the chosen survivor.',
+  'payees.loading': 'Loading payees…',
+  'payees.empty': 'Payees appear here after you record a transaction.',
+  'payees.aliases': 'Aliases',
+  'payees.noAliases': 'No aliases.',
+  'payees.aliasName': 'Raw payee name',
+  'payees.addAlias': 'Add alias',
+  'payees.removeAlias': 'Remove',
+  'payees.mergeInto': 'Merge this payee into',
+  'payees.chooseSurvivor': 'Choose the surviving payee',
+  'payees.merge': 'Merge payees',
+  'payees.mergeHint':
+    'All transactions and aliases move to the surviving payee. You can undo this change.',
+  'payees.refresh': 'Refresh',
+  'payees.error': 'The payee operation could not be completed. Try again.',
+  'payees.error.notFound': 'The payee could not be found. Refresh the list.',
+  'payees.error.aliasNotFound':
+    'The alias could not be found. Refresh the list.',
+  'payees.error.aliasName': 'Enter an alias between 1 and 100 characters.',
+  'payees.error.aliasConflict':
+    'That raw name already belongs to a payee or alias.',
+  'payees.error.samePayee': 'Choose a different surviving payee.',
+  'payees.error.query': 'The payee search is invalid.',
   'categories.title': 'Categories',
   'categories.description':
     'Expense and income categories have at most two levels. Default names follow your language; custom names stay unchanged. Archiving a main category also hides its subcategories from pickers.',
@@ -98,9 +181,38 @@ export const en = {
     'A summarized financial overview will be available here later.',
   'transactions.title': 'Your transactions in one place',
   'transactions.description':
-    'Record expenses and income, then keep account balances up to date.',
+    'Record expenses, income and transfers, then keep account balances up to date.',
   'transactions.listDescription':
-    'Filter transactions by period, account, category, payee or note.',
+    'Filter transactions by period, account, category, payee, tag or note.',
+  'adjustments.setRealBalance': 'Set real balance',
+  'adjustments.edit': 'Edit balance adjustment',
+  'adjustments.save': 'Save balance adjustment',
+  'adjustments.deleteConfirmation':
+    'Permanently delete this balance adjustment? The account balance will update.',
+  'adjustments.confirmDelete': 'Delete balance adjustment',
+  'adjustments.rowType': 'Balance adjustment',
+  'adjustments.observedBalance': 'Observed balance',
+  'adjustments.difference': 'Current difference',
+  'adjustments.zeroDifference': 'No correction needed',
+  'adjustments.zeroDifferenceHint':
+    'This adjustment no longer corrects anything and can be deleted.',
+  'adjustments.error.account': 'Choose an active account.',
+  'adjustments.error.date': 'Enter a valid calendar date.',
+  'adjustments.error.futureDate':
+    'The balance observation date cannot be in the future.',
+  'adjustments.error.balance':
+    'Enter a valid balance within ±90,071,992,547,409.91.',
+  'adjustments.error.note': 'Enter a note of at most 1,000 characters.',
+  'adjustments.error.notFound':
+    'The balance adjustment could not be found. Refresh the list.',
+  'transactions.excluded': 'Excluded',
+  'transactions.excludedHint':
+    'Included in the account balance, but left out of expense and income totals.',
+  'transactions.exclusion': 'Excluded transactions',
+  'transactions.exclusion.all': 'All transactions',
+  'transactions.exclusion.onlyExcluded': 'Only excluded',
+  'transactions.exclusion.hideExcluded': 'Hide excluded',
+  'transactions.error.excluded': 'Choose whether the transaction is excluded.',
   'transactions.filters': 'Transaction filters',
   'transactions.period': 'Period',
   'transactions.period.all': 'All dates',
@@ -125,6 +237,28 @@ export const en = {
     'Choose valid filters and an ordered date range.',
   'transactions.error.totals':
     'The filtered total is too large to represent exactly.',
+  'transactions.duplicate': 'Duplicate transaction',
+  'templates.title': 'Transaction templates',
+  'templates.choose': 'Choose a template',
+  'templates.use': 'Use template',
+  'templates.create': 'Create template',
+  'templates.edit': 'Edit template',
+  'templates.delete': 'Delete template',
+  'templates.save': 'Save template',
+  'templates.name': 'Template name',
+  'templates.saveTransaction': 'Save as template',
+  'templates.savedTransactionHint':
+    'Uses the saved transaction, not unsaved drawer changes.',
+  'templates.optionalHint':
+    'Only the name is required. Leave any other field blank to enter it when using the template.',
+  'templates.tagsHint':
+    'One tag name per line. Missing tags are created when saving the template.',
+  'templates.deleteConfirmation': 'Delete this transaction template?',
+  'templates.amountRequired': 'Enter an amount before saving this transaction.',
+  'templates.error.name': 'Enter a template name between 1 and 100 characters.',
+  'templates.error.split': 'Split transactions cannot be saved as templates.',
+  'templates.error.notFound':
+    'The transaction template could not be found. Refresh the list.',
   'transactions.create': 'Record transaction',
   'transactions.edit': 'Edit transaction',
   'transactions.delete': 'Delete',
@@ -139,14 +273,24 @@ export const en = {
   'transactions.noAccounts':
     'Create an active account before recording a transaction.',
   'transactions.refresh': 'Refresh',
-  'transactions.kind': 'Expense or income',
+  'transactions.kind': 'Transaction type',
   'transactions.expense': 'Expense',
   'transactions.income': 'Income',
+  'transactions.transfer': 'Transfer',
   'transactions.date': 'Date',
   'transactions.amount': 'Amount',
+  'amount.result': 'Calculated amount',
   'transactions.amountHint':
-    'Enter a positive amount with a dot or comma and up to two decimal places.',
+    'Use + - * /, parentheses, dot or comma decimals, and thousands grouping (e.g. 1 234,50). Blur or Enter calculates; the final result is rounded to hundredths.',
   'transactions.account': 'Account',
+  'transactions.fromAccount': 'From account',
+  'transactions.toAccount': 'To account',
+  'transactions.fromAmount': 'Amount sent',
+  'transactions.toAmount': 'Amount received',
+  'transactions.actualRate': 'Actual rate',
+  'transactions.fee': 'Fee amount',
+  'transactions.feeCategory': 'Fee category',
+  'transactions.optional': 'Optional',
   'transactions.chooseAccount': 'Choose an active account',
   'transactions.payee': 'Payee',
   'transactions.payeeHint':
@@ -164,7 +308,7 @@ export const en = {
   'transactions.error.futureDate':
     'The transaction date cannot be in the future.',
   'transactions.error.amount':
-    'Enter a positive amount with up to two decimal places.',
+    'Enter a valid expression yielding a positive amount within 90,071,992,547,409.91. Division by zero is not allowed.',
   'transactions.error.payee': 'Enter a payee name of at most 100 characters.',
   'transactions.error.category':
     'Choose an active category matching expense or income.',
@@ -172,9 +316,42 @@ export const en = {
   'transactions.error.notFound':
     'The transaction could not be found. Refresh the list.',
   'transactions.error.lines': 'The transaction lines do not match its total.',
+  'splits.split': 'Split',
+  'splits.unsplit': 'Return to one part',
+  'splits.remaining': 'Remaining amount',
+  'splits.part': 'Part',
+  'splits.remove': 'Remove part',
+  'splits.addPart': 'Add part',
+  'splits.indicator': 'Split',
+  'tags.title': 'Tags',
+  'tags.all': 'All tags',
+  'tags.manage': 'Manage tags',
+  'tags.empty': 'Create tags in the transaction drawer.',
+  'tags.name': 'Tag name',
+  'tags.rename': 'Rename',
+  'tags.delete': 'Delete tag',
+  'tags.save': 'Save tag',
+  'tags.add': 'Add tag',
+  'tags.remove': 'Remove tag',
+  'tags.hint':
+    'Choose an existing tag or type a new one. Press Enter or Add tag; new tags are created when you save.',
+  'tags.deleteConfirmation':
+    'Delete this tag and remove it from all transactions?',
+  'tags.error.name': 'Enter tag names between 1 and 100 characters.',
+  'tags.error.notFound': 'The tag could not be found. Refresh the list.',
+  'tags.error.duplicate': 'A tag with this name already exists.',
+  'undo.available': 'Change saved.',
+  'transfers.error.accountsDiffer': 'Choose two different accounts.',
+  'transfers.error.equalAmounts':
+    'Amounts must be equal when both accounts use the same currency.',
+  'transfers.error.notFound':
+    'The transfer could not be found. Refresh the list.',
+  'transfers.error.linkedFee': 'Edit or delete this fee through its transfer.',
+  'undo.action': 'Undo',
+  'undo.error': 'The change could not be undone.',
   'accounts.title': 'A place for each account',
   'accounts.description':
-    'Each balance combines its opening balance with income and expenses in the account currency.',
+    'Each balance combines its dated movements and observed balance adjustments in the account currency.',
   'accounts.create': 'Create account',
   'accounts.name': 'Account name',
   'accounts.currency': 'Currency',
@@ -182,12 +359,13 @@ export const en = {
   'accounts.openingDate': 'Opening date',
   'accounts.balance': 'Balance',
   'accounts.balanceHint':
-    'Use a dot or comma and up to two decimal places, without thousands separators. Negative balances are allowed.',
+    'Use + - * /, parentheses, dot or comma decimals, and thousands grouping. Blur or Enter calculates, rounding the final result to hundredths. Negative and zero balances are allowed.',
   'accounts.empty': 'Create an account to start tracking its balance.',
   'accounts.loading': 'Loading accounts…',
   'accounts.rename': 'Rename',
   'accounts.changeCurrency': 'Change currency',
   'accounts.archive': 'Archive',
+  'accounts.unarchive': 'Unarchive',
   'accounts.archived': 'Archived — hidden from account pickers',
   'accounts.delete': 'Delete',
   'accounts.deleteConfirmation': 'Permanently delete this account?',
@@ -202,7 +380,7 @@ export const en = {
   'accounts.error.name': 'Enter an account name between 1 and 100 characters.',
   'accounts.error.currency': 'Choose HUF or CHF.',
   'accounts.error.balance':
-    'Enter a valid balance with up to two decimal places, no grouping, and within ±90,071,992,547,409.91.',
+    'Enter a valid expression yielding a balance within ±90,071,992,547,409.91. Division by zero is not allowed.',
   'accounts.error.date': 'Enter a valid opening date.',
   'accounts.error.notFound':
     'The account could not be found. Refresh the list.',

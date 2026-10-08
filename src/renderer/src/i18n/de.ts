@@ -2,7 +2,97 @@ import { categoryNames } from '../../../shared/category-translations'
 import type { MessageCatalog } from './en'
 
 export const de = {
+  'shortcuts.closeHelp': 'Tastaturhilfe schließen',
+  'transactions.saveAndAddAnother': 'Speichern und weitere hinzufügen',
+  'shortcuts.scope':
+    'Bei geöffnetem Profil: Neue Transaktion und Rückgängig funktionieren außerhalb von Eingabefeldern. Typ- und Speicherkürzel gelten im Transaktionsfenster.',
+  'shortcuts.navigation':
+    'Tab / Shift+Tab wechseln zwischen Feldern und bleiben im geöffneten Dialog.',
+  'shortcuts.undo':
+    'Letzte Änderung rückgängig machen (außerhalb von Eingabefeldern)',
+  'shortcuts.close':
+    'Abbrechen / Transaktionsfenster oder Tastaturhilfe schließen',
+  'shortcuts.help': 'Tastenkürzel',
+  'shortcuts.save':
+    'Speichern (nicht in mehrzeiligen Notizen; Schaltflächen behalten ihre eigene Aktion)',
+  'shortcuts.saveAndAddAnother':
+    'Speichern und weitere hinzufügen (Datum, Konten und Typ behalten)',
+  'shortcuts.newTransaction': 'Neue Transaktion (außerhalb von Eingabefeldern)',
   ...categoryNames.de,
+  'rules.title': 'Kategorisierungsregeln',
+  'rules.description':
+    'Regeln werden der Reihe nach geprüft. Die erste passende Regel gewinnt und kann Zahlungspartner, Kategorie und Tags vor den zuletzt verwendeten Werten ausfüllen.',
+  'rules.loading': 'Regeln werden geladen…',
+  'rules.empty': 'Noch keine Kategorisierungsregeln.',
+  'rules.offer': 'Eine Regel für diese Kategorisierung erstellen?',
+  'rules.offerDismiss': 'Verwerfen',
+  'rules.create': 'Regel erstellen',
+  'rules.edit': 'Bearbeiten',
+  'rules.delete': 'Löschen',
+  'rules.save': 'Regel speichern',
+  'rules.enabled': 'Aktiviert',
+  'rules.disabled': 'Deaktiviert',
+  'rules.up': 'Regel nach oben',
+  'rules.down': 'Regel nach unten',
+  'rules.anyPayee': 'Beliebiger Zahlungspartner',
+  'rules.textContains': 'Notiz enthält',
+  'rules.account': 'Kontobedingung',
+  'rules.anyAccount': 'Beliebiges Konto',
+  'rules.minimum': 'Mindestbetrag',
+  'rules.maximum': 'Höchstbetrag',
+  'rules.amountCurrency': 'Betragswährung',
+  'rules.amountCondition': 'Betragsbedingung',
+  'rules.payeeAction': 'Zahlungspartner setzen',
+  'rules.noPayeeAction': 'Keinen Zahlungspartner setzen',
+  'rules.noCategory': 'Keine Kategorie setzen',
+  'rules.noTags': 'Erstellen Sie zuerst in einer Transaktion einen Tag.',
+  'rules.action': 'Aktion',
+  'rules.formHint':
+    'Wählen Sie mindestens eine Bedingung und eine Aktion: Zahlungspartner, Kategorie oder Tags.',
+  'rules.amountHint':
+    'Optionale inklusive Betragsgrenze in der ausgewählten Regelwährung.',
+  'rules.error': 'Die Regelaktion konnte nicht abgeschlossen werden.',
+  'rules.error.notFound':
+    'Die Regel wurde nicht gefunden. Liste aktualisieren.',
+  'rules.error.condition': 'Mindestens eine Regelbedingung angeben.',
+  'rules.error.text': 'Höchstens 1.000 Zeichen Suchtext eingeben.',
+  'rules.error.amount': 'Einen gültigen, nicht negativen Betrag eingeben.',
+  'rules.error.amountRange':
+    'Der Mindestbetrag darf den Höchstbetrag nicht überschreiten.',
+  'rules.error.action':
+    'Zahlungspartner, Kategorie und/oder mindestens einen Tag wählen.',
+  'rules.error.reference':
+    'Vorhandene aktive Zahlungspartner, Konten, Kategorien und Tags wählen.',
+  'rules.error.order': 'Eine gültige Regelposition wählen.',
+  'payees.title': 'Zahlungspartner',
+  'payees.description':
+    'Aliasse ordnen Rohbezeichnungen einem Zahlungspartner zu. Groß-/Kleinschreibung und Akzente werden beim Abgleich ignoriert. Beim Zusammenführen wechseln Transaktionen und Aliasse zum ausgewählten verbleibenden Zahlungspartner.',
+  'payees.loading': 'Zahlungspartner werden geladen…',
+  'payees.empty':
+    'Zahlungspartner erscheinen hier nach dem Erfassen einer Transaktion.',
+  'payees.aliases': 'Aliasse',
+  'payees.noAliases': 'Keine Aliasse.',
+  'payees.aliasName': 'Rohe Zahlungspartnerbezeichnung',
+  'payees.addAlias': 'Alias hinzufügen',
+  'payees.removeAlias': 'Entfernen',
+  'payees.mergeInto': 'Diesen Zahlungspartner zusammenführen mit',
+  'payees.chooseSurvivor': 'Verbleibenden Zahlungspartner auswählen',
+  'payees.merge': 'Zahlungspartner zusammenführen',
+  'payees.mergeHint':
+    'Alle Transaktionen und Aliasse wechseln zum verbleibenden Zahlungspartner. Diese Änderung kann rückgängig gemacht werden.',
+  'payees.refresh': 'Aktualisieren',
+  'payees.error':
+    'Der Zahlungspartnervorgang konnte nicht abgeschlossen werden. Versuche es erneut.',
+  'payees.error.notFound':
+    'Der Zahlungspartner wurde nicht gefunden. Aktualisiere die Liste.',
+  'payees.error.aliasNotFound':
+    'Der Alias wurde nicht gefunden. Aktualisiere die Liste.',
+  'payees.error.aliasName': 'Gib einen Alias mit 1 bis 100 Zeichen ein.',
+  'payees.error.aliasConflict':
+    'Diese Rohbezeichnung gehört bereits zu einem Zahlungspartner oder Alias.',
+  'payees.error.samePayee':
+    'Wähle einen anderen verbleibenden Zahlungspartner.',
+  'payees.error.query': 'Die Zahlungspartnersuche ist ungültig.',
   'categories.title': 'Kategorien',
   'categories.description':
     'Ausgaben- und Einnahmenkategorien haben höchstens zwei Ebenen. Standardnamen folgen der Sprache; eigene Namen bleiben unverändert. Das Archivieren einer Hauptkategorie blendet auch ihre Unterkategorien in Auswahllisten aus.',
@@ -105,9 +195,39 @@ export const de = {
     'Eine zusammengefasste Finanzübersicht wird später hier verfügbar sein.',
   'transactions.title': 'Deine Transaktionen an einem Ort',
   'transactions.description':
-    'Erfasse Ausgaben und Einnahmen, damit deine Kontosalden aktuell bleiben.',
+    'Erfasse Ausgaben, Einnahmen und Umbuchungen, damit deine Kontosalden aktuell bleiben.',
   'transactions.listDescription':
-    'Transaktionen nach Zeitraum, Konto, Kategorie, Zahlungspartner oder Notiz filtern.',
+    'Transaktionen nach Zeitraum, Konto, Kategorie, Zahlungspartner, Tag oder Notiz filtern.',
+  'adjustments.setRealBalance': 'Tatsächlichen Saldo setzen',
+  'adjustments.edit': 'Saldoabgleich bearbeiten',
+  'adjustments.save': 'Saldoabgleich speichern',
+  'adjustments.deleteConfirmation':
+    'Diesen Saldoabgleich dauerhaft löschen? Der Kontosaldo wird aktualisiert.',
+  'adjustments.confirmDelete': 'Saldoabgleich löschen',
+  'adjustments.rowType': 'Saldoabgleich',
+  'adjustments.observedBalance': 'Beobachteter Saldo',
+  'adjustments.difference': 'Aktuelle Differenz',
+  'adjustments.zeroDifference': 'Keine Korrektur nötig',
+  'adjustments.zeroDifferenceHint':
+    'Dieser Abgleich korrigiert nichts mehr und kann gelöscht werden.',
+  'adjustments.error.account': 'Wähle ein aktives Konto.',
+  'adjustments.error.date': 'Gib ein gültiges Kalenderdatum ein.',
+  'adjustments.error.futureDate':
+    'Das Datum der Saldo-Beobachtung darf nicht in der Zukunft liegen.',
+  'adjustments.error.balance':
+    'Gib einen gültigen Saldo innerhalb von ±90.071.992.547.409,91 ein.',
+  'adjustments.error.note': 'Gib eine Notiz mit höchstens 1.000 Zeichen ein.',
+  'adjustments.error.notFound':
+    'Der Saldoabgleich wurde nicht gefunden. Aktualisiere die Liste.',
+  'transactions.excluded': 'Ausgeschlossen',
+  'transactions.excludedHint':
+    'Im Kontostand enthalten, aber nicht in den Ausgaben- und Einnahmensummen.',
+  'transactions.exclusion': 'Ausgeschlossene Transaktionen',
+  'transactions.exclusion.all': 'Alle Transaktionen',
+  'transactions.exclusion.onlyExcluded': 'Nur ausgeschlossene',
+  'transactions.exclusion.hideExcluded': 'Ausgeschlossene ausblenden',
+  'transactions.error.excluded':
+    'Wähle, ob die Transaktion ausgeschlossen ist.',
   'transactions.filters': 'Transaktionsfilter',
   'transactions.period': 'Zeitraum',
   'transactions.period.all': 'Alle Daten',
@@ -132,6 +252,30 @@ export const de = {
     'Wähle gültige Filter und einen geordneten Datumsbereich.',
   'transactions.error.totals':
     'Die gefilterte Summe ist zu groß für eine exakte Darstellung.',
+  'transactions.duplicate': 'Transaktion duplizieren',
+  'templates.title': 'Transaktionsvorlagen',
+  'templates.choose': 'Vorlage auswählen',
+  'templates.use': 'Vorlage verwenden',
+  'templates.create': 'Vorlage erstellen',
+  'templates.edit': 'Vorlage bearbeiten',
+  'templates.delete': 'Vorlage löschen',
+  'templates.save': 'Vorlage speichern',
+  'templates.name': 'Vorlagenname',
+  'templates.saveTransaction': 'Als Vorlage speichern',
+  'templates.savedTransactionHint':
+    'Verwendet die gespeicherte Transaktion, nicht ungespeicherte Änderungen im Formular.',
+  'templates.optionalHint':
+    'Nur der Name ist erforderlich. Andere Felder können leer bleiben und beim Verwenden ausgefüllt werden.',
+  'templates.tagsHint':
+    'Ein Tag-Name pro Zeile. Fehlende Tags werden beim Speichern der Vorlage erstellt.',
+  'templates.deleteConfirmation': 'Diese Transaktionsvorlage löschen?',
+  'templates.amountRequired':
+    'Gib vor dem Speichern dieser Transaktion einen Betrag ein.',
+  'templates.error.name': 'Gib einen Vorlagennamen mit 1 bis 100 Zeichen ein.',
+  'templates.error.split':
+    'Aufgeteilte Transaktionen können nicht als Vorlagen gespeichert werden.',
+  'templates.error.notFound':
+    'Die Transaktionsvorlage wurde nicht gefunden. Aktualisiere die Liste.',
   'transactions.create': 'Transaktion erfassen',
   'transactions.edit': 'Transaktion bearbeiten',
   'transactions.delete': 'Löschen',
@@ -146,14 +290,24 @@ export const de = {
   'transactions.noAccounts':
     'Erstelle ein aktives Konto, bevor du eine Transaktion erfasst.',
   'transactions.refresh': 'Aktualisieren',
-  'transactions.kind': 'Ausgabe oder Einnahme',
+  'transactions.kind': 'Transaktionstyp',
   'transactions.expense': 'Ausgabe',
   'transactions.income': 'Einnahme',
+  'transactions.transfer': 'Umbuchung',
   'transactions.date': 'Datum',
   'transactions.amount': 'Betrag',
+  'amount.result': 'Berechneter Betrag',
   'transactions.amountHint':
-    'Gib einen positiven Betrag mit Punkt oder Komma und höchstens zwei Nachkommastellen ein.',
+    'Verwende + - * /, Klammern, Punkt oder Komma als Dezimalzeichen und Tausendertrennzeichen (z. B. 1 234,50). Verlassen des Feldes oder Enter berechnet das auf Hundertstel gerundete Endergebnis.',
   'transactions.account': 'Konto',
+  'transactions.fromAccount': 'Quellkonto',
+  'transactions.toAccount': 'Zielkonto',
+  'transactions.fromAmount': 'Gesendeter Betrag',
+  'transactions.toAmount': 'Empfangener Betrag',
+  'transactions.actualRate': 'Tatsächlicher Kurs',
+  'transactions.fee': 'Gebühr',
+  'transactions.feeCategory': 'Gebührenkategorie',
+  'transactions.optional': 'Optional',
   'transactions.chooseAccount': 'Aktives Konto auswählen',
   'transactions.payee': 'Zahlungspartner',
   'transactions.payeeHint':
@@ -171,7 +325,7 @@ export const de = {
   'transactions.error.futureDate':
     'Das Transaktionsdatum darf nicht in der Zukunft liegen.',
   'transactions.error.amount':
-    'Gib einen positiven Betrag mit höchstens zwei Nachkommastellen ein.',
+    'Gib einen gültigen Ausdruck ein, der einen positiven Betrag bis 90.071.992.547.409,91 ergibt. Division durch null ist nicht erlaubt.',
   'transactions.error.payee':
     'Gib einen Zahlungspartner mit höchstens 100 Zeichen ein.',
   'transactions.error.category':
@@ -181,9 +335,44 @@ export const de = {
     'Die Transaktion wurde nicht gefunden. Aktualisiere die Liste.',
   'transactions.error.lines':
     'Die Transaktionszeilen entsprechen nicht dem Gesamtbetrag.',
+  'splits.split': 'Aufteilen',
+  'splits.unsplit': 'Auf einen Teil zurücksetzen',
+  'splits.remaining': 'Verbleibender Betrag',
+  'splits.part': 'Teil',
+  'splits.remove': 'Teil entfernen',
+  'splits.addPart': 'Teil hinzufügen',
+  'splits.indicator': 'Aufgeteilt',
+  'tags.title': 'Tags',
+  'tags.all': 'Alle Tags',
+  'tags.manage': 'Tags verwalten',
+  'tags.empty': 'Erstelle Tags im Transaktionsformular.',
+  'tags.name': 'Tag-Name',
+  'tags.rename': 'Umbenennen',
+  'tags.delete': 'Tag löschen',
+  'tags.save': 'Tag speichern',
+  'tags.add': 'Tag hinzufügen',
+  'tags.remove': 'Tag entfernen',
+  'tags.hint':
+    'Wähle ein vorhandenes Tag oder gib ein neues ein. Drücke Enter oder Tag hinzufügen; neue Tags werden beim Speichern erstellt.',
+  'tags.deleteConfirmation':
+    'Dieses Tag löschen und von allen Transaktionen entfernen?',
+  'tags.error.name': 'Tag-Namen müssen zwischen 1 und 100 Zeichen lang sein.',
+  'tags.error.notFound':
+    'Das Tag wurde nicht gefunden. Aktualisiere die Liste.',
+  'tags.error.duplicate': 'Ein Tag mit diesem Namen existiert bereits.',
+  'undo.available': 'Änderung gespeichert.',
+  'transfers.error.accountsDiffer': 'Wähle zwei verschiedene Konten.',
+  'transfers.error.equalAmounts':
+    'Bei gleicher Währung müssen beide Beträge gleich sein.',
+  'transfers.error.notFound':
+    'Die Umbuchung wurde nicht gefunden. Aktualisiere die Liste.',
+  'transfers.error.linkedFee':
+    'Bearbeite oder lösche diese Gebühr über die zugehörige Umbuchung.',
+  'undo.action': 'Rückgängig',
+  'undo.error': 'Die Änderung konnte nicht rückgängig gemacht werden.',
   'accounts.title': 'Ein Platz für jedes Konto',
   'accounts.description':
-    'Jeder Saldo kombiniert Eröffnungssaldo, Einnahmen und Ausgaben in der Kontowährung.',
+    'Jeder Saldo kombiniert datierte Kontobewegungen und beobachtete Saldoabgleiche in der Kontowährung.',
   'accounts.create': 'Konto erstellen',
   'accounts.name': 'Kontoname',
   'accounts.currency': 'Währung',
@@ -191,12 +380,13 @@ export const de = {
   'accounts.openingDate': 'Eröffnungsdatum',
   'accounts.balance': 'Saldo',
   'accounts.balanceHint':
-    'Punkt oder Komma und höchstens zwei Nachkommastellen verwenden, ohne Tausendertrennzeichen. Negative Salden sind erlaubt.',
+    'Verwende + - * /, Klammern, Punkt oder Komma als Dezimalzeichen und Tausendertrennzeichen. Verlassen des Feldes oder Enter berechnet das auf Hundertstel gerundete Endergebnis. Negative Salden und null sind erlaubt.',
   'accounts.empty': 'Erstelle ein Konto, um seinen Saldo zu verfolgen.',
   'accounts.loading': 'Konten werden geladen…',
   'accounts.rename': 'Umbenennen',
   'accounts.changeCurrency': 'Währung ändern',
   'accounts.archive': 'Archivieren',
+  'accounts.unarchive': 'Dearchivieren',
   'accounts.archived': 'Archiviert — in der Kontoauswahl ausgeblendet',
   'accounts.delete': 'Löschen',
   'accounts.deleteConfirmation': 'Dieses Konto endgültig löschen?',
@@ -211,7 +401,7 @@ export const de = {
   'accounts.error.name': 'Gib einen Kontonamen mit 1 bis 100 Zeichen ein.',
   'accounts.error.currency': 'Wähle HUF oder CHF.',
   'accounts.error.balance':
-    'Gib einen gültigen Saldo mit höchstens zwei Nachkommastellen ohne Gruppierung und innerhalb von ±90.071.992.547.409,91 ein.',
+    'Gib einen gültigen Ausdruck ein, der einen Saldo innerhalb von ±90.071.992.547.409,91 ergibt. Division durch null ist nicht erlaubt.',
   'accounts.error.date': 'Gib ein gültiges Eröffnungsdatum ein.',
   'accounts.error.notFound':
     'Das Konto wurde nicht gefunden. Aktualisiere die Liste.',

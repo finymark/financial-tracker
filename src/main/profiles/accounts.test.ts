@@ -154,7 +154,14 @@ test('archiving preserves the account and balance but hides it from account pick
     { ...archived, archived: true },
     active,
   ])
-  expect(reopened.queries.listAccountOptions()).toEqual([active])
+  expect(reopened.queries.listAccountOptions()).toEqual([
+    {
+      id: active.id,
+      name: active.name,
+      currency: active.currency,
+      archived: false,
+    },
+  ])
   expect(reopened.queries.getAccountBalance(archived.id)).toBe(5099)
 })
 
@@ -214,4 +221,174 @@ test('accounts and their mutation commands stay isolated between profiles', asyn
     'accounts.error.notFound',
   )
   expect(application.queries.listAccounts()).toEqual([account])
+})
+
+test('create, edit, archive, unarchive, and delete account commands undo exact prior images', async () => {
+  const { application } = await setup()
+  const created = application.commands.createAccount({
+    name: 'Undo account',
+    currency: 'HUF',
+    openingBalance: 123,
+    openingDate: '2026-01-01',
+  })
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listAccounts()).toEqual([])
+
+  const account = application.commands.createAccount({
+    name: 'Original',
+    currency: 'HUF',
+    openingBalance: 123,
+    openingDate: '2026-01-01',
+  })
+  application.commands.renameAccount({ id: account.id, name: 'Renamed' })
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listAccounts()).toEqual([account])
+
+  application.commands.changeAccountCurrency({
+    id: account.id,
+    currency: 'CHF',
+  })
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listAccounts()).toEqual([account])
+
+  application.commands.archiveAccount(account.id)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listAccounts()).toEqual([account])
+
+  application.commands.archiveAccount(account.id)
+  application.commands.unarchiveAccount(account.id)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listAccounts()).toEqual([
+    { ...account, archived: true },
+  ])
+
+  application.commands.deleteAccount(account.id)
+  expect(application.queries.listAccounts()).toEqual([])
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listAccounts()).toEqual([
+    { ...account, archived: true },
+  ])
+  expect(created.id).not.toBe(account.id)
+})
+
+test('changing an empty account currency updates only scoped amount rules and undo restores matching', async () => {
+  const { application } = await setup()
+  const account = application.commands.createAccount({
+    name: 'Empty',
+    currency: 'HUF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  const draft = {
+    enabled: true,
+    payeeId: null,
+    textContains: null,
+    accountId: account.id,
+    minAmountMinor: 100,
+    maxAmountMinor: 500,
+    amountCurrency: 'HUF' as const,
+    categoryId: application.queries.listCategoryOptions('expense')[0].id,
+    tagIds: [],
+  }
+  const scoped = application.commands.createCategorisationRule(draft)
+  const unscoped = application.commands.createCategorisationRule({
+    ...draft,
+    accountId: null,
+  })
+  const noAmount = application.commands.createCategorisationRule({
+    ...draft,
+    minAmountMinor: null,
+    maxAmountMinor: null,
+    amountCurrency: null,
+  })
+  const input = {
+    accountId: account.id,
+    kind: 'expense' as const,
+    totalMinor: 200,
+    payeeName: null,
+    note: '',
+  }
+  expect(application.queries.getCategorisationAutofill(input).ruleId).toBe(
+    scoped.id,
+  )
+  application.commands.changeAccountCurrency({
+    id: account.id,
+    currency: 'CHF',
+  })
+  expect(application.queries.listCategorisationRules()).toEqual([
+    { ...scoped, amountCurrency: 'CHF' },
+    unscoped,
+    noAmount,
+  ])
+  expect(application.queries.getCategorisationAutofill(input).ruleId).toBe(
+    scoped.id,
+  )
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listAccounts()).toEqual([account])
+  expect(application.queries.listCategorisationRules()).toEqual([
+    scoped,
+    unscoped,
+    noAmount,
+  ])
+  expect(application.queries.getCategorisationAutofill(input).ruleId).toBe(
+    scoped.id,
+  )
+})
+
+test('account options optionally include archived accounts and never calculate balances', async () => {
+  const { application } = await setup()
+  const account = application.commands.createAccount({
+    name: 'Archived',
+    currency: 'CHF',
+    openingBalance: Number.MAX_SAFE_INTEGER,
+    openingDate: '2026-01-01',
+  })
+  application.commands.createTransaction({
+    accountId: account.id,
+    kind: 'income',
+    date: '2026-01-15',
+    totalMinor: 1,
+    payeeName: null,
+    categoryId: null,
+    note: '',
+  })
+  application.commands.archiveAccount(account.id)
+  const active = application.commands.createAccount({
+    name: 'Active',
+    currency: 'HUF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  expect(() => application.queries.listAccounts()).toThrow(
+    'accounts.error.balance',
+  )
+  const activeOption = {
+    id: active.id,
+    name: 'Active',
+    currency: 'HUF',
+    archived: false,
+  }
+  expect(application.queries.listAccountOptions()).toEqual([activeOption])
+  expect(
+    application.queries.listAccountOptions({ includeArchived: false }),
+  ).toEqual([activeOption])
+  expect(
+    application.queries.listAccountOptions({ includeArchived: true }),
+  ).toEqual([
+    { id: account.id, name: 'Archived', currency: 'CHF', archived: true },
+    activeOption,
+  ])
+  for (const invalid of [
+    null,
+    true,
+    [],
+    { includeArchived: 'true' },
+    { includeArchived: 1 },
+  ]) {
+    expect(() =>
+      application.queries.listAccountOptions(
+        invalid as { includeArchived?: boolean },
+      ),
+    ).toThrow('accounts.error')
+  }
 })

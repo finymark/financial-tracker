@@ -1,4 +1,5 @@
 import type {
+  TransactionExclusionFilter,
   TransactionKind,
   TransactionListInput,
   TransactionPeriod,
@@ -95,12 +96,26 @@ export function validateTransactionNote(value: unknown): string {
   return value
 }
 
+export function validateTransactionExcluded(
+  value: unknown,
+): boolean | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== 'boolean') throw new Error('transactions.error.excluded')
+  return value
+}
+
 export function parseTransactionListInput(
   value: unknown = {},
 ): TransactionListInput {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new Error('transactions.error.filters')
   const input = value as Record<string, unknown>
+  const exclusion = input.exclusion === undefined ? 'all' : input.exclusion
+  if (
+    typeof exclusion !== 'string' ||
+    !['all', 'onlyExcluded', 'hideExcluded'].includes(exclusion)
+  )
+    throw new Error('transactions.error.filters')
   const period = input.period === undefined ? 'all' : input.period
   if (
     typeof period !== 'string' ||
@@ -141,11 +156,13 @@ export function parseTransactionListInput(
     throw new Error('transactions.error.filters')
   return {
     period: period as TransactionPeriod,
+    exclusion: exclusion as TransactionExclusionFilter,
     from,
     to,
     accountId: id(input.accountId),
     categoryId: id(input.categoryId),
     payeeId: id(input.payeeId),
+    tagId: id(input.tagId),
     search: (input.search as string | undefined)?.trim(),
     offset: offset as number,
     limit: limit as number,
