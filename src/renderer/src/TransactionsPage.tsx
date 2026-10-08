@@ -40,6 +40,7 @@ interface TransactionsPageProps {
   newTransactionRequested: boolean
   onNewTransactionHandled(): void
   onTransactionChanged(): void
+  initialReportFilter: TransactionListInput | null
 }
 
 export function TransactionsPage({
@@ -50,6 +51,7 @@ export function TransactionsPage({
   newTransactionRequested,
   onNewTransactionHandled,
   onTransactionChanged,
+  initialReportFilter,
 }: TransactionsPageProps) {
   const [page, setPage] = useState<TransactionPage>({
     rows: [],
@@ -64,17 +66,19 @@ export function TransactionsPage({
       stale: false,
     },
   })
-  const [request, setRequest] = useState<TransactionListInput>({
-    period: 'all',
-    limit: 200,
-    offset: 0,
-  })
+  const [request, setRequest] = useState<TransactionListInput>(
+    initialReportFilter ?? {
+      period: 'all',
+      limit: 200,
+      offset: 0,
+    },
+  )
   const [filters, setFilters] = useState({
-    period: 'all' as TransactionPeriod,
-    from: '',
-    to: '',
+    period: (initialReportFilter?.period ?? 'all') as TransactionPeriod,
+    from: initialReportFilter?.from ?? '',
+    to: initialReportFilter?.to ?? '',
     accountId: '',
-    categoryId: '',
+    categoryId: initialReportFilter?.categoryId ?? '',
     payeeId: '',
     tagId: '',
     search: '',
@@ -260,6 +264,11 @@ export function TransactionsPage({
         className="grid gap-3 rounded-md border p-3 sm:grid-cols-3 lg:grid-cols-6"
         aria-label={t('transactions.filters')}
       >
+        {initialReportFilter && (
+          <p className="self-end text-xs text-muted-foreground sm:col-span-3 lg:col-span-6">
+            {t('reports.transactionFilter')}
+          </p>
+        )}
         <label className="space-y-1 text-xs font-medium">
           {t('transactions.period')}
           <NativeSelect

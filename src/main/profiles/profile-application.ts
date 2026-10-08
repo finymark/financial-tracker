@@ -166,6 +166,15 @@ import {
   getRateStatus,
   refreshExchangeRates as refreshProfileExchangeRates,
 } from './profile-exchange-rates'
+import type {
+  CategoryBreakdownReport,
+  ReportDateRangeInput,
+} from '../../shared/reports'
+import {
+  parseReportDateRangeInput,
+  resolveReportDateRange,
+} from './report-validation'
+import { getCategoryBreakdown } from './profile-reports'
 
 const MIGRATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -220,6 +229,7 @@ export interface OpenProfileApplicationOptions {
 }
 
 export interface ProfileQueries {
+  getCategoryBreakdown(input: ReportDateRangeInput): CategoryBreakdownReport
   convertToBaseCurrency(
     lines: readonly ConversionLine[],
   ): BaseCurrencyConversion
@@ -1131,6 +1141,16 @@ class OpenProfileApplication implements ProfileApplication {
       updateSettings: (changes) => this.#updateSettings(changes),
     }
     this.queries = {
+      getCategoryBreakdown: (input) => {
+        this.#assertAvailable()
+        const range = resolveReportDateRange(
+          parseReportDateRangeInput(input),
+          this.#clock,
+        )
+        return this.#database.transaction(() =>
+          getCategoryBreakdown(this.#database, range, this.#clock),
+        )()
+      },
       exportTransactionsCsv: (input) => {
         this.#assertAvailable()
         return this.#database.transaction(() =>

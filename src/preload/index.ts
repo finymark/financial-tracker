@@ -2,6 +2,10 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 
 const bridge: AppBridge = {
+  reports: {
+    categoryBreakdown: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.reportsCategoryBreakdown, input),
+  },
   rates: {
     status: () => ipcRenderer.invoke(IPC_CHANNELS.ratesStatus),
     onStatusChanged: (listener) => {
