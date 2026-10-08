@@ -1,0 +1,20 @@
+HOSSZÚ MINTA Kft.
+4444 Példaváros, Próba köz 5.
+Adószám: 00000000-0-00
+NAV ellenőrző kód: MINTA
+NYUGTA
+2025. 02. 03. 11:22
+Pékáru                         650 Ft
+Tejtermék                      799 Ft
+Zöldség                      1 250 Ft
+Gyümölcs                     1 875 Ft
+Háztartás                    2 425 Ft
+Ital                         3 000 Ft
+ÁFA A 27% alap              7 569 Ft
+ÁFA A 27%                    2 043 Ft
+ÁFA B 5% alap                 369 Ft
+ÁFA B 5%                       18 Ft
+ÁFA OSSZESEN                 2 061 Ft
+OSSZESEN                     9.999,-
+BANKKÁRTYA                   9 999 Ft
+Köszönjük a vásárlást

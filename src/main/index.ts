@@ -54,6 +54,8 @@ import { registerAttachmentIpc } from './profiles/attachment-ipc'
 import { registerReceiptIpc } from './profiles/receipt-ipc'
 import { registerPhoneUploadIpc, renderPhoneUploadQr } from './phone-upload-ipc'
 import sharp from 'sharp'
+import { preprocessReceiptImage } from './ocr/receipt-preprocessing'
+import { TesseractOcrEngine } from './ocr/tesseract-ocr-engine'
 
 let mainWindow: BrowserWindow | null = null
 let quickAddWindow: BrowserWindow | null = null
@@ -199,6 +201,28 @@ async function smokeTest(): Promise<void> {
     if (metadata.width !== 1 || metadata.height !== 1)
       throw new Error('Image processing failed')
     console.log('Image smoke test OK')
+    const syntheticReceipt = await sharp(
+      Buffer.from(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160">
+          <rect width="100%" height="100%" fill="white"/>
+          <text x="35" y="110" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="black">TOTAL 12.50</text>
+        </svg>`,
+      ),
+    )
+      .png()
+      .toBuffer()
+    const ocr = new TesseractOcrEngine()
+    try {
+      const result = await ocr.recognize(
+        await preprocessReceiptImage(syntheticReceipt),
+        ['eng'],
+      )
+      if (!/TOTAL\s+12[.,]50/iu.test(result.text))
+        throw new Error(`OCR returned unexpected text: ${result.text}`)
+      console.log('OCR smoke test OK')
+    } finally {
+      await ocr.dispose()
+    }
     const qrDataUrl = await renderPhoneUploadQr(
       `http://192.168.1.2:12345/u/${'a'.repeat(43)}`,
     )
@@ -206,8 +230,8 @@ async function smokeTest(): Promise<void> {
       throw new Error('QR rendering failed')
     console.log('QR smoke test OK')
     exitCode = 0
-  } catch {
-    console.error('Smoke test FAILED')
+  } catch (error) {
+    console.error('Smoke test FAILED', error)
   } finally {
     rmSync(directory, { recursive: true, force: true })
     app.exit(exitCode)
@@ -264,6 +288,7 @@ function startApplication(): void {
   let trayNoticeShown = settings.isTrayNoticeShown()
   let tray: Tray | null = null
   const rateSource = new MnbExchangeRateSource(createElectronNetTransport())
+  const receiptOcr = new TesseractOcrEngine()
   const onRateStatusChanged = () => {
     if (mainWindow && !mainWindow.isDestroyed())
       mainWindow.webContents.send(IPC_CHANNELS.ratesStatusChanged)
@@ -300,6 +325,7 @@ function startApplication(): void {
       onReceiptInboxChanged,
       onWatchedFolderStatusChanged,
       onWatchedFolderFailure,
+      ocrEngine: receiptOcr,
     },
   )
   const exchangeRates = new ExchangeRateScheduler(profiles, rateSource, {
@@ -504,6 +530,7 @@ function startApplication(): void {
   tray.on('double-click', showMainWindow)
   updateTray()
   app.on('will-quit', () => {
+    void receiptOcr.dispose()
     disposeAttachmentIpc()
     disposeDesktopIntegrations()
   })

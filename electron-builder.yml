@@ -4,14 +4,31 @@ directories:
   output: release
 files:
   - out/**/*
+  - '!node_modules/[@]tesseract.js-data/**/*'
 extraResources:
   - from: build/icon.png
     to: icon.png
+  - from: node_modules/financial-tracker-ocr-models
+    to: ocr-models
 asar: true
 asarUnpack:
   - node_modules/better-sqlite3/**/*.node
   - node_modules/sharp/**/*
   - node_modules/@img/**/*
+  # Tesseract starts its Node adapter with worker_threads; worker code, WASM,
+  # and its runtime dependency graph must be addressable outside app.asar.
+  - node_modules/tesseract.js/**/*
+  - node_modules/tesseract.js-core/**/*
+  - node_modules/bmp-js/**/*
+  - node_modules/idb-keyval/**/*
+  - node_modules/is-url/**/*
+  - node_modules/node-fetch/**/*
+  - node_modules/regenerator-runtime/**/*
+  - node_modules/tr46/**/*
+  - node_modules/wasm-feature-detect/**/*
+  - node_modules/webidl-conversions/**/*
+  - node_modules/whatwg-url/**/*
+  - node_modules/zlibjs/**/*
 # better-sqlite3 ships a Node-API binary; do not run its legacy node-gyp script.
 npmRebuild: false
 win:

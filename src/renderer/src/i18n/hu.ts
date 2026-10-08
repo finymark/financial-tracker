@@ -183,6 +183,13 @@ export const hu = {
   'receipts.back': 'Vissza a nyugta beérkezőkhöz',
   'receipts.confirm': 'Tranzakció megerősítése',
   'receipts.discard': 'Elvetés',
+  'receipts.reading':
+    'A nyugta olvasása folyamatban… Kézzel továbbra is kitölthető.',
+  'receipts.ocrPrefilled': 'OCR-rel beolvasva',
+  'receipts.ocrLowConfidence':
+    'Az OCR bizonytalan. Ellenőrizd az összes előre kitöltött mezőt.',
+  'receipts.currencyMismatch':
+    'Nincs a felismert pénznemhez tartozó aktív számla:',
   'receipts.source.drop': 'Az alkalmazásba behúzva',
   'receipts.source.folder': 'Figyelt mappa',
   'receipts.source.phone': 'Telefonos feltöltés',

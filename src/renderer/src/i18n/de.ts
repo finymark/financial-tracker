@@ -193,6 +193,13 @@ export const de = {
   'receipts.back': 'Zurück zum Belegeingang',
   'receipts.confirm': 'Transaktion bestätigen',
   'receipts.discard': 'Verwerfen',
+  'receipts.reading':
+    'Beleg wird gelesen… Manuelle Eingabe ist weiterhin möglich.',
+  'receipts.ocrPrefilled': 'durch OCR gelesen',
+  'receipts.ocrLowConfidence':
+    'Die OCR-Sicherheit ist niedrig. Bitte alle vorausgefüllten Felder prüfen.',
+  'receipts.currencyMismatch':
+    'Kein aktives Konto entspricht der erkannten Währung:',
   'receipts.source.drop': 'In die App gezogen',
   'receipts.source.folder': 'Überwachter Ordner',
   'receipts.source.phone': 'Vom Telefon hochgeladen',

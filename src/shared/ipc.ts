@@ -126,6 +126,7 @@ import type {
   IntakeReceiptInput,
   Receipt,
   ReceiptIdInput,
+  ReceiptPrefill,
   ReceiptPreviewInput,
 } from './receipts'
 
@@ -238,6 +239,7 @@ export const IPC_CHANNELS = {
   receiptsList: 'receipts:list',
   receiptsCount: 'receipts:count',
   receiptsDefaultAccount: 'receipts:default-account',
+  receiptsPrefill: 'receipts:prefill',
   receiptsConfirm: 'receipts:confirm',
   receiptsDiscard: 'receipts:discard',
   receiptsPreview: 'receipts:preview',
@@ -267,6 +269,7 @@ export interface AppBridge {
     list(): Promise<Receipt[]>
     count(): Promise<number>
     defaultAccountId(): Promise<string | null>
+    prefill(input: ReceiptIdInput): Promise<ReceiptPrefill>
     confirm(input: ConfirmReceiptInput): Promise<ConfirmedReceipt>
     discard(input: ReceiptIdInput): Promise<Receipt>
     preview(input: ReceiptPreviewInput): Promise<string>

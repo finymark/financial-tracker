@@ -17,11 +17,14 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "prepare": "husky",
+    "prepare": "node scripts/stage-ocr-models.mjs && husky",
     "guard": "node scripts/check-files.mjs",
     "dist:win": "npm run build && electron-builder --win nsis --publish never"
   },
   "dependencies": {
+    "@tesseract.js-data/deu": "1.0.0",
+    "@tesseract.js-data/eng": "1.0.0",
+    "@tesseract.js-data/hun": "1.0.0",
     "better-sqlite3": "13.0.3",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
@@ -33,7 +36,9 @@
     "react-is": "19.3.0",
     "recharts": "3.10.1",
     "sharp": "0.35.5",
-    "tailwind-merge": "3.7.0"
+    "tailwind-merge": "3.7.0",
+    "tesseract.js": "7.0.0",
+    "tesseract.js-core": "7.0.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",
@@ -62,6 +67,7 @@
     "better-sqlite3": false,
     "electron": false,
     "esbuild": false,
-    "electron-winstaller": false
+    "electron-winstaller": false,
+    "tesseract.js": false
   }
 }
