@@ -1,5 +1,8 @@
 import type Database from 'better-sqlite3'
-import type { ExactBaseCurrencyAmount } from '../../shared/exchange-rates'
+import type {
+  BaseCurrencyConversion,
+  ExactBaseCurrencyAmount,
+} from '../../shared/exchange-rates'
 import type {
   CategoryBreakdownReport,
   SpendingPaceComparison,
@@ -13,7 +16,7 @@ import {
   roundHalfAwayFromZero,
 } from '../../shared/exact-math'
 import { getCategoryBreakdown } from './profile-reports'
-import { convertToBaseCurrency } from './profile-exchange-rates'
+import { baseCurrency } from './profile-exchange-rates'
 import { monthEnd } from './period-date-range'
 
 function compare(
@@ -97,7 +100,13 @@ export function getSpendingPace(
       }),
     )
   }
-  const empty = convertToBaseCurrency(database, [])
+  const empty: BaseCurrencyConversion = {
+    baseCurrency: baseCurrency(database),
+    exactTotal: { numerator: '0', denominator: '1' },
+    roundedMinor: 0,
+    unconverted: [],
+    stale: false,
+  }
   // Include categories used only in the comparison months as well as current ones.
   const categories = new Map(
     [

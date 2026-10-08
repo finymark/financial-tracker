@@ -1077,7 +1077,9 @@ class OpenProfileApplication implements ProfileApplication {
         ),
       undoLast: () => {
         this.#assertAvailable()
-        return this.#undoHistory.undoLast(this.#database)
+        const undone = this.#undoHistory.undoLast(this.#database)
+        if (undone) this.#maybeRefreshExchangeRates()
+        return undone
       },
       deleteCategory: (input) =>
         this.#executeUndoableCommand(
@@ -1498,30 +1500,36 @@ class OpenProfileApplication implements ProfileApplication {
       (operation) => this.#executeBackgroundWrite(operation),
     ).finally(() => {
       if (this.#pendingRateRefresh === pending) this.#pendingRateRefresh = null
+      if (this.#rateRefreshRequested) {
+        this.#rateRefreshRequested = false
+        this.#maybeRefreshExchangeRates()
+      }
     })
     this.#pendingRateRefresh = pending
     return pending
   }
 
   #maybeRefreshExchangeRates(): void {
-    const source = this.#options.exchangeRateSource
-    if (!source || !needsExchangeRateRefresh(this.#database)) return
-    if (this.#pendingRateRefresh) {
-      this.#rateRefreshRequested = true
-      return
+    if (!this.#database.open || this.#restoring) return
+    const logger = this.#options.logger ?? console
+    try {
+      const source = this.#options.exchangeRateSource
+      if (!source || !needsExchangeRateRefresh(this.#database, this.#clock))
+        return
+      if (this.#pendingRateRefresh) {
+        this.#rateRefreshRequested = true
+        return
+      }
+      void this.#refreshExchangeRates(source)
+        .finally(() => {
+          this.#options.onRateStatusChanged?.()
+        })
+        .catch((error: unknown) => {
+          logger.error('Exchange-rate refresh failed', error)
+        })
+    } catch (error) {
+      logger.error('Exchange-rate refresh failed', error)
     }
-    void this.#refreshExchangeRates(source)
-      .catch((error: unknown) => {
-        const logger = this.#options.logger ?? console
-        logger.error('Exchange-rate refresh failed', error)
-      })
-      .finally(() => {
-        this.#options.onRateStatusChanged?.()
-        if (this.#rateRefreshRequested) {
-          this.#rateRefreshRequested = false
-          this.#maybeRefreshExchangeRates()
-        }
-      })
   }
 
   #executeUndoableCommand<BeforeImage, AfterImage, Result>(

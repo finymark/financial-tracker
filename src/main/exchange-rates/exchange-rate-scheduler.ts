@@ -66,8 +66,9 @@ export class ExchangeRateScheduler {
     }
     const existing = this.#pending.get(application)
     if (existing) return existing
-    const refresh = application.commands
-      .refreshExchangeRates(this.#source)
+    const refresh = (async () => {
+      await application.commands.refreshExchangeRates(this.#source)
+    })()
       .catch((error: unknown) => {
         this.#logger.error('Exchange-rate refresh failed', error)
       })

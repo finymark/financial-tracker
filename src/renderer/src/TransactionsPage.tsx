@@ -1,3 +1,4 @@
+import { reportFlagsForCategory } from './lib/transaction-report-filter'
 import type { Currency } from '../../shared/accounts'
 import type { CreateCategorisationRuleInput } from '../../shared/rules'
 import { CreateRuleDialog } from './components/create-rule-dialog'
@@ -53,13 +54,13 @@ export function TransactionsPage({
   onTransactionChanged,
   initialReportFilter,
 }: TransactionsPageProps) {
-  const [reportFlags, setReportFlags] = useState<
-    Pick<TransactionListInput, 'kind' | 'uncategorized' | 'exactCategory'>
-  >({
-    kind: initialReportFilter?.kind,
-    uncategorized: initialReportFilter?.uncategorized,
-    exactCategory: initialReportFilter?.exactCategory,
-  })
+  const [reportFilterActive, setReportFilterActive] = useState(
+    Boolean(
+      initialReportFilter?.kind ||
+      initialReportFilter?.uncategorized ||
+      initialReportFilter?.exactCategory,
+    ),
+  )
   const [page, setPage] = useState<TransactionPage>({
     rows: [],
     totals: [],
@@ -176,6 +177,16 @@ export function TransactionsPage({
   }, [request, revision, language, undoRevision, pageKey])
   function applyFilters(event: FormEvent) {
     event.preventDefault()
+    const reportFlags = reportFilterActive
+      ? reportFlagsForCategory(request, filters.categoryId)
+      : {}
+    setReportFilterActive(
+      Boolean(
+        reportFlags.kind ||
+        reportFlags.uncategorized ||
+        reportFlags.exactCategory,
+      ),
+    )
     setRequest({
       period: filters.period,
       ...(filters.period === 'custom'
@@ -193,22 +204,23 @@ export function TransactionsPage({
     })
   }
 
-  const reportFilterParts = initialReportFilter
+  const reportFilterParts = reportFilterActive
     ? [
-        reportFlags.uncategorized
+        request.uncategorized
           ? t('reports.uncategorized')
-          : filters.categoryId
-            ? categories.find((category) => category.id === filters.categoryId)
+          : request.categoryId
+            ? categories.find((category) => category.id === request.categoryId)
                 ?.name
             : null,
-        reportFlags.kind
-          ? t(`reports.transactionFilter.${reportFlags.kind}`)
+        request.exactCategory
+          ? t('reports.transactionFilter.exactCategory')
           : null,
+        request.kind ? t(`reports.transactionFilter.${request.kind}`) : null,
       ].filter((part): part is string => Boolean(part))
     : []
 
   function clearReportFlags() {
-    setReportFlags({})
+    setReportFilterActive(false)
     setRequest((current) => {
       const next = { ...current }
       delete next.kind
@@ -298,7 +310,7 @@ export function TransactionsPage({
         className="grid gap-3 rounded-md border p-3 sm:grid-cols-3 lg:grid-cols-6"
         aria-label={t('transactions.filters')}
       >
-        {reportFilterParts.length > 0 && (
+        {reportFilterActive && (
           <div className="flex items-center gap-2 self-end text-xs text-muted-foreground sm:col-span-3 lg:col-span-6">
             <span className="rounded-full border bg-muted px-3 py-1">
               {t('reports.transactionFilter')} {reportFilterParts.join(', ')}

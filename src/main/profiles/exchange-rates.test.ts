@@ -2,7 +2,11 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, test, vi } from 'vitest'
-import type { ExchangeRateSource } from '../exchange-rates/exchange-rate-source'
+import type {
+  ExchangeRate,
+  ExchangeRateSource,
+} from '../exchange-rates/exchange-rate-source'
+import { ExchangeRateScheduler } from '../exchange-rates/exchange-rate-scheduler'
 import {
   openProfileApplication,
   type ProfileApplication,
@@ -17,6 +21,7 @@ const clock = () => now
 async function setup(
   baseCurrency: 'HUF' | 'CHF' = 'HUF',
   exchangeRateSource?: ExchangeRateSource,
+  logger?: Pick<Console, 'error'>,
 ) {
   const directory = mkdtempSync(join(tmpdir(), 'financial-tracker-rates-'))
   directories.push(directory)
@@ -27,6 +32,7 @@ async function setup(
     paths: registry.getProfilePaths(profile.id),
     clock,
     exchangeRateSource,
+    logger,
   })
   applications.push(application)
   application.commands.updateSettings({ baseCurrency })
@@ -440,3 +446,303 @@ test('transaction totals include one rounded base-currency total and explicit un
     stale: false,
   })
 })
+
+function controlledSource() {
+  const calls: Parameters<ExchangeRateSource['fetchRates']>[0][] = []
+  const pending: {
+    resolve(rates: ExchangeRate[]): void
+    reject(error: Error): void
+  }[] = []
+  const value: ExchangeRateSource = {
+    fetchRates(input) {
+      calls.push(input)
+      return new Promise((resolve, reject) => pending.push({ resolve, reject }))
+    },
+  }
+  return { value, calls, pending }
+}
+
+test('drains a backdated write queued during a scheduler-started refresh', async () => {
+  const fake = controlledSource()
+  const application = await setup('HUF', fake.value)
+  const account = application.commands.createAccount({
+    name: 'CHF',
+    currency: 'CHF',
+    openingBalance: 0,
+    openingDate: '2026-08-24',
+  })
+  fake.pending.shift()!.resolve([
+    { date: '2026-08-24', currency: 'CHF', rate: '400', unit: 1 },
+    { date: '2026-08-25', currency: 'CHF', rate: '400', unit: 1 },
+  ])
+  await vi.waitFor(() =>
+    expect(application.queries.getRateStatus().coverage?.endDate).toBe(
+      '2026-08-25',
+    ),
+  )
+  now = new Date('2026-08-26T10:00:00.000Z')
+  const scheduler = new ExchangeRateScheduler(
+    { getActiveApplication: () => application },
+    fake.value,
+  )
+  const refresh = scheduler.refreshActive()
+  application.commands.createTransaction({
+    accountId: account.id,
+    kind: 'expense',
+    date: '2026-07-01',
+    totalMinor: 100,
+    payeeName: null,
+    categoryId: null,
+    note: '',
+  })
+  expect(fake.calls).toHaveLength(2)
+  fake.pending
+    .shift()!
+    .resolve([{ date: '2026-08-26', currency: 'CHF', rate: '400', unit: 1 }])
+  await refresh
+  await vi.waitFor(() => expect(fake.calls).toHaveLength(3))
+  expect(fake.calls[2]).toEqual({
+    startDate: '2026-06-17',
+    endDate: '2026-08-09',
+    currencies: ['CHF'],
+  })
+  fake.pending
+    .shift()!
+    .resolve([{ date: '2026-06-30', currency: 'CHF', rate: '400', unit: 1 }])
+  await vi.waitFor(() =>
+    expect(application.queries.getRateStatus().missing).toBe(false),
+  )
+  expect(application.queries.listTransactions().baseTotals).toMatchObject({
+    expenseMinor: 40_000,
+    unconverted: [],
+  })
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTransactions().rows).toEqual([])
+})
+
+test.each(['close', 'restore'] as const)(
+  'does not reject in the background when a queued refresh settles during %s',
+  async (lifecycle) => {
+    const fake = controlledSource()
+    const logger = { error: vi.fn() }
+    const application = await setup('HUF', fake.value, logger)
+    const account = application.commands.createAccount({
+      name: 'CHF',
+      currency: 'CHF',
+      openingBalance: 0,
+      openingDate: '2026-08-24',
+    })
+    application.commands.createTransaction({
+      accountId: account.id,
+      kind: 'expense',
+      date: '2026-07-01',
+      totalMinor: 100,
+      payeeName: null,
+      categoryId: null,
+      note: '',
+    })
+    const unhandled = vi.fn()
+    process.on('unhandledRejection', unhandled)
+    try {
+      let restoring: Promise<void> | undefined
+      if (lifecycle === 'close') application.close()
+      else
+        restoring = application.commands.restoreBackup({
+          backupId: application.queries.listBackups()[0].id,
+          confirmed: true,
+        })
+      fake.pending
+        .shift()!
+        .resolve([
+          { date: '2026-08-25', currency: 'CHF', rate: '400', unit: 1 },
+        ])
+      await vi.waitFor(() =>
+        expect(logger.error).toHaveBeenCalledWith(
+          'Exchange-rate refresh failed',
+          expect.objectContaining({
+            message:
+              lifecycle === 'close'
+                ? 'Profile is closed'
+                : 'Profile restore is in progress',
+          }),
+        ),
+      )
+      await restoring
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(unhandled).not.toHaveBeenCalled()
+      expect(fake.calls).toHaveLength(1)
+      if (lifecycle === 'restore')
+        expect(application.queries.listAccounts()).toEqual([])
+    } finally {
+      process.off('unhandledRejection', unhandled)
+    }
+  },
+)
+
+test('scheduler logs a closed profile refresh without rejecting', async () => {
+  const application = await setup()
+  application.close()
+  const logger = { error: vi.fn() }
+  const scheduler = new ExchangeRateScheduler(
+    { getActiveApplication: () => application },
+    source([]).value,
+    { logger },
+  )
+  await expect(scheduler.refreshActive()).resolves.toBeUndefined()
+  expect(logger.error).toHaveBeenCalledWith(
+    'Exchange-rate refresh failed',
+    expect.objectContaining({ message: 'Profile is closed' }),
+  )
+})
+
+test('a write refreshes coverage that ends before yesterday', async () => {
+  const fake = controlledSource()
+  const application = await setup('HUF', fake.value)
+  const account = application.commands.createAccount({
+    name: 'CHF',
+    currency: 'CHF',
+    openingBalance: 0,
+    openingDate: '2026-08-24',
+  })
+  fake.pending.shift()!.resolve([
+    { date: '2026-08-24', currency: 'CHF', rate: '400', unit: 1 },
+    { date: '2026-08-25', currency: 'CHF', rate: '400', unit: 1 },
+  ])
+  await vi.waitFor(() =>
+    expect(application.queries.getRateStatus().coverage?.endDate).toBe(
+      '2026-08-25',
+    ),
+  )
+  now = new Date('2026-08-27T10:00:00.000Z')
+  application.commands.createTransaction({
+    accountId: account.id,
+    kind: 'expense',
+    date: '2026-08-27',
+    totalMinor: 100,
+    payeeName: null,
+    categoryId: null,
+    note: '',
+  })
+  expect(fake.calls.at(-1)).toMatchObject({
+    startDate: '2026-08-26',
+    endDate: '2026-08-27',
+  })
+  fake.pending
+    .shift()!
+    .resolve([{ date: '2026-08-27', currency: 'CHF', rate: '401', unit: 1 }])
+  await vi.waitFor(() =>
+    expect(application.queries.getRateStatus().stale).toBe(false),
+  )
+  expect(application.queries.listTransactions().baseTotals).toMatchObject({
+    expenseMinor: 40_100,
+    stale: false,
+  })
+})
+
+test('a write inside coverage repairs a left-edge gap with a previous published rate', async () => {
+  const fake = controlledSource()
+  const application = await setup('HUF', fake.value)
+  const account = application.commands.createAccount({
+    name: 'CHF',
+    currency: 'CHF',
+    openingBalance: 0,
+    openingDate: '2026-08-24',
+  })
+  fake.pending.shift()!.resolve([
+    { date: '2026-08-24', currency: 'CHF', rate: '400', unit: 1 },
+    { date: '2026-08-25', currency: 'CHF', rate: '400', unit: 1 },
+  ])
+  await vi.waitFor(() =>
+    expect(application.queries.getRateStatus().coverage?.endDate).toBe(
+      '2026-08-25',
+    ),
+  )
+  application.commands.createTransaction({
+    accountId: account.id,
+    kind: 'expense',
+    date: '2026-08-15',
+    totalMinor: 100,
+    payeeName: null,
+    categoryId: null,
+    note: '',
+  })
+  expect(fake.calls.at(-1)).toMatchObject({
+    startDate: '2026-08-01',
+    endDate: '2026-08-15',
+  })
+  expect(application.queries.getRateStatus().missing).toBe(true)
+  fake.pending
+    .shift()!
+    .resolve([{ date: '2026-08-14', currency: 'CHF', rate: '400', unit: 1 }])
+  await vi.waitFor(() =>
+    expect(application.queries.getRateStatus().missing).toBe(false),
+  )
+  expect(application.queries.listTransactions().baseTotals).toMatchObject({
+    expenseMinor: 40_000,
+    unconverted: [],
+  })
+})
+
+test.each(['transaction', 'account'] as const)(
+  'undo refreshes an older CHF %s restored into a left-edge gap',
+  async (aggregate) => {
+    const fake = controlledSource()
+    const logger = { error: vi.fn() }
+    const application = await setup('HUF', fake.value, logger)
+    const account = application.commands.createAccount({
+      name: 'CHF',
+      currency: 'CHF',
+      openingBalance: 0,
+      openingDate: '2026-08-24',
+    })
+    fake.pending.shift()!.resolve([
+      { date: '2026-08-24', currency: 'CHF', rate: '400', unit: 1 },
+      { date: '2026-08-25', currency: 'CHF', rate: '400', unit: 1 },
+    ])
+    await vi.waitFor(() =>
+      expect(application.queries.getRateStatus().coverage?.endDate).toBe(
+        '2026-08-25',
+      ),
+    )
+    const older =
+      aggregate === 'transaction'
+        ? application.commands.createTransaction({
+            accountId: account.id,
+            kind: 'expense',
+            date: '2026-08-15',
+            totalMinor: 100,
+            payeeName: null,
+            categoryId: null,
+            note: '',
+          })
+        : application.commands.createAccount({
+            name: 'Older CHF',
+            currency: 'CHF',
+            openingBalance: 100,
+            openingDate: '2026-08-15',
+          })
+    fake.pending.shift()!.reject(new Error('offline'))
+    await vi.waitFor(() => expect(logger.error).toHaveBeenCalledTimes(1))
+    if (aggregate === 'transaction')
+      application.commands.deleteTransaction(older.id)
+    else application.commands.deleteAccount(older.id)
+    expect(application.queries.getRateStatus().missing).toBe(false)
+    expect(application.commands.undoLast()).toBe(true)
+    expect(fake.calls).toHaveLength(3)
+    fake.pending
+      .shift()!
+      .resolve([{ date: '2026-08-14', currency: 'CHF', rate: '400', unit: 1 }])
+    await vi.waitFor(() =>
+      expect(application.queries.getRateStatus().missing).toBe(false),
+    )
+    expect(
+      application.queries.convertToBaseCurrency([
+        { date: '2026-08-15', currency: 'CHF', amountMinor: 100 },
+      ]),
+    ).toMatchObject({ roundedMinor: 40_000, unconverted: [] })
+    expect(application.commands.undoLast()).toBe(true)
+    if (aggregate === 'transaction')
+      expect(application.queries.listTransactions().rows).toEqual([])
+    else expect(application.queries.listAccounts()).toHaveLength(1)
+  },
+)
