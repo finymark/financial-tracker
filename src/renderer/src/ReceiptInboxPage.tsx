@@ -19,6 +19,7 @@ import { createFormatters } from './i18n'
 import { matchShortcut } from './lib/shortcuts'
 import { shortcutTargetContext } from './lib/shortcut-context'
 import { today } from '../../shared/date'
+import { PhoneUploadDialog } from './components/phone-upload-dialog'
 
 interface Props {
   language: Language
@@ -88,7 +89,9 @@ export function ReceiptInboxPage({
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<MessageKey | null>(null)
+  const [showPhoneUpload, setShowPhoneUpload] = useState(false)
   const amountRef = useRef<HTMLInputElement>(null)
+  const phoneUploadRef = useRef<HTMLButtonElement>(null)
   const references = useTransactionReferenceData(0, language, undoRevision)
   const format = createFormatters(language)
 
@@ -451,6 +454,11 @@ export function ReceiptInboxPage({
 
   return (
     <CardContent className="space-y-4">
+      <div className="flex justify-end">
+        <Button ref={phoneUploadRef} onClick={() => setShowPhoneUpload(true)}>
+          {t('phoneUpload.title')}
+        </Button>
+      </div>
       {loading ? (
         <p role="status" className="text-sm text-muted-foreground">
           {t('receipts.loading')}
@@ -501,6 +509,13 @@ export function ReceiptInboxPage({
         <p role="alert" className="text-sm font-medium text-error">
           {t(error)}
         </p>
+      )}
+      {showPhoneUpload && (
+        <PhoneUploadDialog
+          t={t}
+          triggerRef={phoneUploadRef}
+          onClose={() => setShowPhoneUpload(false)}
+        />
       )}
     </CardContent>
   )

@@ -665,6 +665,21 @@ export const en = {
   'settings.preview': 'Formatting preview',
   'settings.date': 'Date',
   'settings.number': 'Number',
+  'phoneUpload.title': 'Upload from phone',
+  'phoneUpload.starting': 'Starting the private network upload…',
+  'phoneUpload.noPrivateNetwork':
+    'Not connected to a private network. Connect this PC to your private Wi-Fi and try again.',
+  'phoneUpload.error': 'Phone upload could not be started. Try again.',
+  'phoneUpload.interface': 'Private network connection',
+  'phoneUpload.qrAlt': 'QR code for the phone upload address',
+  'phoneUpload.address': 'Or open this address on your phone',
+  'phoneUpload.expiresIn': 'Stops automatically in {time}',
+  'phoneUpload.expired': 'This upload session has stopped.',
+  'phoneUpload.uploaded': '{count} uploaded',
+  'phoneUpload.firewallTitle': 'Windows firewall',
+  'phoneUpload.firewallGuidance':
+    'Windows may ask to allow “Financial Tracker”. Allow it on Private networks only. If the phone cannot connect, make sure both devices use the same Wi-Fi and the Windows network is set to Private.',
+  'phoneUpload.close': 'Close',
 }
 
 export type MessageKey = keyof typeof en

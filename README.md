@@ -210,10 +210,11 @@ Get-Content $log
 $process.ExitCode
 ```
 
-It must print `SQLite smoke test OK`, then `Image smoke test OK`, and exit 0.
+It must print `SQLite smoke test OK`, `Image smoke test OK`, then
+`QR smoke test OK`, and exit 0.
 The flag opens a temporary file-backed database, runs a query, and processes a
-tiny in-memory image with Sharp before cleaning up and exiting without opening a
-window or reading profiles. For an installed-artifact check, silently
+tiny in-memory image with Sharp, then renders a QR code before cleaning up and
+exiting without opening a window or reading profiles. For an installed-artifact check, silently
 install `Financial Tracker Setup <version>.exe` with `/S /D=<temporary-directory>`
 (the directory argument must be last), then run the installed executable with
 `--smoke-test`. Uninstall that temporary installation afterwards. Do not use this
@@ -416,7 +417,8 @@ and light/dark mode where applicable:
    `release/win-unpacked/Financial Tracker.exe`, and repeat shortcut, tray,
    profile-picker, Enter/Esc, privacy, and conflict checks. Then run
    `release/win-unpacked/Financial Tracker.exe --smoke-test`; it must print
-   `SQLite smoke test OK`, then `Image smoke test OK`, and exit 0.
+   `SQLite smoke test OK`, `Image smoke test OK`, then `QR smoke test OK`, and
+   exit 0.
 
 ## Exchange rates and base-currency conversion
 
@@ -813,7 +815,8 @@ and verify the attachment opens again.
 
 Build with `npx electron-builder --win nsis --publish never`, then run
 `"release/win-unpacked/Financial Tracker.exe" --smoke-test`. It must print
-`SQLite smoke test OK` followed by `Image smoke test OK` and exit successfully.
+`SQLite smoke test OK`, `Image smoke test OK`, then `QR smoke test OK` and exit
+successfully.
 
 ## Receipt inbox
 
@@ -844,6 +847,32 @@ translated rejection. With the transaction drawer open, drop an image on its
 attachment drop zone and verify it attaches to that transaction instead of
 entering the receipt inbox. Repeat in HU/EN/DE, using only the keyboard where
 applicable, and check light/dark and narrow-window layouts.
+
+### Phone upload
+
+Choose **Upload from phone** in the **Receipt inbox** to start a temporary HTTP
+server on a private IPv4 network connection. The dialog shows the local address
+and a QR code, and offers a connection picker when the PC has several eligible
+private interfaces. The page accepts JPEG, PNG, and WebP photos directly into
+the open profile's receipt inbox. Its random 256-bit URL token remains valid for
+the batch, while the server limits each photo to 25 MB, accepts at most two
+uploads concurrently and 50 in one session, and stops after 10 minutes, when
+the dialog closes, when the profile changes, or when the app quits. No receipt
+is sent to a cloud service.
+
+#### Manual phone-upload check
+
+Run `npm run dev` with synthetic images only and put a phone and the PC on the
+same private Wi-Fi. Open **Receipt inbox → Upload from phone**, scan the QR code
+with the phone, and if Windows shows a firewall prompt, allow **Financial
+Tracker** on **Private networks only**. Take or select several JPEG/PNG/WebP
+photos in one batch and verify each result on the phone page, the dialog's
+uploaded count, and the inbox list/sidebar counter. Try a non-image file and
+verify the phone page reports rejection without adding it. Close the dialog and
+verify its URL no longer connects; repeat and leave it open for 10 minutes to
+verify automatic shutdown. If the phone cannot connect, confirm both devices
+use the same Wi-Fi and Windows marks the network as Private. Repeat in HU/EN/DE
+and, where available, choose each listed private network interface.
 
 ### Manual Categorisation rules check
 
@@ -1461,8 +1490,9 @@ window lifecycle are manual checks, not covered by the unit suite.
 
 1. Run `npm run build`, then `npx electron-builder --win nsis --publish never`.
    Run `"release/win-unpacked/Financial Tracker.exe" --smoke-test` and also with
-   `--hidden --smoke-test`: both must print **SQLite smoke test OK** followed by
-   **Image smoke test OK** and exit with code 0 without a tray icon or window.
+   `--hidden --smoke-test`: both must print **SQLite smoke test OK**, **Image
+   smoke test OK**, then **QR smoke test OK** and exit with code 0 without a tray
+   icon or window.
    Repeat the smoke test while a normal
    instance is running to check it does not acquire/block the single-instance
    lock or steal focus. Install the generated NSIS installer from `release/`.

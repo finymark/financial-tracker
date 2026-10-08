@@ -2,6 +2,19 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 
 const bridge: AppBridge = {
+  phoneUpload: {
+    start: (input) => ipcRenderer.invoke(IPC_CHANNELS.phoneUploadStart, input),
+    stop: (input) => ipcRenderer.invoke(IPC_CHANNELS.phoneUploadStop, input),
+    onReceived: (listener) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        received: Parameters<typeof listener>[0],
+      ) => listener(received)
+      ipcRenderer.on(IPC_CHANNELS.phoneUploadReceived, handler)
+      return () =>
+        ipcRenderer.removeListener(IPC_CHANNELS.phoneUploadReceived, handler)
+    },
+  },
   files: {
     path: (file) => webUtils.getPathForFile(file),
   },
