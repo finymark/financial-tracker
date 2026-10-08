@@ -36,6 +36,7 @@ export interface CategorisationRulesImage {
 
 export function captureCategorisationRules(
   database: Database.Database,
+  categoryId?: string,
 ): CategorisationRulesImage | null {
   return {
     rules: database
@@ -46,24 +47,36 @@ export function captureCategorisationRules(
           amount_currency AS amountCurrency, action_payee_id AS actionPayeeId,
           category_id AS categoryId, created_at AS createdAt,
           updated_at AS updatedAt
-         FROM categorisation_rules ORDER BY sort_order, rowid`,
+         FROM categorisation_rules ${categoryId === undefined ? '' : 'WHERE category_id = ?'} ORDER BY sort_order, rowid`,
       )
-      .all() as StoredRuleImage[],
+      .all(
+        ...(categoryId === undefined ? [] : [categoryId]),
+      ) as StoredRuleImage[],
     tags: database
       .prepare(
         `SELECT rule_id AS ruleId, tag_id AS tagId
-         FROM categorisation_rule_tags ORDER BY rule_id, tag_id`,
+         FROM categorisation_rule_tags ${categoryId === undefined ? '' : 'WHERE rule_id IN (SELECT id FROM categorisation_rules WHERE category_id = ?)'} ORDER BY rule_id, tag_id`,
       )
-      .all() as { ruleId: string; tagId: string }[],
+      .all(...(categoryId === undefined ? [] : [categoryId])) as {
+      ruleId: string
+      tagId: string
+    }[],
   }
 }
 
 export function restoreCategorisationRules(
   database: Database.Database,
   image: CategorisationRulesImage | null,
+  replaceAll = true,
 ): void {
   if (image === null) return
-  database.prepare('DELETE FROM categorisation_rules').run()
+  if (replaceAll) database.prepare('DELETE FROM categorisation_rules').run()
+  else {
+    const remove = database.prepare(
+      'DELETE FROM categorisation_rules WHERE id = ?',
+    )
+    for (const rule of image.rules) remove.run(rule.id)
+  }
   const insertRule = database.prepare(
     `INSERT INTO categorisation_rules
      (id, enabled, sort_order, payee_id, text_contains, account_id,

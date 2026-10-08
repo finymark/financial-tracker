@@ -10,7 +10,7 @@ import {
   Scale,
   Trash2,
 } from 'lucide-react'
-import type { Account } from '../../../shared/accounts'
+import type { AccountOption } from '../../../shared/accounts'
 import type { Category } from '../../../shared/categories'
 import type {
   Transaction,
@@ -25,7 +25,7 @@ import { Button } from './ui/button'
 
 interface Props {
   page: TransactionPage
-  accounts: Account[]
+  accounts: AccountOption[]
   categories: Category[]
   language: Language
   t(key: MessageKey): string

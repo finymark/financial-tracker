@@ -22,6 +22,7 @@ import {
   type RuleForm,
 } from './rule-editor'
 import { amountInput } from '../lib/amount-input-value'
+import { createFormatters } from '../i18n'
 
 interface RuleSettingsProps {
   disabled: boolean
@@ -50,6 +51,7 @@ export function RuleSettings({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<MessageKey | null>(null)
   const locked = disabled || loading || busy
+  const format = createFormatters(language)
 
   async function load() {
     return Promise.all([
@@ -225,9 +227,9 @@ export function RuleSettings({
                   {rule.accountId &&
                     `${t('rules.account')}: ${accountName(rule.accountId)}; `}
                   {rule.minAmountMinor !== null &&
-                    `${t('rules.minimum')}: ${amountInput(rule.minAmountMinor)}; `}
+                    `${t('rules.minimum')}: ${format.money(rule.minAmountMinor, rule.amountCurrency!)}; `}
                   {rule.maxAmountMinor !== null &&
-                    `${t('rules.maximum')}: ${amountInput(rule.maxAmountMinor)}; `}
+                    `${t('rules.maximum')}: ${format.money(rule.maxAmountMinor, rule.amountCurrency!)}; `}
                   {rule.actionPayeeName &&
                     `${t('rules.payeeAction')}: ${rule.actionPayeeName}; `}
                   {t('rules.action')}: {categoryName(rule.categoryId)}

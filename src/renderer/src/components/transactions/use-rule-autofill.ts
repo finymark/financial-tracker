@@ -5,7 +5,7 @@ import {
   type SetStateAction,
   type RefObject,
 } from 'react'
-import type { Account } from '../../../../shared/accounts'
+import type { AccountOption } from '../../../../shared/accounts'
 import { parseAmountExpression } from '../../../../shared/amount-expression'
 import {
   mergeRuleAutofill,
@@ -16,7 +16,7 @@ import type { DrawerForm } from './transaction-form'
 export function useRuleAutofill(
   form: DrawerForm | null,
   setForm: Dispatch<SetStateAction<DrawerForm | null>>,
-  accounts: Account[],
+  accounts: AccountOption[],
   autofillProtected: RefObject<ProtectedAutofillFields>,
   focusRevision: number,
 ) {

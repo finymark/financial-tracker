@@ -517,3 +517,74 @@ test('category IDs and commands stay isolated between profiles', async () => {
       .find((entry) => entry.id === category.id),
   ).toEqual(category)
 })
+
+test('reorder undo restores sibling order without changing categorised lines, templates or rules', async () => {
+  const { application } = await setup()
+  const before = application.queries.listCategories()
+  const account = application.commands.createAccount({
+    name: 'Cash',
+    currency: 'HUF',
+    openingBalance: 0,
+    openingDate: '2026-01-01',
+  })
+  const food = before.find((category) => category.seedKey === 'expense.food')!
+  const restaurant = before.find(
+    (category) => category.seedKey === 'expense.food.restaurant',
+  )!
+  const salary = before.find(
+    (category) => category.seedKey === 'income.salary',
+  )!
+  const transaction = application.commands.createTransaction({
+    accountId: account.id,
+    kind: 'expense',
+    date: '2026-01-15',
+    totalMinor: 300,
+    payeeName: null,
+    categoryId: null,
+    note: '',
+    lines: [
+      {
+        amountMinor: 100,
+        categoryId: food.id,
+        note: 'Main',
+        tagNames: ['Trip'],
+      },
+      {
+        amountMinor: 200,
+        categoryId: restaurant.id,
+        note: 'Child',
+        tagNames: [],
+      },
+    ],
+  })
+  const template = application.commands.createTemplate({
+    name: 'Income',
+    categoryId: salary.id,
+    tagNames: ['Trip'],
+  })
+  const rule = application.commands.createCategorisationRule({
+    enabled: true,
+    payeeId: null,
+    textContains: 'Dinner',
+    accountId: null,
+    minAmountMinor: null,
+    maxAmountMinor: null,
+    categoryId: restaurant.id,
+    tagIds: [transaction.lines[0].tags[0].id],
+  })
+  const categories = application.queries.listCategories()
+  for (const [id, sortOrder] of [
+    [restaurant.id, 0],
+    [food.id, 1],
+  ] as const) {
+    application.commands.reorderCategory({ id, sortOrder })
+    expect(
+      application.queries.listCategories().map((category) => category.id),
+    ).not.toEqual(categories.map((category) => category.id))
+    expect(application.commands.undoLast()).toBe(true)
+    expect(application.queries.listCategories()).toEqual(categories)
+    expect(application.queries.listTransactions().rows).toEqual([transaction])
+    expect(application.queries.listTemplates()).toEqual([template])
+    expect(application.queries.listCategorisationRules()).toEqual([rule])
+  }
+})

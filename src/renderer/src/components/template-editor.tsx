@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import type { Account } from '../../../shared/accounts'
+import type { AccountOption } from '../../../shared/accounts'
 import type { Category } from '../../../shared/categories'
 import type {
   CreateTemplateInput,
@@ -16,7 +16,7 @@ import { NativeSelect } from './ui/native-select'
 
 interface Props {
   template?: TransactionTemplate
-  accounts: Account[]
+  accounts: AccountOption[]
   categories: Category[]
   language: Language
   t(key: MessageKey): string

@@ -371,3 +371,73 @@ test('migration 16 gives existing amount rules the account or base currency', as
     }),
   ])
 })
+
+test('rules with later-archived references can be disabled or edited, but changing to archived references is rejected', async () => {
+  const { application, otherAccount, categories } = await setup()
+  const parent = application.commands.createCategory({
+    name: 'Archived parent',
+    kind: 'expense',
+  })
+  const child = application.commands.createCategory({
+    name: 'Child',
+    kind: 'expense',
+    parentId: parent.id,
+  })
+  const draft = {
+    enabled: true,
+    payeeId: null,
+    textContains: null,
+    accountId: otherAccount.id,
+    minAmountMinor: 100,
+    maxAmountMinor: 500,
+    amountCurrency: 'HUF' as const,
+    categoryId: child.id,
+    tagIds: [],
+  }
+  const rule = application.commands.createCategorisationRule(draft)
+  application.commands.archiveAccount(otherAccount.id)
+  application.commands.archiveCategory(parent.id)
+  const disabled = application.commands.updateCategorisationRule({
+    ...draft,
+    id: rule.id,
+    enabled: false,
+  })
+  expect(disabled).toEqual({ ...rule, enabled: false })
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listCategorisationRules()).toEqual([rule])
+  expect(
+    application.commands.updateCategorisationRule({
+      ...draft,
+      id: rule.id,
+      textContains: 'Updated',
+    }).textContains,
+  ).toBe('Updated')
+  const other = application.commands.createCategorisationRule({
+    ...draft,
+    accountId: null,
+    categoryId: categories[1].id,
+    textContains: 'Other',
+  })
+  for (const changed of [
+    { accountId: otherAccount.id },
+    { categoryId: child.id },
+  ]) {
+    expect(() =>
+      application.commands.updateCategorisationRule({
+        ...draft,
+        id: other.id,
+        accountId: null,
+        categoryId: categories[1].id,
+        textContains: 'Other',
+        ...changed,
+      }),
+    ).toThrow('rules.error.reference')
+  }
+  expect(() =>
+    application.commands.updateCategorisationRule({
+      ...draft,
+      id: rule.id,
+      amountCurrency: 'CHF',
+    }),
+  ).toThrow('rules.error.amount')
+})

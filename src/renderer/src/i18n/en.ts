@@ -6,8 +6,7 @@ export const en = {
     'With an open profile: new transaction and undo work outside text editing controls. Type and save shortcuts work in the transaction drawer.',
   'shortcuts.navigation':
     'Tab / Shift+Tab move between fields and stay inside the open dialog.',
-  'shortcuts.undo':
-    'Undo latest transaction command (outside text editing controls)',
+  'shortcuts.undo': 'Undo last change (outside text editing controls)',
   'shortcuts.close': 'Cancel / close drawer or shortcut help',
   'shortcuts.help': 'Keyboard shortcuts',
   'shortcuts.save':
@@ -253,7 +252,7 @@ export const en = {
   'templates.optionalHint':
     'Only the name is required. Leave any other field blank to enter it when using the template.',
   'templates.tagsHint':
-    'One tag name per line. Tags are created only when recording a transaction.',
+    'One tag name per line. Missing tags are created when saving the template.',
   'templates.deleteConfirmation': 'Delete this transaction template?',
   'templates.amountRequired': 'Enter an amount before saving this transaction.',
   'templates.error.name': 'Enter a template name between 1 and 100 characters.',

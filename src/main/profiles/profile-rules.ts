@@ -126,22 +126,36 @@ export function getCategorisationRule(
 function validateReferences(
   database: Database.Database,
   input: CreateCategorisationRuleInput,
+  current?: CategorisationRule,
 ): void {
-  if (input.payeeId !== null) getPayee(database, input.payeeId)
-  if (input.actionPayeeId != null) getPayee(database, input.actionPayeeId)
-  if (input.accountId !== null) {
+  if (input.payeeId !== null && input.payeeId !== current?.payeeId)
+    getPayee(database, input.payeeId)
+  if (
+    input.actionPayeeId != null &&
+    input.actionPayeeId !== current?.actionPayeeId
+  )
+    getPayee(database, input.actionPayeeId)
+  if (
+    input.accountId !== null &&
+    (input.accountId !== current?.accountId ||
+      input.amountCurrency !== current?.amountCurrency)
+  ) {
     const account = database
       .prepare('SELECT archived, currency FROM accounts WHERE id = ?')
       .get(input.accountId) as
       { archived: number; currency: 'HUF' | 'CHF' } | undefined
-    if (!account || account.archived) throw new Error('rules.error.reference')
+    if (
+      !account ||
+      (input.accountId !== current?.accountId && account.archived)
+    )
+      throw new Error('rules.error.reference')
     if (
       input.amountCurrency !== null &&
       input.amountCurrency !== account.currency
     )
       throw new Error('rules.error.amount')
   }
-  if (input.categoryId !== null) {
+  if (input.categoryId !== null && input.categoryId !== current?.categoryId) {
     const category = getCategory(database, input.categoryId)
     const parentArchived =
       category.parentId !== null &&
@@ -150,6 +164,7 @@ function validateReferences(
       throw new Error('rules.error.reference')
   }
   for (const tagId of input.tagIds) {
+    if (current?.tags.some((tag) => tag.id === tagId)) continue
     if (!database.prepare('SELECT 1 FROM tags WHERE id = ?').get(tagId))
       throw new Error('rules.error.reference')
   }
@@ -216,8 +231,8 @@ export function updateCategorisationRule(
   clock: () => Date,
 ): CategorisationRule {
   const input = parseUpdateCategorisationRuleInput(value)
-  getCategorisationRule(database, input.id)
-  validateReferences(database, input)
+  const current = getCategorisationRule(database, input.id)
+  validateReferences(database, input, current)
   database
     .prepare(
       `UPDATE categorisation_rules SET enabled = ?, payee_id = ?,

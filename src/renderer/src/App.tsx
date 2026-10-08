@@ -368,6 +368,7 @@ function Shell({
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsError, setSettingsError] = useState(false)
   const [backupBusy, setBackupBusy] = useState(false)
+  const [accountBusy, setAccountBusy] = useState(false)
   const [categoryBusy, setCategoryBusy] = useState(false)
   const [payeeBusy, setPayeeBusy] = useState(false)
   const [ruleBusy, setRuleBusy] = useState(false)
@@ -379,7 +380,7 @@ function Shell({
   const format = createFormatters(language)
 
   const undoLast = useCallback(async () => {
-    if (undoBusy) return
+    if (undoBusy || accountBusy) return
     setUndoBusy(true)
     setUndoError(false)
     try {
@@ -395,7 +396,7 @@ function Shell({
     } finally {
       setUndoBusy(false)
     }
-  }, [undoBusy])
+  }, [undoBusy, accountBusy])
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -409,6 +410,7 @@ function Shell({
       if (action === 'newTransaction') {
         if (
           savingSettings ||
+          accountBusy ||
           backupBusy ||
           categoryBusy ||
           payeeBusy ||
@@ -425,6 +427,7 @@ function Shell({
       } else if (action === 'undo') {
         if (
           savingSettings ||
+          accountBusy ||
           backupBusy ||
           categoryBusy ||
           payeeBusy ||
@@ -441,6 +444,7 @@ function Shell({
     undoLast,
     undoBusy,
     savingSettings,
+    accountBusy,
     backupBusy,
     categoryBusy,
     payeeBusy,
@@ -511,7 +515,13 @@ function Shell({
               aria-label={t(`navigation.${id}`)}
               aria-current={page === id ? 'page' : undefined}
               title={collapsed ? t(`navigation.${id}`) : undefined}
-              disabled={backupBusy || categoryBusy || payeeBusy || ruleBusy}
+              disabled={
+                accountBusy ||
+                backupBusy ||
+                categoryBusy ||
+                payeeBusy ||
+                ruleBusy
+              }
               onClick={() => setPage(id)}
             >
               <Icon aria-hidden="true" />
@@ -530,7 +540,9 @@ function Shell({
           title={
             collapsed ? `${active.name} — ${t('profile.switch')}` : undefined
           }
-          disabled={backupBusy || categoryBusy || payeeBusy || ruleBusy}
+          disabled={
+            accountBusy || backupBusy || categoryBusy || payeeBusy || ruleBusy
+          }
           onClick={onSwitchProfile}
         >
           <UsersRound className="size-5 shrink-0" aria-hidden="true" />
@@ -578,6 +590,7 @@ function Shell({
                 key={`${active.id}:${undoRevision}`}
                 language={language}
                 t={t}
+                onBusyChange={setAccountBusy}
                 onChanged={() => {
                   setUndoError(false)
                   setUndoOffered(true)
@@ -611,6 +624,7 @@ function Shell({
                       value={language}
                       disabled={
                         savingSettings ||
+                        accountBusy ||
                         backupBusy ||
                         categoryBusy ||
                         payeeBusy ||
@@ -639,6 +653,7 @@ function Shell({
                       value={theme}
                       disabled={
                         savingSettings ||
+                        accountBusy ||
                         backupBusy ||
                         categoryBusy ||
                         payeeBusy ||
@@ -670,6 +685,7 @@ function Shell({
                       value={baseCurrency}
                       disabled={
                         savingSettings ||
+                        accountBusy ||
                         backupBusy ||
                         categoryBusy ||
                         payeeBusy ||
@@ -735,7 +751,11 @@ function Shell({
               key={`${active.id}:${undoRevision}`}
               t={t}
               disabled={
-                savingSettings || backupBusy || categoryBusy || ruleBusy
+                savingSettings ||
+                accountBusy ||
+                backupBusy ||
+                categoryBusy ||
+                ruleBusy
               }
               onBusyChange={setPayeeBusy}
               onChanged={() => {
@@ -751,7 +771,11 @@ function Shell({
               baseCurrency={baseCurrency}
               t={t}
               disabled={
-                savingSettings || backupBusy || categoryBusy || payeeBusy
+                savingSettings ||
+                accountBusy ||
+                backupBusy ||
+                categoryBusy ||
+                payeeBusy
               }
               onBusyChange={setRuleBusy}
               onChanged={() => {
@@ -764,7 +788,13 @@ function Shell({
             <CategorySettings
               key={`${active.id}:${categoryRevision}:${undoRevision}`}
               t={t}
-              disabled={savingSettings || backupBusy || payeeBusy || ruleBusy}
+              disabled={
+                savingSettings ||
+                accountBusy ||
+                backupBusy ||
+                payeeBusy ||
+                ruleBusy
+              }
               onBusyChange={setCategoryBusy}
               onChanged={() => {
                 setUndoError(false)
@@ -798,7 +828,11 @@ function Shell({
           <p className="text-sm">
             {t(undoError ? 'undo.error' : 'undo.available')}
           </p>
-          <Button variant="ghost" disabled={undoBusy} onClick={undoLast}>
+          <Button
+            variant="ghost"
+            disabled={undoBusy || accountBusy}
+            onClick={undoLast}
+          >
             {t('undo.action')}
           </Button>
         </aside>

@@ -10,6 +10,7 @@ import { templateFields, validateTemplateId } from './template-validation'
 import { getTransaction } from './profile-transactions'
 import { validateTransactionId } from './transaction-validation'
 import { tagKey } from '../../shared/text-keys'
+import { getOrCreateTag } from './profile-tags'
 
 interface StoredTemplate extends Omit<
   TransactionTemplate,
@@ -99,14 +100,17 @@ export function storeTemplate(
     .run(template.id)
   const insertTag = database.prepare(
     `INSERT INTO transaction_template_tags (template_id, tag_id)
-     SELECT ?, id FROM tags WHERE normalized_name = ?`,
+     VALUES (?, ?)`,
   )
   const seen = new Set<string>()
   for (const name of template.tagNames) {
     const key = tagKey(name)
     if (seen.has(key)) continue
     seen.add(key)
-    insertTag.run(template.id, key)
+    insertTag.run(
+      template.id,
+      getOrCreateTag(database, name, template.updatedAt).id,
+    )
   }
 }
 

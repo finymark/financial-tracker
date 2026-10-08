@@ -174,7 +174,7 @@ test('saves an unsplit transaction as a template, edits optional fields, and und
     totalMinor: null,
     categoryId: null,
     payeeName: 'New payee',
-    tagNames: [],
+    tagNames: ['New tag'],
     note: 'New note',
     excluded: false,
   })
@@ -273,9 +273,9 @@ test('templates accept independent optional fields and using a variable-amount p
   })
   expect(template.totalMinor).toBeNull()
   expect(template.payeeName).toBe('Cafe')
-  expect(template.tagNames).toEqual([])
+  expect(template.tagNames).toEqual(['Trip'])
   expect(application.queries.listPayees()).toEqual([])
-  expect(application.queries.listTags()).toEqual([])
+  expect(application.queries.listTags()).toMatchObject([{ name: 'Trip' }])
   expect(() =>
     application.commands.createTransaction({
       ...input,
@@ -293,7 +293,7 @@ test('templates accept independent optional fields and using a variable-amount p
   })
   expect(recorded.totalMinor).toBe(375)
   expect(recorded.payeeName).toBe('Cafe')
-  expect(recorded.line.tags).toEqual([])
+  expect(recorded.line.tags).toMatchObject([{ name: 'Trip' }])
   expect(application.commands.undoLast()).toBe(true)
   expect(application.queries.listTemplates()).toEqual(
     expect.arrayContaining([categoryOnly, template]),
@@ -817,7 +817,7 @@ test('deleting shared account/category references preserves both template and ru
   expect(application.queries.listCategorisationRules()).toHaveLength(2)
 })
 
-test('category replacement retargets rules and transactions while deleted template references become empty', async () => {
+test('category replacement retargets rules, transactions and templates and undo restores all references', async () => {
   const { application, input } = await setup()
   const category = application.commands.createCategory({
     name: 'Replaceable',
@@ -851,7 +851,7 @@ test('category replacement retargets rules and transactions while deleted templa
     { ...rule, categoryId: replacement.id },
   ])
   expect(application.queries.listTemplates()).toEqual([
-    { ...template, categoryId: null },
+    { ...template, categoryId: replacement.id },
   ])
   expect(application.queries.listTransactions().rows[0]).toMatchObject({
     line: { categoryId: replacement.id },
@@ -939,4 +939,38 @@ test('migration 16 upgrades version-14 template data without changing the ledger
   expect(reopened.queries.listTransactions()).toEqual(before)
   expect(reopened.queries.listCategorisationRules()).toEqual([rule])
   expect(reopened.commands.undoLast()).toBe(false)
+})
+
+test('template saves create missing tags, reuse Unicode-equivalent names, and undo removes only newly created tags', async () => {
+  const { application, input } = await setup()
+  const source = application.commands.createTransaction({
+    ...input,
+    tagNames: ['Élelmiszer', 'Ärztin'],
+  })
+  application.commands.deleteTransaction(source.id)
+  const reused = application.queries.listTags()
+  const template = application.commands.createTemplate({
+    name: 'Tagged template',
+    tagNames: ['élelmiszer', 'ärztin', 'New trip', 'NEW TRIP'],
+  })
+  expect(template.tagNames).toEqual(['New trip', 'Ärztin', 'Élelmiszer'])
+  expect(application.queries.listTags()).toEqual(expect.arrayContaining(reused))
+  expect(application.queries.listTags()).toHaveLength(3)
+  expect(
+    application.queries.listTags().find((tag) => tag.name === 'New trip')
+      ?.createdAt,
+  ).toBe(clock().toISOString())
+  application.commands.updateTemplate({
+    ...template,
+    tagNames: ['New trip', 'New project'],
+  })
+  expect(application.queries.listTags()).toHaveLength(4)
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTemplates()).toEqual([template])
+  expect(application.queries.listTags().map((tag) => tag.name)).not.toContain(
+    'New project',
+  )
+  expect(application.commands.undoLast()).toBe(true)
+  expect(application.queries.listTemplates()).toEqual([])
+  expect(application.queries.listTags()).toEqual(reused)
 })

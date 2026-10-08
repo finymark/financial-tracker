@@ -9,7 +9,7 @@ export const de = {
   'shortcuts.navigation':
     'Tab / Shift+Tab wechseln zwischen Feldern und bleiben im geöffneten Dialog.',
   'shortcuts.undo':
-    'Letzte Transaktionsänderung rückgängig machen (außerhalb von Eingabefeldern)',
+    'Letzte Änderung rückgängig machen (außerhalb von Eingabefeldern)',
   'shortcuts.close':
     'Abbrechen / Transaktionsfenster oder Tastaturhilfe schließen',
   'shortcuts.help': 'Tastenkürzel',
@@ -267,7 +267,7 @@ export const de = {
   'templates.optionalHint':
     'Nur der Name ist erforderlich. Andere Felder können leer bleiben und beim Verwenden ausgefüllt werden.',
   'templates.tagsHint':
-    'Ein Tag-Name pro Zeile. Tags werden erst beim Erfassen einer Transaktion erstellt.',
+    'Ein Tag-Name pro Zeile. Fehlende Tags werden beim Speichern der Vorlage erstellt.',
   'templates.deleteConfirmation': 'Diese Transaktionsvorlage löschen?',
   'templates.amountRequired':
     'Gib vor dem Speichern dieser Transaktion einen Betrag ein.',

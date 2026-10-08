@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { Account, AccountOption } from '../../../../shared/accounts'
+import type { AccountOption } from '../../../../shared/accounts'
 import type { Category } from '../../../../shared/categories'
 import type { Payee, TransactionKind } from '../../../../shared/transactions'
 import type { Tag } from '../../../../shared/tags'
@@ -13,7 +13,7 @@ export function useTransactionReferenceData(
   undoRevision: number,
 ) {
   const [data, setData] = useState({
-    accounts: [] as Account[],
+    accounts: [] as AccountOption[],
     categories: [] as Category[],
     accountOptions: [] as AccountOption[],
     categoryOptions: { expense: [], income: [] } as Record<
@@ -36,9 +36,8 @@ export function useTransactionReferenceData(
   useEffect(() => {
     let ignore = false
     void Promise.all([
-      window.app.accounts.list(),
+      window.app.accounts.listOptions({ includeArchived: true }),
       window.app.categories.list(),
-      window.app.accounts.listOptions(),
       Promise.all([
         window.app.categories.listOptions({ kind: 'expense' }),
         window.app.categories.listOptions({ kind: 'income' }),
@@ -51,7 +50,6 @@ export function useTransactionReferenceData(
         ([
           accounts,
           categories,
-          accountOptions,
           [expense, income],
           payees,
           tags,
@@ -62,7 +60,7 @@ export function useTransactionReferenceData(
             setData({
               accounts,
               categories,
-              accountOptions,
+              accountOptions: accounts.filter((account) => !account.archived),
               categoryOptions: { expense, income },
               payees,
               tags,

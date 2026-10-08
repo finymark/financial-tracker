@@ -25,6 +25,10 @@ export interface AccountOption {
   archived: boolean
 }
 
+export interface ListAccountOptionsInput {
+  includeArchived?: boolean
+}
+
 export interface AccountIdInput {
   id: string
 }
