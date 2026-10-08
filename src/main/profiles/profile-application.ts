@@ -1231,11 +1231,6 @@ function removeDatabaseSidecarFiles(databasePath: string): void {
   }
 }
 
-function removeDatabaseFiles(databasePath: string): void {
-  rmSync(databasePath, { force: true })
-  removeDatabaseSidecarFiles(databasePath)
-}
-
 class OpenProfileApplication implements ProfileApplication {
   readonly commands: ProfileCommands
   readonly queries: ProfileQueries
@@ -2260,11 +2255,13 @@ async function openProfileDatabase(
         })()
       } catch (error) {
         database.close()
+        // Sidecars go first: if their removal fails, the rolled-back database
+        // file is still in place and the next open retries the migration.
+        removeDatabaseSidecarFiles(options.paths.databasePath)
         if (backupPath) {
-          removeDatabaseFiles(options.paths.databasePath)
           copyFileSync(backupPath, options.paths.databasePath)
         } else {
-          removeDatabaseFiles(options.paths.databasePath)
+          rmSync(options.paths.databasePath, { force: true })
         }
         throw new MigrationError(migration, backupPath, error)
       }

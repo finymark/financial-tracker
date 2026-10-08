@@ -1147,6 +1147,7 @@ describe('profile application API', () => {
     })
     initial.close()
     // A persistent journal mode keeps the -journal file after rollback/close.
+    // The pragma only takes effect before the transaction's first page write.
     const leavesJournal = defineSqlMigration(
       currentVersion + 1,
       'fails after keeping its rollback journal',
