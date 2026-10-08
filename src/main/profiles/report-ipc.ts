@@ -16,6 +16,17 @@ export function registerReportIpc(
   )
   registerIpcHandler(
     ipcMain,
+    IPC_CHANNELS.reportsMonthlyTrend,
+    (
+      _event,
+      value,
+    ): Awaited<ReturnType<AppBridge['reports']['monthlyTrend']>> =>
+      controller
+        .getActiveApplication()
+        .queries.getMonthlyTrend(parseReportDateRangeInput(value)),
+  )
+  registerIpcHandler(
+    ipcMain,
     IPC_CHANNELS.reportsCategoryBreakdown,
     (
       _event,

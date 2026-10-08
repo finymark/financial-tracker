@@ -225,6 +225,20 @@ export const de = {
   'overview.chartLabel': 'Die fünf größten Ausgabenkategorien dieses Monats',
   'overview.shareHint':
     'Anteile beziehen sich auf umgerechnete Ausgaben aller Kategorien, nicht nur der ersten fünf. Nicht umgerechnete Beträge werden separat angezeigt und sind nicht in den Anteilen enthalten.',
+  'reports.trend.title': 'Monatlicher Trend',
+  'reports.trend.description':
+    'Ausgaben, Einnahmen und Saldo in der Basiswährung.',
+  'reports.trend.partial': 'Teilmonat',
+  'reports.trend.partialHint':
+    'Teilmonate enthalten nur Tage innerhalb des gewählten Zeitraums.',
+  'reports.trend.unconvertedHint':
+    'Beträge ohne Wechselkurs fehlen im Diagramm. Die Tabelle zeigt sie für jeden Monat separat.',
+  'reports.trend.chartLabel':
+    'Monatliche Ausgaben und Einnahmen mit Saldolinie',
+  'reports.trend.month': 'Monat',
+  'reports.trend.expenses': 'Ausgaben',
+  'reports.trend.incomes': 'Einnahmen',
+  'reports.trend.net': 'Saldo',
   'reports.title': 'Ausgaben nach Kategorie',
   'reports.description':
     'Vergleichen Sie Kategoriesummen in Ihrer Basiswährung und öffnen Sie die zugehörigen Transaktionen.',

@@ -212,6 +212,19 @@ export const hu = {
   'overview.chartLabel': 'A hónap öt legnagyobb kiadási kategóriája',
   'overview.shareHint':
     'Az arányok az összes kategória átváltott kiadásain alapulnak, nem csak az első ötén. A nem átváltott összegek külön jelennek meg, és nem számítanak bele az arányokba.',
+  'reports.trend.title': 'Havi trend',
+  'reports.trend.description':
+    'Kiadások, bevételek és egyenleg az alapdevizában.',
+  'reports.trend.partial': 'részleges',
+  'reports.trend.partialHint':
+    'A részleges hónapok csak a kiválasztott tartomány napjait tartalmazzák.',
+  'reports.trend.unconvertedHint':
+    'Az árfolyam nélküli összegek nem szerepelnek a diagramon. Az alábbi táblázat havonta külön mutatja őket.',
+  'reports.trend.chartLabel': 'Havi kiadások és bevételek egyenlegvonallal',
+  'reports.trend.month': 'Hónap',
+  'reports.trend.expenses': 'Kiadások',
+  'reports.trend.incomes': 'Bevételek',
+  'reports.trend.net': 'Egyenleg',
   'reports.title': 'Kiadások kategóriánként',
   'reports.description':
     'Hasonlítsa össze a kategóriák összegeit az alapdevizában, és tekintse meg a mögöttes tranzakciókat.',

@@ -23,6 +23,7 @@ import { CardContent } from './components/ui/card'
 import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
 import { createFormatters, type Language, type MessageKey } from './i18n'
+import { MonthlyTrendReport } from './MonthlyTrendReport'
 
 interface ReportsPageProps {
   language: Language
@@ -49,6 +50,7 @@ export function ReportsPage({
   onOpenTransactions,
 }: ReportsPageProps) {
   const format = createFormatters(language)
+  const [tab, setTab] = useState<'category' | 'trend'>('category')
   const [filters, setFilters] = useState({
     period: 'thisMonth' as ReportPeriod,
     from: '',
@@ -65,12 +67,13 @@ export function ReportsPage({
   } | null>(null)
   const currentResult = result?.key === reportKey ? result : null
   const report = currentResult?.report ?? null
-  const loading = currentResult === null
+  const loading = tab === 'category' && currentResult === null
   const error = currentResult?.error ?? false
   const [chartKind, setChartKind] = useState<ChartKind>('pie')
   const [selectedId, setSelectedId] = useState<string | null | undefined>()
 
   useEffect(() => {
+    if (tab !== 'category') return
     let ignore = false
     void window.app.reports
       .categoryBreakdown(request)
@@ -86,7 +89,7 @@ export function ReportsPage({
     return () => {
       ignore = true
     }
-  }, [request, reportKey])
+  }, [request, reportKey, tab])
 
   const chartData = useMemo(
     () =>
@@ -141,6 +144,27 @@ export function ReportsPage({
 
   return (
     <CardContent className="space-y-6">
+      <div
+        className="flex flex-wrap gap-2"
+        aria-label={t('navigation.reports')}
+      >
+        <Button
+          type="button"
+          variant={tab === 'category' ? 'default' : 'ghost'}
+          aria-pressed={tab === 'category'}
+          onClick={() => setTab('category')}
+        >
+          {t('reports.title')}
+        </Button>
+        <Button
+          type="button"
+          variant={tab === 'trend' ? 'default' : 'ghost'}
+          aria-pressed={tab === 'trend'}
+          onClick={() => setTab('trend')}
+        >
+          {t('reports.trend.title')}
+        </Button>
+      </div>
       <form
         className="flex flex-wrap items-end gap-3 rounded-md border p-3"
         onSubmit={apply}
@@ -204,17 +228,20 @@ export function ReportsPage({
         </Button>
       </form>
 
-      {loading && (
+      {tab === 'trend' && (
+        <MonthlyTrendReport request={request} language={language} t={t} />
+      )}
+      {tab === 'category' && loading && (
         <p role="status" className="text-sm text-muted-foreground">
           {t('reports.loading')}
         </p>
       )}
-      {error && (
+      {tab === 'category' && error && (
         <p role="alert" className="text-sm font-medium text-error">
           {t('reports.error')}
         </p>
       )}
-      {!loading && !error && report && (
+      {tab === 'category' && !loading && !error && report && (
         <>
           <section className="space-y-3" aria-labelledby="report-total">
             <div className="flex flex-wrap items-center justify-between gap-3">

@@ -210,6 +210,19 @@ export const en = {
   'overview.chartLabel': 'Top five expense categories this month',
   'overview.shareHint':
     'Shares use converted expenses across all categories, not only the top five. Unconverted amounts are shown separately and are not included in shares.',
+  'reports.trend.title': 'Monthly trend',
+  'reports.trend.description':
+    'Expenses, incomes and net in your base currency.',
+  'reports.trend.partial': 'partial',
+  'reports.trend.partialHint':
+    'Partial months include only days within the selected range.',
+  'reports.trend.unconvertedHint':
+    'Amounts without a rate are not in the chart. Each month lists them separately below.',
+  'reports.trend.chartLabel': 'Monthly expenses and incomes with a net line',
+  'reports.trend.month': 'Month',
+  'reports.trend.expenses': 'Expenses',
+  'reports.trend.incomes': 'Incomes',
+  'reports.trend.net': 'Net',
   'reports.title': 'Expenses by category',
   'reports.description':
     'Compare category totals in your base currency and drill down to the transactions behind them.',

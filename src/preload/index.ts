@@ -5,6 +5,8 @@ const bridge: AppBridge = {
   reports: {
     overviewDashboard: () =>
       ipcRenderer.invoke(IPC_CHANNELS.reportsOverviewDashboard),
+    monthlyTrend: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.reportsMonthlyTrend, input),
     categoryBreakdown: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.reportsCategoryBreakdown, input),
   },
