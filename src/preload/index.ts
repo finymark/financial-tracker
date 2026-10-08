@@ -1,7 +1,23 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 
 const bridge: AppBridge = {
+  files: {
+    path: (file) => webUtils.getPathForFile(file),
+  },
+  attachments: {
+    pick: () => ipcRenderer.invoke(IPC_CHANNELS.attachmentsPick),
+    pickCopyFolder: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.attachmentsPickCopyFolder),
+    import: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.attachmentsImport, input),
+    list: (input) => ipcRenderer.invoke(IPC_CHANNELS.attachmentsList, input),
+    attach: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.attachmentsAttach, input),
+    remove: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.attachmentsRemove, input),
+    open: (input) => ipcRenderer.invoke(IPC_CHANNELS.attachmentsOpen, input),
+  },
   desktop: {
     autostartStatus: () =>
       ipcRenderer.invoke(IPC_CHANNELS.desktopAutostartStatus),

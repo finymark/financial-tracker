@@ -641,9 +641,40 @@ export function TransactionsPage({
               {t(
                 deleting.kind === 'adjustment'
                   ? 'adjustments.confirmDelete'
-                  : 'transactions.confirmDelete',
+                  : deleting.kind !== 'transfer' &&
+                      deleting.attachments.length > 0
+                    ? 'attachments.deleteWithTransaction'
+                    : 'transactions.confirmDelete',
               )}
             </Button>
+            {deleting.kind !== 'transfer' &&
+              deleting.kind !== 'adjustment' &&
+              deleting.attachments.length > 0 && (
+                <Button
+                  variant="ghost"
+                  disabled={busy || loading}
+                  onClick={() =>
+                    void window.app.attachments
+                      .pickCopyFolder()
+                      .then((folder) => {
+                        if (folder)
+                          void run(
+                            () =>
+                              window.app.transactions.delete({
+                                id: deleting.id,
+                                saveAttachmentsTo: folder,
+                              }),
+                            true,
+                          )
+                      })
+                      .catch((error: unknown) =>
+                        setError(transactionError(error)),
+                      )
+                  }
+                >
+                  {t('attachments.saveCopiesAndDelete')}
+                </Button>
+              )}
             <Button
               variant="ghost"
               disabled={busy}
@@ -669,6 +700,10 @@ export function TransactionsPage({
           onClose={() => setForm(null)}
           onRuleOffer={setRuleOffer}
           onCreateRecurring={onCreateRecurring}
+          onAttachmentChanged={() => {
+            onTransactionChanged()
+            setRevision((current) => current + 1)
+          }}
           createRef={createRef}
         />
       )}
