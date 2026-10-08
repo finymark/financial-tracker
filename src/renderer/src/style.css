@@ -14,12 +14,17 @@
 }
 
 .title-bar {
-  height: var(--title-bar-height);
-  flex: 0 0 var(--title-bar-height);
+  height: env(titlebar-area-height, var(--title-bar-height));
+  flex: 0 0 env(titlebar-area-height, var(--title-bar-height));
   overflow: hidden;
   background: var(--title-bar);
   color: var(--title-bar-foreground);
   user-select: none;
+}
+
+/* Keep fixed drawers, dialogs and toasts below the native title-bar overlay. */
+.window-content {
+  contain: layout;
 }
 
 .title-bar-drag-region {

@@ -1345,7 +1345,27 @@ export default function App() {
   return (
     <div className="flex h-dvh flex-col">
       <TitleBar profileName={active?.name} />
-      <div className="min-h-0 flex-1">{content}</div>
+      <div className="window-content min-h-0 flex-1">
+        {content}
+        {(dropActive || dropBusy) && active && !showPicker && (
+          <div className="pointer-events-none fixed inset-0 z-[100] grid place-items-center bg-foreground/25 p-8">
+            <div className="rounded-xl border-2 border-dashed bg-background p-10 text-center text-lg font-semibold shadow-xl">
+              {t(dropBusy ? 'receipts.dropProcessing' : 'receipts.dropOverlay')}
+            </div>
+          </div>
+        )}
+        {dropError && (
+          <aside
+            role="alert"
+            className="fixed right-4 bottom-4 z-[101] flex max-w-md items-center gap-3 rounded-lg border bg-card p-4 text-sm text-error shadow-lg"
+          >
+            <p>{t(dropError)}</p>
+            <Button variant="ghost" onClick={() => setDropError(null)}>
+              {t('tray.noticeOk')}
+            </Button>
+          </aside>
+        )}
+      </div>
       {startupShortcutFailure && (
         <aside
           role="alert"
@@ -1356,24 +1376,6 @@ export default function App() {
             variant="ghost"
             onClick={() => setStartupShortcutFailure(null)}
           >
-            {t('tray.noticeOk')}
-          </Button>
-        </aside>
-      )}
-      {(dropActive || dropBusy) && active && !showPicker && (
-        <div className="pointer-events-none fixed inset-0 z-[100] grid place-items-center bg-foreground/25 p-8">
-          <div className="rounded-xl border-2 border-dashed bg-background p-10 text-center text-lg font-semibold shadow-xl">
-            {t(dropBusy ? 'receipts.dropProcessing' : 'receipts.dropOverlay')}
-          </div>
-        </div>
-      )}
-      {dropError && (
-        <aside
-          role="alert"
-          className="fixed right-4 bottom-4 z-[101] flex max-w-md items-center gap-3 rounded-lg border bg-card p-4 text-sm text-error shadow-lg"
-        >
-          <p>{t(dropError)}</p>
-          <Button variant="ghost" onClick={() => setDropError(null)}>
             {t('tray.noticeOk')}
           </Button>
         </aside>

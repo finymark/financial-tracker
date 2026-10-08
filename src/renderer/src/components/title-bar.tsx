@@ -14,9 +14,7 @@ export function TitleBar({ profileName }: { profileName?: string }) {
         {profileName && (
           <>
             <span aria-hidden="true">—</span>
-            <span className="title-bar-profile" title={profileName}>
-              {profileName}
-            </span>
+            <span className="title-bar-profile">{profileName}</span>
           </>
         )}
       </div>

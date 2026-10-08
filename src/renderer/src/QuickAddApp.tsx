@@ -481,7 +481,7 @@ export default function QuickAddApp() {
     >
       <div className="flex h-dvh flex-col">
         <TitleBar profileName={active?.name} />
-        <main className="min-h-0 flex-1 overflow-y-auto bg-background p-5 text-foreground">
+        <main className="window-content min-h-0 flex-1 overflow-y-auto bg-background p-5 text-foreground">
           <header className="mb-5 flex items-center justify-between gap-3">
             <h1 className="text-xl font-semibold">{t('quickAdd.title')}</h1>
             <Button
