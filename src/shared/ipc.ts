@@ -86,6 +86,12 @@ import type {
   ReportDateRangeInput,
   SpendingPaceReport,
 } from './reports'
+import type {
+  CreateRecurringTransactionInput,
+  RecurringTransaction,
+  RecurringTransactionIdInput,
+  UpdateRecurringTransactionInput,
+} from './recurring'
 
 export const IPC_CHANNELS = {
   getVersion: 'app:getVersion',
@@ -158,9 +164,27 @@ export const IPC_CHANNELS = {
   reportsSpendingPace: 'reports:spending-pace',
   reportsOverviewDashboard: 'reports:overview-dashboard',
   reportsMonthlyTrend: 'reports:monthly-trend',
+  recurringList: 'recurring:list',
+  recurringCreate: 'recurring:create',
+  recurringUpdate: 'recurring:update',
+  recurringPause: 'recurring:pause',
+  recurringResume: 'recurring:resume',
+  recurringDelete: 'recurring:delete',
 } as const
 
 export interface AppBridge {
+  recurring: {
+    list(): Promise<RecurringTransaction[]>
+    create(
+      input: CreateRecurringTransactionInput,
+    ): Promise<RecurringTransaction>
+    update(
+      input: UpdateRecurringTransactionInput,
+    ): Promise<RecurringTransaction>
+    pause(input: RecurringTransactionIdInput): Promise<void>
+    resume(input: RecurringTransactionIdInput): Promise<void>
+    delete(input: RecurringTransactionIdInput): Promise<void>
+  }
   reports: {
     cashFlow(input: ReportDateRangeInput): Promise<CashFlowReport>
     spendingPace(): Promise<SpendingPaceReport>

@@ -55,6 +55,25 @@ export function hasAccountTransactions(
       .get(account.id, account.id),
   )
   if (transfer) return true
+  const hasRecurringSchema = Boolean(
+    database
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'recurring_transactions'",
+      )
+      .get(),
+  )
+  const recurring =
+    hasRecurringSchema &&
+    Boolean(
+      database
+        .prepare(
+          `SELECT 1 FROM recurring_transactions WHERE account_id = ?
+           UNION ALL SELECT 1 FROM pending_transactions WHERE account_id = ?
+           LIMIT 1`,
+        )
+        .get(account.id, account.id),
+    )
+  if (recurring) return true
   return Boolean(
     database
       .prepare('SELECT 1 FROM balance_adjustments WHERE account_id = ? LIMIT 1')

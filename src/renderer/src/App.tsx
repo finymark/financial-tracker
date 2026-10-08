@@ -4,6 +4,7 @@ import {
   EyeOff,
   ArrowLeftRight,
   ChartPie,
+  CalendarClock,
   LayoutDashboard,
   PanelLeftClose,
   PanelLeftOpen,
@@ -49,10 +50,12 @@ import type { RateStatus } from '../../shared/exchange-rates'
 import { ReportsPage } from './ReportsPage'
 import { OverviewPage } from './OverviewPage'
 import type { TransactionListInput } from '../../shared/transactions'
+import { RecurringPage } from './RecurringPage'
 
 const pages = [
   { id: 'overview', icon: LayoutDashboard },
   { id: 'transactions', icon: ArrowLeftRight },
+  { id: 'recurring', icon: CalendarClock },
   { id: 'reports', icon: ChartPie },
   { id: 'accounts', icon: Wallet },
   { id: 'settings', icon: Settings },
@@ -736,6 +739,18 @@ function Shell({
                 onOpenTransactions={(input) => {
                   setReportTransactionFilter(input)
                   setPage('transactions')
+                }}
+              />
+            )}
+            {page === 'recurring' && (
+              <RecurringPage
+                key={`${active.id}:${undoRevision}`}
+                language={language}
+                t={t}
+                undoRevision={undoRevision}
+                onChanged={() => {
+                  setUndoError(false)
+                  setUndoOffered(true)
                 }}
               />
             )}

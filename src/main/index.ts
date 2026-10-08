@@ -27,6 +27,8 @@ import {
 } from './exchange-rates/mnb-source'
 import { ExchangeRateScheduler } from './exchange-rates/exchange-rate-scheduler'
 import { registerReportIpc } from './profiles/report-ipc'
+import { RecurringScheduler } from './recurring-scheduler'
+import { registerRecurringIpc } from './profiles/recurring-ipc'
 
 const APP_ID = 'com.finymark.financial-tracker'
 const APP_NAME = 'Financial Tracker'
@@ -103,6 +105,8 @@ void app.whenReady().then(() => {
     onStatusChanged: onRateStatusChanged,
   })
   exchangeRates.start()
+  const recurring = new RecurringScheduler(profiles)
+  recurring.start()
 
   registerIpcHandler(
     ipcMain,
@@ -115,8 +119,12 @@ void app.whenReady().then(() => {
     () => {
       exchangeRates.start()
       void exchangeRates.refreshActive()
+      recurring.start()
     },
-    () => exchangeRates.stop(),
+    () => {
+      exchangeRates.stop()
+      recurring.stop()
+    },
   )
   registerAccountIpc(ipcMain, profiles)
   registerCategoryIpc(ipcMain, profiles)
@@ -131,11 +139,13 @@ void app.whenReady().then(() => {
   registerTemplateIpc(ipcMain, profiles)
   registerExchangeRateIpc(ipcMain, profiles)
   registerReportIpc(ipcMain, profiles)
+  registerRecurringIpc(ipcMain, profiles)
 
   let shutdownPromise: Promise<void> | null = null
   let shutdownComplete = false
   function shutdown(): Promise<void> {
     exchangeRates.stop()
+    recurring.stop()
     shutdownPromise ??= profiles.shutdown().then(() => {
       shutdownComplete = true
     })
@@ -153,6 +163,7 @@ void app.whenReady().then(() => {
     await profiles.recoverFromFailedShutdown()
     exchangeRates.start()
     void exchangeRates.refreshActive()
+    recurring.start()
   })
 })
 
