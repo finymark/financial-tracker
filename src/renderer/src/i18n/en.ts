@@ -100,7 +100,7 @@ export const en = {
   'transactions.description':
     'Record expenses, income and transfers, then keep account balances up to date.',
   'transactions.listDescription':
-    'Filter transactions by period, account, category, payee or note.',
+    'Filter transactions by period, account, category, payee, tag or note.',
   'transactions.excluded': 'Excluded',
   'transactions.excludedHint':
     'Included in the account balance, but left out of expense and income totals.',
@@ -190,13 +190,30 @@ export const en = {
   'transactions.error.notFound':
     'The transaction could not be found. Refresh the list.',
   'transactions.error.lines': 'The transaction lines do not match its total.',
+  'tags.title': 'Tags',
+  'tags.all': 'All tags',
+  'tags.manage': 'Manage tags',
+  'tags.empty': 'Create tags in the transaction drawer.',
+  'tags.name': 'Tag name',
+  'tags.rename': 'Rename',
+  'tags.delete': 'Delete tag',
+  'tags.save': 'Save tag',
+  'tags.add': 'Add tag',
+  'tags.remove': 'Remove tag',
+  'tags.hint':
+    'Choose an existing tag or type a new one. Press Enter or Add tag; new tags are created when you save.',
+  'tags.deleteConfirmation':
+    'Delete this tag and remove it from all transactions?',
+  'tags.error.name': 'Enter tag names between 1 and 100 characters.',
+  'tags.error.notFound': 'The tag could not be found. Refresh the list.',
+  'tags.error.duplicate': 'A tag with this name already exists.',
+  'undo.available': 'Change saved.',
   'transfers.error.accountsDiffer': 'Choose two different accounts.',
   'transfers.error.equalAmounts':
     'Amounts must be equal when both accounts use the same currency.',
   'transfers.error.notFound':
     'The transfer could not be found. Refresh the list.',
   'transfers.error.linkedFee': 'Edit or delete this fee through its transfer.',
-  'undo.available': 'Transaction changed.',
   'undo.action': 'Undo',
   'undo.error': 'The change could not be undone.',
   'accounts.title': 'A place for each account',

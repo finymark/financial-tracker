@@ -1,5 +1,6 @@
 import type { CategoryKind } from './categories'
 import type { Currency } from './accounts'
+import type { Tag } from './tags'
 import type { Transfer } from './transfers'
 
 export type TransactionKind = CategoryKind
@@ -14,6 +15,7 @@ export interface TransactionLine {
   id: string
   amountMinor: number
   categoryId: string | null
+  tags: Tag[]
 }
 
 export interface Transaction {
@@ -33,6 +35,8 @@ export interface Transaction {
 }
 
 export interface CreateTransactionInput {
+  // Omitted names mean no tags on create; supplied names replace the single line's tags.
+  tagNames?: string[]
   accountId: string
   kind: TransactionKind
   date: string
@@ -44,6 +48,7 @@ export interface CreateTransactionInput {
   excluded?: boolean
 }
 
+// On update, omitted tagNames preserve existing tags; an explicit [] removes them.
 export interface UpdateTransactionInput extends CreateTransactionInput {
   id: string
 }
@@ -68,6 +73,7 @@ export interface TransactionListInput {
   accountId?: string
   categoryId?: string
   payeeId?: string
+  tagId?: string
   search?: string
   offset?: number
   limit?: number
