@@ -7,7 +7,7 @@ const personalRules = ['windows-home', 'secret', 'email', 'fixture-image']
 const patterns = [
   [
     'windows-home',
-    /(?:[a-z]:[\\/]+Users[\\/]+|\/[a-z]\/Users\/)[^\\/\s"'<>]+/gi,
+    /(?:[a-z]:[\\/]+Users[\\/]+|\/[a-z]\/Users\/|\/Users\/|\/home\/)[^\\/\s"'<>]+/gi,
   ],
   [
     'secret',
