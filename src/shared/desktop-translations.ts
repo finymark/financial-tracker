@@ -8,6 +8,8 @@ type DesktopKey =
   | 'tray.notice'
   | 'tray.noticeOk'
   | 'quickAdd.openError'
+  | 'updates.readyTitle'
+  | 'updates.readyBody'
   | 'settings.autostart'
   | 'settings.autostartDescription'
   | 'settings.autostartUnavailable'
@@ -31,6 +33,9 @@ export const desktopMessages = {
     'tray.noticeOk': 'OK',
     'quickAdd.openError':
       'Quick add could not open the last used profile. Open the main window and try again.',
+    'updates.readyTitle': 'Update ready',
+    'updates.readyBody':
+      'Version {version} is ready. Open Financial Tracker to install it.',
     'settings.autostart': 'Start with Windows',
     'settings.autostartDescription':
       'Start hidden in the tray when you sign in. This setting applies to every profile on this Windows account; off by default.',
@@ -59,6 +64,9 @@ export const desktopMessages = {
     'tray.noticeOk': 'Rendben',
     'quickAdd.openError':
       'A Gyors rögzítés nem tudta megnyitni a legutóbb használt profilt. Nyisd meg a főablakot, és próbáld újra.',
+    'updates.readyTitle': 'Frissítés érhető el',
+    'updates.readyBody':
+      'Elkészült az új verzió ({version}). Nyisd meg a Financial Trackert a telepítéshez.',
     'settings.autostart': 'Indítás a Windows rendszerrel',
     'settings.autostartDescription':
       'Bejelentkezéskor rejtve, a tálcán indul. A beállítás a Windows-fiók minden profiljára érvényes, és alapból ki van kapcsolva.',
@@ -88,6 +96,9 @@ export const desktopMessages = {
     'tray.noticeOk': 'OK',
     'quickAdd.openError':
       'Die Schnellerfassung konnte das zuletzt verwendete Profil nicht öffnen. Öffne das Hauptfenster und versuche es erneut.',
+    'updates.readyTitle': 'Update bereit',
+    'updates.readyBody':
+      'Die neue Version ({version}) ist bereit. Öffne Financial Tracker, um sie zu installieren.',
     'settings.autostart': 'Mit Windows starten',
     'settings.autostartDescription':
       'Bei der Anmeldung verborgen im Infobereich starten. Diese Einstellung gilt für alle Profile dieses Windows-Kontos; standardmäßig ausgeschaltet.',

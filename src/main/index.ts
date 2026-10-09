@@ -7,14 +7,17 @@ import {
   Menu,
   nativeImage,
   nativeTheme,
+  Notification,
   screen,
   Tray,
   type BrowserWindowConstructorOptions,
 } from 'electron'
+import electronUpdater from 'electron-updater'
 import { join } from 'node:path'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { registerUpdates } from './updates'
+import { registerUpdates, type UpdaterLike } from './updates'
+import { LastVersionFile } from './last-version'
 import { openDatabase } from './db'
 import { IPC_CHANNELS, type AppBridge } from '../shared/ipc'
 import { ProfileController } from './profiles/profile-controller'
@@ -336,6 +339,11 @@ function startApplication(): void {
       cause: error,
     })
   }
+  const justUpdatedVersion = app.isPackaged
+    ? new LastVersionFile(app.getPath('userData')).recordCurrentVersion(
+        app.getVersion(),
+      )
+    : null
   let trayNoticeShown = settings.isTrayNoticeShown()
   let tray: Tray | null = null
   const windowStateFile = new WindowStateFile(app.getPath('userData'))
@@ -654,16 +662,19 @@ function startApplication(): void {
     quitting = true
     void shutdown()
   })
-  registerUpdates(
+  const updateWindow = mainWindow
+  const { autoUpdater } = electronUpdater
+  registerUpdates({
     ipcMain,
-    mainWindow,
-    app.isPackaged,
-    () => {
+    updater: autoUpdater as UpdaterLike,
+    packaged: app.isPackaged,
+    justUpdatedVersion,
+    beforeInstall: () => {
       // electron-updater can close windows before Electron's before-quit event.
       quitting = true
       return shutdown()
     },
-    async () => {
+    recoverAfterFailure: async () => {
       quitting = false
       shutdownPromise = null
       shutdownComplete = false
@@ -673,5 +684,34 @@ function startApplication(): void {
       recurring.start()
       updateTray()
     },
-  )
+    window: {
+      send: (state) => {
+        if (!updateWindow.isDestroyed())
+          updateWindow.webContents.send(IPC_CHANNELS.updatesStateChanged, state)
+      },
+      isVisible: () => !updateWindow.isDestroyed() && updateWindow.isVisible(),
+      show: showMainWindow,
+    },
+    notifications: {
+      show: (version, onClick) => {
+        const messages = desktopMessages[activeLanguage()]
+        const notification = new Notification({
+          title: messages['updates.readyTitle'],
+          body: messages['updates.readyBody'].replace('{version}', version),
+        })
+        notification.once('click', onClick)
+        notification.show()
+      },
+    },
+    timers: {
+      setInterval: (callback, milliseconds) =>
+        setInterval(callback, milliseconds),
+    },
+    logError: (error) => {
+      console.warn(
+        'Update check or notification failed; try again later.',
+        error,
+      )
+    },
+  })
 }

@@ -164,11 +164,15 @@ export const de = {
     'Diese Kategorie hat Transaktionen. Wähle einen Ersatz, um sie zu erhalten.',
   'categories.error.replacement':
     'Wähle eine andere aktive Ersatzkategorie derselben Art.',
+  'updates.downloading': 'Update wird heruntergeladen… {percent} %',
   'updates.ready':
-    'Ein Update wurde heruntergeladen. Starten Sie zur Installation neu.',
+    'Die neue Version ({version}) ist bereit. Möchtest du sie jetzt installieren?',
+  'updates.later': 'Später',
   'updates.restart': 'Neustarten und aktualisieren',
+  'updates.restarting': 'Neustart…',
+  'updates.updated': 'Auf Version {version} aktualisiert.',
   'updates.error':
-    'Neustart für das Update fehlgeschlagen. Bitte versuchen Sie es erneut.',
+    'Neustart für das Update fehlgeschlagen. Bitte versuche es erneut.',
   'app.name': 'Financial Tracker',
   'app.tagline': 'Deine Finanzen auf deinem PC.',
   'rates.status.upToDate': 'Wechselkurse sind aktuell',

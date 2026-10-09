@@ -129,13 +129,17 @@ const bridge: AppBridge = {
     delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.rulesDelete, input),
   },
   updates: {
-    isReady: () => ipcRenderer.invoke(IPC_CHANNELS.updatesIsReady),
-    onReady: (listener) => {
-      const handler = () => listener()
-      ipcRenderer.on(IPC_CHANNELS.updatesReady, handler)
+    state: () => ipcRenderer.invoke(IPC_CHANNELS.updatesState),
+    onStateChanged: (listener) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        state: Parameters<typeof listener>[0],
+      ) => listener(state)
+      ipcRenderer.on(IPC_CHANNELS.updatesStateChanged, handler)
       return () =>
-        ipcRenderer.removeListener(IPC_CHANNELS.updatesReady, handler)
+        ipcRenderer.removeListener(IPC_CHANNELS.updatesStateChanged, handler)
     },
+    justUpdated: () => ipcRenderer.invoke(IPC_CHANNELS.updatesJustUpdated),
     restart: () => ipcRenderer.invoke(IPC_CHANNELS.updatesRestart),
   },
   getVersion: () => ipcRenderer.invoke(IPC_CHANNELS.getVersion),
