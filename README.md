@@ -1580,6 +1580,20 @@ stored in validated, atomically replaced `app-settings.json` beside
 `profiles.json` in the app's user-data folder. As with profiles, uninstall keeps
 app data, so reinstalling with preserved data does not repeat the notice.
 
+Without a valid saved window state the main window opens maximized on the
+primary display, with the taskbar visible (not full screen). Afterwards its
+normal size, position and maximized state are saved for the installation, shared
+by all profiles, in a separate atomically replaced `window-state.json` beside
+`app-settings.json`. Changes are saved after one second without further changes,
+and immediately on close-to-tray and quit. Minimized and full-screen states never
+replace the last usable state. When restoring, the window's title strip must lie
+on a connected display, otherwise the window opens at its default size centred on
+the primary display. A window larger than its display is shrunk to fit. A
+`--hidden` start writes nothing before the window is first opened and checks the
+connected displays again at that moment. A missing or invalid `window-state.json`
+is ignored. Older versions never read it, so going back to an older version
+still starts.
+
 **Settings → Start with Windows** is off by default and shared by all profiles
 on this Windows account. The preference is stored only in Windows' login-item
 setting (no duplicate JSON preference that could become stale), using
@@ -1689,3 +1703,29 @@ behavior and taskbar integration are manual checks, not covered by the unit suit
    Recheck Ctrl+Z ledger undo, Ctrl+Shift+H, N, Ctrl+N, ?, Alt+1–3,
    Ctrl+Enter, Esc and global Ctrl+Alt+N. Ctrl+R, Ctrl+Shift+R,
    Ctrl+Shift+I and F12 must not reload the app or open developer tools.
+
+### Manual window size and position check (installed NSIS build)
+
+Use a synthetic test profile. Electron reads the real roaming app-data folder
+even when the `APPDATA` environment variable is changed, so run these checks in
+the installed build or in a disposable Windows account.
+
+1. Remove `window-state.json` from the app-data folder (or use a fresh
+   installation) and start the app: the main window opens maximized on the
+   primary display and the taskbar stays visible.
+2. Restore the window, move and resize it, then close it to the tray within one
+   second. Reopen it from the tray, quit from the tray and start again: the same
+   size and position return.
+3. On a second display, set a custom size, maximize, quit and start again: the
+   window opens maximized on that display, and **Restore** returns the custom
+   size there.
+4. Minimize, then quit from the tray and start again: the window opens in its
+   previous normal or maximized state, not minimized.
+5. Quit with the window on a second display (also one placed above the primary),
+   disconnect that display and start again: the window opens centred on the
+   primary display with a reachable title bar and native buttons.
+6. Enable **Start with Windows** and sign in again: no window appears and
+   `window-state.json` stays unchanged until **Open** in the tray, which applies
+   the saved state on the currently connected displays.
+7. Repeat steps 2–3 with 100% and 150% display scaling on different displays.
+   Quick add keeps its own compact size and position.
