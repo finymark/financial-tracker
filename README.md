@@ -1513,6 +1513,10 @@ Enter and Space to pin and toggle it; unpinned pointer leave, blur and Esc must
 close it. In a transaction drawer, Enter or Space on the hint must not save, and
 Esc on an open hint must close only the hint. With a hint focused, press `?` and
 verify the keyboard-shortcut dialog opens exactly once and returns focus correctly.
+Open a hint by hover while focus remains on another control, then press Esc:
+only the hint must close, not its surrounding drawer or dialog. Move the pointer
+away and back to verify the hint reopens. Activate a hint twice with click, Enter
+and Space to verify the first activation pins it and the second closes it.
 
 Check hints near every window edge, after scrolling, and in narrow drawers and
 dialogs: tooltips must flip or shift inside the window, stay below the themed
@@ -1520,7 +1524,10 @@ title strip without overlapping the native minimize, maximize or close buttons,
 remain above modal content, use the light/dark card tokens, and never block
 typing or pointer use. With a screen reader, verify each button is announced as
 “Help: <topic>” in the active language and its tooltip text is read as the
-description. Confirm focus traps still contain the hint buttons and no tooltip
+description. Every dialog, drawer, landmark and labelled region must be named
+exactly by its visible heading, without a “Help: …” suffix, and in browse mode
+the hidden tooltip texts must not appear as unrelated text at the end of the
+document. Confirm focus traps still contain the hint buttons and no tooltip
 itself receives focus.
 
 ### Manual backup check
