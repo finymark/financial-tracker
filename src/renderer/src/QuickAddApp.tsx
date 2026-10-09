@@ -297,7 +297,7 @@ function QuickAddForm({
           </label>
         </div>
         <label className="block space-y-2 text-sm font-medium">
-          {t('transactions.payee')}
+          {t(`transactions.payee.${form.kind}`)}
           <Input
             data-native-enter
             list="quick-payees"

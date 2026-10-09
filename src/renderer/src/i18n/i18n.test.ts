@@ -20,6 +20,18 @@ test.each(languages)('translates messages in %s', (language) => {
   expect(translate(language, 'navigation.settings')).toBe(names[language])
 })
 
+test('uses the agreed Hungarian finance terms and kind-specific payee labels', () => {
+  expect(translate('hu', 'navigation.receipts')).toBe('Blokkok')
+  expect(translate('hu', 'receipts.title')).toBe('Feldolgozandó blokkok')
+  expect(translate('hu', 'transactions.payee')).toBe('Bolt / partner')
+  expect(translate('hu', 'transactions.payee.expense')).toBe('Bolt')
+  expect(translate('hu', 'transactions.payee.income')).toBe('Forrás')
+  expect(translate('hu', 'adjustments.rowType')).toBe('Egyenlegegyeztetés')
+  expect(translate('hu', 'settings.baseCurrency')).toBe('Alappénznem')
+  expect(translate('hu', 'transactions.excluded')).toBe('Kihagyva')
+  expect(translate('hu', 'recurring.definitions')).toBe('Ütemezések')
+})
+
 test.each([
   ['hu', 'hu-HU'],
   ['en', 'en-GB'],

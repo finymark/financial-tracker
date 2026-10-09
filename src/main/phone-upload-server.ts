@@ -97,12 +97,12 @@ const pageMessages: Record<
   }
 > = {
   hu: {
-    title: 'Nyugtafotók feltöltése',
-    choose: 'Fotók készítése vagy kiválasztása',
+    title: 'Blokk feltöltése telefonról',
+    choose: 'Készíts vagy válassz fotókat',
     queued: 'Várakozik',
     uploading: 'Feltöltés…',
     uploaded: 'Feltöltve',
-    failed: 'Sikertelen',
+    failed: 'Nem sikerült',
   },
   en: {
     title: 'Upload receipt photos',

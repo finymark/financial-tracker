@@ -903,7 +903,7 @@ export function TransactionDrawer({
                       htmlFor="transaction-payee"
                       className="text-sm font-medium"
                     >
-                      {t('transactions.payee')}
+                      {t(`transactions.payee.${form.kind}`)}
                     </label>
                     <Input
                       id="transaction-payee"

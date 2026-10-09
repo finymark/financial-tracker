@@ -84,13 +84,13 @@ test('exports ISO dates, signed two-decimal amounts, and a UTF-8 BOM with CRLF r
 test.each([
   [
     'hu',
-    'Dátum;Számla;Típus;Kedvezményezett;Főkategória;Alkategória;Összeg;Pénznem;Megjegyzés;Címkék;Kizárt',
+    'Dátum;Számla;Típus;Bolt / partner;Főkategória;Alkategória;Összeg;Pénznem;Megjegyzés;Címkék;Kihagyva',
     'Kiadás',
     'Bevétel',
     'Igen',
     'Nem',
+    'Étkezés',
     'Élelmiszer',
-    'Bolt',
     ',',
   ],
   [
