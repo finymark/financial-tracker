@@ -1587,8 +1587,9 @@ by all profiles, in a separate atomically replaced `window-state.json` beside
 `app-settings.json`. Changes are saved after one second without further changes,
 and immediately on close-to-tray and quit. Minimized and full-screen states never
 replace the last usable state. When restoring, the window's title strip must lie
-on a connected display, otherwise the window opens at its default size centred on
-the primary display. A window larger than its display is shrunk to fit. A
+on a connected display. The window is then moved fully onto the display holding
+most of it, and shrunk only if it is larger than that display. Otherwise it opens
+at its default size centred on the primary display, still maximized if it was. A
 `--hidden` start writes nothing before the window is first opened and checks the
 connected displays again at that moment. A missing or invalid `window-state.json`
 is ignored. Older versions never read it, so going back to an older version
@@ -1723,7 +1724,9 @@ the installed build or in a disposable Windows account.
    previous normal or maximized state, not minimized.
 5. Quit with the window on a second display (also one placed above the primary),
    disconnect that display and start again: the window opens centred on the
-   primary display with a reachable title bar and native buttons.
+   primary display with a reachable title bar and native buttons (maximized if
+   it was maximized when you quit). A window left partly off a display edge
+   returns fully on that display at the same size.
 6. Enable **Start with Windows** and sign in again: no window appears and
    `window-state.json` stays unchanged until **Open** in the tray, which applies
    the saved state on the currently connected displays.
