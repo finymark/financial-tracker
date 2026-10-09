@@ -11,13 +11,11 @@ import {
   DEFAULT_QUICK_ADD_ACCELERATOR,
   normaliseAccelerator,
 } from '../shared/accelerator'
-import { parseWindowState, type WindowState } from './window-state'
 
 interface AppSettings {
   version: 1
   trayNoticeShown: boolean
   quickAddAccelerator: string
-  windowState?: WindowState
 }
 
 function parseSettings(value: unknown): AppSettings {
@@ -34,8 +32,7 @@ function parseSettings(value: unknown): AppSettings {
       (key) =>
         key !== 'version' &&
         key !== 'trayNoticeShown' &&
-        key !== 'quickAddAccelerator' &&
-        key !== 'windowState',
+        key !== 'quickAddAccelerator',
     )
   ) {
     throw new Error('Unsupported or invalid app settings')
@@ -43,8 +40,6 @@ function parseSettings(value: unknown): AppSettings {
   return {
     version: 1,
     trayNoticeShown: input.trayNoticeShown,
-    // A malformed window rectangle must not prevent the application from starting.
-    windowState: parseWindowState(input.windowState),
     quickAddAccelerator:
       input.quickAddAccelerator === undefined
         ? DEFAULT_QUICK_ADD_ACCELERATOR
@@ -104,16 +99,6 @@ export class AppSettingsFile {
       ...this.#read(),
       quickAddAccelerator: normaliseAccelerator(accelerator),
     })
-  }
-
-  getWindowState(): WindowState | undefined {
-    return this.#read().windowState
-  }
-
-  setWindowState(state: WindowState): void {
-    const parsed = parseWindowState(state)
-    if (!parsed) throw new Error('Invalid window state')
-    this.#write({ ...this.#read(), windowState: parsed })
   }
 
   #read(): AppSettings {

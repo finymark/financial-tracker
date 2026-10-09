@@ -46,6 +46,7 @@ import { registerReportIpc } from './profiles/report-ipc'
 import { RecurringScheduler } from './recurring-scheduler'
 import { registerRecurringIpc } from './profiles/recurring-ipc'
 import { AppSettingsFile } from './app-settings'
+import { WindowStateFile } from './window-state-file'
 import {
   initialWindowState,
   windowStateToSave,
@@ -342,8 +343,9 @@ function startApplication(): void {
   }
   let trayNoticeShown = settings.isTrayNoticeShown()
   let tray: Tray | null = null
+  const windowStateFile = new WindowStateFile(app.getPath('userData'))
   const initialState = initialWindowState(
-    settings.getWindowState(),
+    windowStateFile.getWindowState(),
     screen.getAllDisplays().map((display) => display.workArea),
     screen.getPrimaryDisplay().workArea,
   )
@@ -366,7 +368,7 @@ function startApplication(): void {
     // Before the first show, retain the intended maximize flag, not the hidden window's.
     pendingWindowState = captureWindowState() ?? pendingWindowState
     try {
-      settings.setWindowState(pendingWindowState)
+      windowStateFile.setWindowState(pendingWindowState)
     } catch {
       console.warn('Could not persist the main window state.')
     }
