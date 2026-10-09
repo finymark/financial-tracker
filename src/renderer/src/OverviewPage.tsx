@@ -164,17 +164,16 @@ export function OverviewPage({
                 aria-labelledby={`overview-${key}`}
                 className="space-y-3 rounded-lg border p-4"
               >
-                <h3
-                  id={`overview-${key}`}
-                  className="flex items-center gap-1 font-medium"
-                >
-                  {t(`overview.${key}`)}
+                <div className="flex items-center gap-1">
+                  <h3 id={`overview-${key}`} className="font-medium">
+                    {t(`overview.${key}`)}
+                  </h3>
                   <HelpHint
                     t={t}
                     topicKey={`overview.${key}`}
                     textKey={`help.overview.${key}`}
                   />
-                </h3>
+                </div>
                 <p className="text-2xl font-semibold">
                   {amount(report.thisMonth[key])}
                 </p>
@@ -212,17 +211,16 @@ export function OverviewPage({
             aria-labelledby="overview-top-categories"
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3
-                id="overview-top-categories"
-                className="flex items-center gap-1 font-medium"
-              >
-                {t('overview.topCategories')}
+              <div className="flex items-center gap-1">
+                <h3 id="overview-top-categories" className="font-medium">
+                  {t('overview.topCategories')}
+                </h3>
                 <HelpHint
                   t={t}
                   topicKey="overview.topCategories"
                   textKey="help.overview.topCategories"
                 />
-              </h3>
+              </div>
               <Button variant="ghost" onClick={onOpenReports}>
                 {t('overview.reports')}
               </Button>

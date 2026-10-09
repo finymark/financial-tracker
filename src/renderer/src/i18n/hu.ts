@@ -204,7 +204,7 @@ export const hu = {
   'receipts.error.notFound': 'A nyugta nem található. Frissítsd a listát.',
   'receipts.error.preview': 'A nyugta előnézete nem hozható létre.',
   'recurring.title': 'Ismétlődő tranzakciók',
-  'recurring.definitions': 'Beállítások',
+  'recurring.definitions': 'Definíciók',
   'recurring.sections': 'Ismétlődő tranzakciók szakaszai',
   'recurring.fromTransaction': 'Ismétlődő tranzakció létrehozása',
   'recurring.fromTemplate': 'Ismétlődő létrehozása sablonból',
@@ -751,7 +751,7 @@ export const hu = {
   'help.transactions.csvSeparator':
     'Válaszd ki, hogyan jelenjenek meg a tizedes törtek a táblázatkezelőben. Pont esetén vessző, vessző esetén pontosvessző választja el a mezőket, így nincs félreértés.',
   'help.transactions.amountCalculator':
-    'A számításhoz a + - * / jeleket és zárójeleket használhatod. A mező elhagyásakor vagy Enter lenyomásakor az eredmény századokra kerekítve jelenik meg.',
+    'A számításhoz a + - * / jeleket és zárójeleket használhatod. A végeredményt századokra kerekíti; a HUF-előnézet egész egységeket mutat.',
   'help.transactions.split':
     'A felosztás egy tranzakciót külön összegű, kategóriájú, címkéjű és megjegyzésű részekre bont. A részek összege egyezzen meg a tranzakció teljes összegével.',
   'help.transactions.transfer':
@@ -760,8 +760,12 @@ export const hu = {
     'Az átvezetési díj külön kiadásként kerül a forrásszámlára. Válassz hozzá kategóriát, és csak akkor zárd ki, ha a kimutatásokban sem szeretnéd látni.',
   'help.transactions.tags':
     'A címkékkel kategóriáktól függetlenül csoportosíthatod a tranzakciókat. Adj hozzá meglévő vagy új címkéket; a Címkék kezelése részen átnevezheted vagy törölheted őket.',
+  'help.transactions.tagsBasic':
+    'A címkékkel kategóriáktól függetlenül csoportosíthatod a tranzakciókat. Válassz meglévő címkét, vagy írj be újat.',
   'help.transactions.attachments':
-    'A mellékletek a profilba másolva a tranzakcióval együtt maradnak. Nyugtafotót, képet vagy PDF-et adhatsz hozzá; az eltávolítás törli a profilban lévő másolatot.',
+    'A mellékletek a profilba másolva a tranzakcióval együtt maradnak. Az eltávolítás leválasztja a fájlt; a Visszavonás visszaállítja. A hivatkozás nélkül maradt fájlt az alkalmazás később törölheti.',
+  'help.transactions.drawer':
+    'Itt kiadást, bevételt vagy átvezetést rögzíthetsz és szerkeszthetsz. Egysoros mezőben az Enter ment; a Ctrl+Enter ment és új űrlapot nyit.',
   'help.receipts.phoneUpload':
     'Ideiglenes feltöltőoldalt indít az azonos privát Wi-Fi-hálózaton lévő telefonhoz. A munkamenet alatt a címet ismerők hozzáférhetnek a feltöltésekhez, ezért csak megbízható privát hálózaton használd, és utána zárd be.',
   'help.recurring.pending':
@@ -787,7 +791,7 @@ export const hu = {
   'help.accounts.create':
     'Hozz létre külön számlát minden olyan helyhez és pénznemhez, ahol pénzt tartasz. Add meg az egyenleget és a dátumot, amelytől az előzmények kezdődnek.',
   'help.accounts.currency':
-    'Minden számlának pontosan egy pénzneme van. Ezt csak addig módosíthatod, amíg nincs tranzakció a számlán.',
+    'Minden számlának pontosan egy pénzneme van. Csak akkor módosíthatod, ha a számlán nincs tranzakció, átvezetés vagy egyenlegkorrekció.',
   'help.accounts.openingBalance':
     'A nyitóegyenleg a számla egyenlege az előzmények kezdetén, a nyitás dátumán. Lehet pozitív, nulla vagy negatív, és számítást is beírhatsz a mezőbe.',
   'help.accounts.archive':
@@ -801,9 +805,9 @@ export const hu = {
   'help.settings.ruleAmountCurrency':
     'Az összeghatárok összehasonlítása ebben a pénznemben történik. Ha a szabály számlafeltételt tartalmaz, automatikusan annak pénzneme érvényes.',
   'help.settings.backups':
-    'A profil megnyitásakor helyi adatbázis-mentés készül, és a legutóbbi tíz indítási mentés marad meg. A visszaállítás az aktuális profiladatokat a kiválasztott mentésre cseréli.',
+    'A visszaállítás az aktuális profiladatokat a kiválasztott mentésre cseréli, ezért a mentés óta végzett módosítások elvesznek.',
   'help.settings.watchedFolder':
-    'A mappába kerülő új nyugtafotókat az alkalmazás beolvassa a Nyugta beérkezők közé. Sikeres átvétel után az eredeti fájlok a feldolgozott almappába kerülnek; szinkronizált helyi mappával másik eszközről is fogadhatsz fotókat.',
+    'A teljesen bemásolt fotót az alkalmazás először a feldolgozott almappába helyezi, majd onnan importálja a Nyugta beérkezők közé. Ha az importálás nem sikerül, a fájl ott marad, és értesítés jelenik meg.',
   'help.settings.shortcut':
     'Ez a rendszerszintű gyorsbillentyű akkor is megnyitja a Gyors rögzítést, ha a főablak rejtve van, és ezen a Windows-fiókon minden profilra érvényes. Fókuszáld a gyorsbillentyű mezőjét, majd nyomd le a kívánt billentyűkombinációt.',
   'help.settings.autostart':
@@ -811,7 +815,7 @@ export const hu = {
   'help.settings.baseCurrency':
     'A kimutatások a többi pénznemet az adott nap árfolyamával erre a pénznemre váltják. A módosítás a kimutatások megjelenítését változtatja, a számlákon tárolt összegeket nem.',
   'help.settings.exchangeRates':
-    'Az alkalmazás letölti és helyben tárolja a hivatalos MNB-árfolyamokat a kimutatások átváltásához. Ha egy árfolyam hiányzik vagy elavult, az érintett összegek a frissítésig külön jelennek meg.',
+    'Az alkalmazás letölti és helyben tárolja a hivatalos MNB-árfolyamokat. A tárolt lefedettség utáni dátumok a legutóbbi tárolt árfolyamot használják, és ideiglenesként jelennek meg. Csak azok az összegek maradnak átváltatlanok, amelyek dátumához nincs korábbi közzétett árfolyam.',
   'help.settings.privacy':
     'A Privát mód elrejti a megjelenített összegeket és olvashatatlanná teszi a diagramértékeket, de a tárolt adatokat nem módosítja. Bárhol átkapcsolhatod a Ctrl+Shift+H billentyűkkel.',
   'help.settings.formattingPreview':

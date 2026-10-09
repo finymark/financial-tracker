@@ -75,17 +75,16 @@ export function ExportCsvDialog({
           }
         }}
       >
-        <h2
-          id="export-csv-title"
-          className="flex items-center gap-1 text-xl font-semibold"
-        >
-          {t('csv.export')}
+        <div className="flex items-center gap-1">
+          <h2 id="export-csv-title" className="text-xl font-semibold">
+            {t('csv.export')}
+          </h2>
           <HelpHint
             t={t}
             topicKey="csv.export"
             textKey="help.transactions.csvExport"
           />
-        </h2>
+        </div>
         <p className="text-sm text-muted-foreground">{t('csv.description')}</p>
         {error && (
           <p role="alert" className="text-sm text-error">

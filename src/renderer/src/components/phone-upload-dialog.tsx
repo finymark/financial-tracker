@@ -104,17 +104,16 @@ export function PhoneUploadDialog({ t, triggerRef, onClose }: Props) {
           }
         }}
       >
-        <h2
-          id="phone-upload-title"
-          className="flex items-center gap-1 text-xl font-semibold"
-        >
-          {t('phoneUpload.title')}
+        <div className="flex items-center gap-1">
+          <h2 id="phone-upload-title" className="text-xl font-semibold">
+            {t('phoneUpload.title')}
+          </h2>
           <HelpHint
             t={t}
             topicKey="phoneUpload.title"
             textKey="help.receipts.phoneUpload"
           />
-        </h2>
+        </div>
         {busy && !session && (
           <p role="status" className="text-sm text-muted-foreground">
             {t('phoneUpload.starting')}
@@ -184,14 +183,7 @@ export function PhoneUploadDialog({ t, triggerRef, onClose }: Props) {
           </>
         )}
         <aside className="space-y-1 rounded border p-3 text-sm">
-          <h3 className="flex items-center gap-1 font-semibold">
-            {t('phoneUpload.firewallTitle')}
-            <HelpHint
-              t={t}
-              topicKey="phoneUpload.firewallTitle"
-              textKey="help.receipts.phoneUpload"
-            />
-          </h3>
+          <h3 className="font-semibold">{t('phoneUpload.firewallTitle')}</h3>
           <p>{t('phoneUpload.firewallGuidance')}</p>
         </aside>
         <div className="flex justify-end">

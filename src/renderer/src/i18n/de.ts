@@ -789,8 +789,12 @@ export const de = {
     'Eine Umbuchungsgebühr wird als eigene Ausgabe im Quellkonto erfasst. Wähle ihre Kategorie und schließe sie nur aus, wenn sie nicht in Berichte einfließen soll.',
   'help.transactions.tags':
     'Tags gruppieren Transaktionen unabhängig von ihren Kategorien. Füge vorhandene oder neue Tags hinzu; unter Tags verwalten kannst du sie umbenennen oder löschen.',
+  'help.transactions.tagsBasic':
+    'Tags gruppieren Transaktionen unabhängig von ihren Kategorien. Wähle ein vorhandenes Tag oder gib ein neues ein.',
   'help.transactions.attachments':
-    'Anhänge werden in dieses Profil kopiert und bei der Transaktion aufbewahrt. Füge Belegfotos, Bilder oder PDFs hinzu; Entfernen löscht die Profilkopie.',
+    'Anhänge werden in dieses Profil kopiert und bei der Transaktion aufbewahrt. Entfernen trennt die Datei ab; Rückgängig stellt sie wieder her. Eine nicht mehr referenzierte Datei kann später bereinigt werden.',
+  'help.transactions.drawer':
+    'Erfasse oder bearbeite hier eine Ausgabe, Einnahme oder Umbuchung. Enter speichert in einem einzeiligen Feld; Strg+Enter speichert und öffnet ein neues Formular.',
   'help.receipts.phoneUpload':
     'Startet vorübergehend eine Upload-Seite für ein Handy im selben privaten WLAN. Während der Sitzung kann jeder mit der Adresse auf Uploads zugreifen; nutze daher nur ein vertrauenswürdiges privates Netzwerk und schließe sie danach.',
   'help.recurring.pending':
@@ -816,7 +820,7 @@ export const de = {
   'help.accounts.create':
     'Erstelle für jeden Ort und jede Währung, an dem du Geld hältst, ein Konto. Lege Saldo und Datum fest, ab dem sein Verlauf beginnen soll.',
   'help.accounts.currency':
-    'Jedes Konto hat genau eine Währung. Du kannst sie nur ändern, solange das Konto keine Transaktionen hat.',
+    'Jedes Konto hat genau eine Währung. Du kannst sie nur ändern, solange das Konto keine Transaktionen, Umbuchungen oder Saldoabgleiche hat.',
   'help.accounts.openingBalance':
     'Der Anfangssaldo ist der Kontosaldo zu Beginn seines Verlaufs am Eröffnungsdatum. Er darf positiv, null oder negativ sein; du kannst auch eine Rechnung in das Feld eingeben.',
   'help.accounts.archive':
@@ -830,9 +834,9 @@ export const de = {
   'help.settings.ruleAmountCurrency':
     'Betragsgrenzen werden in dieser Währung verglichen. Hat die Regel eine Kontobedingung, wird automatisch dessen Währung verwendet.',
   'help.settings.backups':
-    'Beim Öffnen dieses Profils entsteht eine lokale Datenbanksicherung; die letzten zehn Startsicherungen bleiben erhalten. Wiederherstellen ersetzt die aktuellen Profildaten durch die gewählte Sicherung.',
+    'Wiederherstellen ersetzt die aktuellen Profildaten durch die gewählte Sicherung; Änderungen seit dieser Sicherung gehen verloren.',
   'help.settings.watchedFolder':
-    'Die App importiert neue Belegfotos aus diesem Ordner in den Belegeingang. Nach erfolgreicher Übernahme werden die Originaldateien in den Unterordner feldolgozott verschoben; ein synchronisierter lokaler Ordner kann Fotos von einem anderen Gerät empfangen.',
+    'Nachdem ein Foto vollständig kopiert wurde, verschiebt die App es zuerst in den Unterordner feldolgozott und importiert es dann in den Belegeingang. Schlägt der Import fehl, bleibt die Datei dort und ein Hinweis erscheint.',
   'help.settings.shortcut':
     'Dieses systemweite Tastenkürzel öffnet Schnellerfassung auch bei ausgeblendetem Hauptfenster und gilt für alle Profile dieses Windows-Kontos. Fokussiere das Kürzelfeld und drücke die gewünschte Tastenkombination.',
   'help.settings.autostart':
@@ -840,7 +844,7 @@ export const de = {
   'help.settings.baseCurrency':
     'Berichte rechnen andere Währungen mit dem Kurs des jeweiligen Tages in diese Währung um. Eine Änderung betrifft die Berichtsanzeige, nicht gespeicherte Kontobeträge.',
   'help.settings.exchangeRates':
-    'Die App lädt offizielle MNB-Wechselkurse herunter und speichert sie lokal für die Berichtsumrechnung. Fehlt ein Kurs oder ist er veraltet, bleiben betroffene Beträge bis zur Aktualisierung separat.',
+    'Die App lädt offizielle MNB-Kurse herunter und speichert sie lokal. Daten nach dem gespeicherten Abdeckungszeitraum verwenden den letzten gespeicherten Kurs und werden als vorläufig markiert. Nur Beträge ohne früher veröffentlichten Kurs bleiben unumgerechnet.',
   'help.settings.privacy':
     'Der Privatmodus verbirgt angezeigte Beträge und verschleiert Diagrammwerte, ohne gespeicherte Daten zu ändern. Schalte ihn überall mit Strg+Umschalt+H um.',
   'help.settings.formattingPreview':

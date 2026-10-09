@@ -216,14 +216,16 @@ function ProfilePicker({
             className="mx-auto mb-3 size-9 text-primary"
             aria-hidden="true"
           />
-          <h1 className="flex items-center justify-center gap-1 text-2xl font-semibold">
-            {t('profilePicker.title')}
+          <div className="flex items-center justify-center gap-1">
+            <h1 className="text-2xl font-semibold">
+              {t('profilePicker.title')}
+            </h1>
             <HelpHint
               t={t}
               topicKey="profilePicker.title"
               textKey="help.page.profilePicker"
             />
-          </h1>
+          </div>
           <p className="mt-2 text-sm text-muted-foreground">
             {t('profilePicker.description')}
           </p>
@@ -231,14 +233,14 @@ function ProfilePicker({
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-1">
-              {t('profilePicker.choose')}
+            <div className="flex items-center gap-1">
+              <CardTitle>{t('profilePicker.choose')}</CardTitle>
               <HelpHint
                 t={t}
                 topicKey="profilePicker.choose"
                 textKey="help.profilePicker.profiles"
               />
-            </CardTitle>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {snapshot.profiles.length === 0 ? (
@@ -364,14 +366,14 @@ function ProfilePicker({
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-1">
-              {t('profile.create')}
+            <div className="flex items-center gap-1">
+              <CardTitle>{t('profile.create')}</CardTitle>
               <HelpHint
                 t={t}
                 topicKey="profile.create"
                 textKey="help.profilePicker.create"
               />
-            </CardTitle>
+            </div>
             <CardDescription>{t('profile.createDescription')}</CardDescription>
           </CardHeader>
           <CardContent>
@@ -847,17 +849,19 @@ function Shell({
                 />
               </div>
             )}
-            <h1
-              id="page-title"
-              className="flex items-center gap-1 text-2xl font-semibold tracking-tight"
-            >
-              {t(`navigation.${page}`)}
+            <div className="flex items-center gap-1">
+              <h1
+                id="page-title"
+                className="text-2xl font-semibold tracking-tight"
+              >
+                {t(`navigation.${page}`)}
+              </h1>
               <HelpHint
                 t={t}
                 topicKey={`navigation.${page}`}
                 textKey={`help.page.${page}`}
               />
-            </h1>
+            </div>
           </header>
           <Card>
             <CardHeader>
@@ -1076,17 +1080,16 @@ function Shell({
                   className="rounded-lg bg-muted p-4"
                   aria-labelledby="formatting-preview"
                 >
-                  <h3
-                    id="formatting-preview"
-                    className="mb-3 flex items-center gap-1 text-sm font-medium"
-                  >
-                    {t('settings.preview')}
+                  <div className="mb-3 flex items-center gap-1">
+                    <h3 id="formatting-preview" className="text-sm font-medium">
+                      {t('settings.preview')}
+                    </h3>
                     <HelpHint
                       t={t}
                       topicKey="settings.preview"
                       textKey="help.settings.formattingPreview"
                     />
-                  </h3>
+                  </div>
                   <dl className="grid gap-4 text-sm sm:grid-cols-2">
                     <div>
                       <dt className="text-muted-foreground">

@@ -756,8 +756,12 @@ export const en = {
     'A transfer fee is recorded as a separate expense in the source account. Choose its category and exclude it only if it should stay out of reports.',
   'help.transactions.tags':
     'Tags group transactions independently of their categories. Add existing or new tags, and use Manage tags to rename or delete them.',
+  'help.transactions.tagsBasic':
+    'Tags group transactions independently of their categories. Choose an existing tag or enter a new one.',
   'help.transactions.attachments':
-    'Attachments are copied into this profile and kept with the transaction. Add receipt photos, images or PDFs; removing one deletes the profile copy.',
+    'Attachments are copied into this profile and kept with the transaction. Removing one detaches it; Undo restores it. An unreferenced file may be cleaned up later.',
+  'help.transactions.drawer':
+    'Record or edit an expense, income or transfer here. Enter saves from a single-line field; Ctrl+Enter saves and opens a new form.',
   'help.receipts.phoneUpload':
     'Start a temporary upload page for a phone on the same private Wi-Fi. Anyone who can open the address during the session can access its uploads, so use only a trusted private network and close it when finished.',
   'help.recurring.pending':
@@ -783,7 +787,7 @@ export const en = {
   'help.accounts.create':
     'Create an account for each place and currency where money is held. Set the balance and date from which its history should begin.',
   'help.accounts.currency':
-    'Each account has exactly one currency. You can change it only before the account has transactions.',
+    'Each account has exactly one currency. You can change it only while the account has no transactions, transfers or balance adjustments.',
   'help.accounts.openingBalance':
     'The opening balance is the account balance at the start of its history on the opening date. It may be positive, zero or negative, and you can enter a calculation in the field.',
   'help.accounts.archive':
@@ -797,9 +801,9 @@ export const en = {
   'help.settings.ruleAmountCurrency':
     'Amount boundaries are compared in this currency. If the rule has an account condition, that account’s currency is used automatically.',
   'help.settings.backups':
-    'A local database backup is created when this profile opens, and the latest ten startup backups are kept. Restoring replaces current profile data with the selected backup.',
+    'Restoring replaces current profile data with the selected backup, so changes made since that backup are lost.',
   'help.settings.watchedFolder':
-    'The app imports new receipt photos from this folder into the receipt inbox. After a successful intake, the original files move to the feldolgozott subfolder; a synced local folder can accept photos from another device.',
+    'After a photo finishes copying, the app first moves it to the feldolgozott subfolder, then imports it into the receipt inbox. If import fails, the file stays there and a notice appears.',
   'help.settings.shortcut':
     'This system-wide shortcut opens Quick add even when the main window is hidden, and applies to every profile on this Windows account. Focus the shortcut field and press the desired key combination.',
   'help.settings.autostart':
@@ -807,7 +811,7 @@ export const en = {
   'help.settings.baseCurrency':
     'Reports convert other currencies into this currency using the exchange rate for each date. Changing it changes report display, not stored account amounts.',
   'help.settings.exchangeRates':
-    'The app downloads and stores official MNB exchange rates locally for report conversion. If a rate is missing or stale, affected amounts remain separate until rates refresh.',
+    'The app downloads and stores official MNB rates locally. Dates after cached coverage use the latest cached rate and are marked provisional. Only amounts with no earlier published rate remain unconverted.',
   'help.settings.privacy':
     'Privacy mode hides displayed amounts and obscures chart values without changing stored data. Toggle it anywhere with Ctrl+Shift+H.',
   'help.settings.formattingPreview':

@@ -46,7 +46,7 @@ export function TagManager({
         <HelpHint
           t={t}
           topicKey="tags.title"
-          textKey="help.transactions.tags"
+          textKey="help.transactions.tagsBasic"
         />
       </div>
       {tags.length === 0 && (

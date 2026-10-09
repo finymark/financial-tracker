@@ -579,39 +579,39 @@ export function TransactionDrawer({
             className="ml-auto h-full w-full max-w-lg overflow-y-auto border-l bg-background p-6 shadow-xl"
           >
             <div className="mb-6 flex items-center justify-between gap-3">
-              <h2
-                id="transaction-drawer-title"
-                className="flex items-center gap-1 text-xl font-semibold"
-              >
-                {t(
-                  form.kind === 'adjustment'
-                    ? form.id
-                      ? 'adjustments.edit'
-                      : 'adjustments.setRealBalance'
-                    : form.id
-                      ? 'transactions.edit'
-                      : 'transactions.create',
-                )}
+              <div className="flex items-center gap-1">
+                <h2
+                  id="transaction-drawer-title"
+                  className="text-xl font-semibold"
+                >
+                  {t(
+                    form.kind === 'adjustment'
+                      ? form.id
+                        ? 'adjustments.edit'
+                        : 'adjustments.setRealBalance'
+                      : form.id
+                        ? 'transactions.edit'
+                        : 'transactions.create',
+                  )}
+                </h2>
                 <HelpHint
                   t={t}
                   topicKey={
                     form.kind === 'adjustment'
-                      ? 'adjustments.setRealBalance'
-                      : form.kind === 'transfer'
-                        ? 'transactions.transfer'
-                        : form.id
-                          ? 'transactions.edit'
-                          : 'transactions.create'
+                      ? form.id
+                        ? 'adjustments.edit'
+                        : 'adjustments.setRealBalance'
+                      : form.id
+                        ? 'transactions.edit'
+                        : 'transactions.create'
                   }
                   textKey={
                     form.kind === 'adjustment'
                       ? 'help.transactions.balanceAdjustment'
-                      : form.kind === 'transfer'
-                        ? 'help.transactions.transfer'
-                        : 'help.page.transactions'
+                      : 'help.transactions.drawer'
                   }
                 />
-              </h2>
+              </div>
               <Button
                 variant="ghost"
                 size="icon"
@@ -702,7 +702,13 @@ export function TransactionDrawer({
                       </label>
                       <HelpHint
                         t={t}
-                        topicKey="transactions.amount"
+                        topicKey={
+                          form.kind === 'transfer'
+                            ? 'transactions.fromAmount'
+                            : form.kind === 'adjustment'
+                              ? 'adjustments.observedBalance'
+                              : 'transactions.amount'
+                        }
                         textKey="help.transactions.amountCalculator"
                       />
                     </div>

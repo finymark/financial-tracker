@@ -322,17 +322,16 @@ export function AccountsPage({
         className="space-y-4 border-t pt-6"
         aria-labelledby="create-account-title"
       >
-        <h3
-          id="create-account-title"
-          className="flex items-center gap-1 font-semibold"
-        >
-          {t('accounts.create')}
+        <div className="flex items-center gap-1">
+          <h3 id="create-account-title" className="font-semibold">
+            {t('accounts.create')}
+          </h3>
           <HelpHint
             t={t}
             topicKey="accounts.create"
             textKey="help.accounts.create"
           />
-        </h3>
+        </div>
         <form className="space-y-4" onSubmit={submitCreate}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">

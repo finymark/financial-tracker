@@ -1,9 +1,10 @@
 import {
+  useEffect,
   useId,
   useLayoutEffect,
+  useReducer,
   useRef,
   useState,
-  type PointerEvent,
 } from 'react'
 import { createPortal } from 'react-dom'
 import { CircleHelp } from 'lucide-react'
@@ -29,6 +30,30 @@ export interface HelpTooltipPosition {
 
 interface ViewportInsets {
   top?: number
+}
+
+interface HelpHintVisibility {
+  open: boolean
+  pinned: boolean
+  hovered: boolean
+}
+
+type HelpHintVisibilityEvent =
+  'pointerEnter' | 'pointerLeave' | 'focus' | 'activate' | 'dismiss'
+
+export function helpHintVisibility(
+  state: HelpHintVisibility,
+  event: HelpHintVisibilityEvent,
+): HelpHintVisibility {
+  if (event === 'pointerEnter') return { ...state, open: true, hovered: true }
+  if (event === 'pointerLeave')
+    return { ...state, open: state.pinned, hovered: false }
+  if (event === 'focus') return { ...state, open: true }
+  if (event === 'activate')
+    return state.pinned
+      ? { ...state, open: false, pinned: false }
+      : { ...state, open: true, pinned: true }
+  return { ...state, open: false, pinned: false }
 }
 
 const VIEWPORT_PADDING = 8
@@ -97,8 +122,12 @@ export function HelpHint({ t, topicKey, textKey }: HelpHintProps) {
   const tooltipId = useId()
   const buttonRef = useRef<HTMLButtonElement>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
-  const [open, setOpen] = useState(false)
-  const [pinned, setPinned] = useState(false)
+  const [visibility, updateVisibility] = useReducer(helpHintVisibility, {
+    open: false,
+    pinned: false,
+    hovered: false,
+  })
+  const { open } = visibility
   const [position, setPosition] = useState<HelpTooltipPosition | null>(null)
 
   useLayoutEffect(() => {
@@ -125,25 +154,27 @@ export function HelpHint({ t, topicKey, textKey }: HelpHintProps) {
     }
   }, [open, text])
 
-  function close() {
-    setPinned(false)
-    setOpen(false)
-  }
+  useEffect(() => {
+    if (!open) return
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
+      updateVisibility('dismiss')
+    }
+    window.addEventListener('keydown', dismiss, true)
+    return () => window.removeEventListener('keydown', dismiss, true)
+  }, [open])
 
-  function leave(event: PointerEvent<HTMLSpanElement>) {
-    if (
-      event.relatedTarget instanceof Node &&
-      event.currentTarget.contains(event.relatedTarget)
-    )
-      return
-    if (!pinned) setOpen(false)
+  function close() {
+    updateVisibility('dismiss')
   }
 
   return (
     <span
       className="inline-flex shrink-0 align-middle"
-      onPointerEnter={() => setOpen(true)}
-      onPointerLeave={leave}
+      onPointerEnter={() => updateVisibility('pointerEnter')}
+      onPointerLeave={() => updateVisibility('pointerLeave')}
     >
       <button
         ref={buttonRef}
@@ -153,31 +184,15 @@ export function HelpHint({ t, topicKey, textKey }: HelpHintProps) {
         aria-label={`${t('help.accessibleName')}: ${t(topicKey)}`}
         aria-describedby={descriptionId}
         aria-expanded={open}
-        onFocus={() => setOpen(true)}
+        onFocus={() => updateVisibility('focus')}
         onBlur={close}
-        onClick={() => {
-          if (pinned) close()
-          else {
-            setPinned(true)
-            setOpen(true)
-          }
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape' && open) {
-            event.preventDefault()
-            event.stopPropagation()
-            close()
-          }
-        }}
+        onClick={() => updateVisibility('activate')}
       >
         <CircleHelp aria-hidden="true" className="size-4" />
       </button>
-      {createPortal(
-        <span id={descriptionId} className="sr-only">
-          {text}
-        </span>,
-        document.body,
-      )}
+      <span id={descriptionId} hidden>
+        {text}
+      </span>
       {open &&
         createPortal(
           <div

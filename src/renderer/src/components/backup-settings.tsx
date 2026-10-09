@@ -95,14 +95,14 @@ export function BackupSettings({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-1">
-          {t('backups.title')}
+        <div className="flex items-center gap-1">
+          <CardTitle>{t('backups.title')}</CardTitle>
           <HelpHint
             t={t}
             topicKey="backups.title"
             textKey="help.settings.backups"
           />
-        </CardTitle>
+        </div>
         <CardDescription>{t('backups.description')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

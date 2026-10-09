@@ -116,14 +116,14 @@ export function CategorySettings({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-1">
-          {t('categories.title')}
+        <div className="flex items-center gap-1">
+          <CardTitle>{t('categories.title')}</CardTitle>
           <HelpHint
             t={t}
             topicKey="categories.title"
             textKey="help.settings.categories"
           />
-        </CardTitle>
+        </div>
         <CardDescription>{t('categories.description')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -150,17 +150,16 @@ export function CategorySettings({
               className="space-y-3"
               aria-labelledby={`categories-${groupKind}`}
             >
-              <h3
-                id={`categories-${groupKind}`}
-                className="flex items-center gap-1 font-semibold"
-              >
-                {t(`categories.${groupKind}`)}
+              <div className="flex items-center gap-1">
+                <h3 id={`categories-${groupKind}`} className="font-semibold">
+                  {t(`categories.${groupKind}`)}
+                </h3>
                 <HelpHint
                   t={t}
                   topicKey={`categories.${groupKind}`}
                   textKey="help.settings.categories"
                 />
-              </h3>
+              </div>
               <ul className="space-y-2">
                 {categories
                   .filter((category) => category.kind === groupKind)
@@ -415,17 +414,16 @@ export function CategorySettings({
           className="space-y-3 border-t pt-6"
           aria-labelledby="create-category-title"
         >
-          <h3
-            id="create-category-title"
-            className="flex items-center gap-1 font-semibold"
-          >
-            {t('categories.create')}
+          <div className="flex items-center gap-1">
+            <h3 id="create-category-title" className="font-semibold">
+              {t('categories.create')}
+            </h3>
             <HelpHint
               t={t}
               topicKey="categories.create"
               textKey="help.settings.categories"
             />
-          </h3>
+          </div>
           <form className="space-y-4" onSubmit={submitCreate}>
             <div className="space-y-2">
               <label htmlFor="category-name" className="text-sm font-medium">

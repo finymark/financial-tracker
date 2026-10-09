@@ -280,17 +280,16 @@ export function ReportsPage({
           <section className="space-y-3" aria-labelledby="report-total">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3
-                  id="report-total"
-                  className="flex items-center gap-1 text-sm font-medium"
-                >
-                  {t('reports.total')}
+                <div className="flex items-center gap-1">
+                  <h3 id="report-total" className="text-sm font-medium">
+                    {t('reports.total')}
+                  </h3>
                   <HelpHint
                     t={t}
-                    topicKey="reports.title"
+                    topicKey="reports.total"
                     textKey="help.reports.category"
                   />
-                </h3>
+                </div>
                 <p className="text-2xl font-semibold tabular-nums">
                   {format.amount(
                     report.total.roundedMinor,
@@ -451,7 +450,9 @@ export function ReportsPage({
               </h3>
               <HelpHint
                 t={t}
-                topicKey="reports.categories"
+                topicKey={
+                  selected ? 'reports.subcategories' : 'reports.categories'
+                }
                 textKey="help.reports.breakdown"
               />
             </div>

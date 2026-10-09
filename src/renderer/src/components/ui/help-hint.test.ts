@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { placeHelpTooltip } from './help-hint'
+import { helpHintVisibility, placeHelpTooltip } from './help-hint'
 
 const tooltip = { width: 240, height: 96 }
 const viewport = { width: 800, height: 600 }
@@ -62,5 +62,34 @@ describe('placeHelpTooltip', () => {
         { width: 320, height: 200 },
       ),
     ).toEqual({ left: 8, top: 8, placement: 'bottom' })
+  })
+})
+
+describe('helpHintVisibility', () => {
+  test('pins on first activation and closes on second activation', () => {
+    const hovered = helpHintVisibility(
+      { open: false, pinned: false, hovered: false },
+      'pointerEnter',
+    )
+    const pinned = helpHintVisibility(hovered, 'activate')
+    expect(pinned).toEqual({ open: true, pinned: true, hovered: true })
+    expect(helpHintVisibility(pinned, 'activate')).toEqual({
+      open: false,
+      pinned: false,
+      hovered: true,
+    })
+  })
+
+  test('reopens when the pointer leaves and hovers again after dismissal', () => {
+    const dismissed = helpHintVisibility(
+      { open: true, pinned: false, hovered: true },
+      'dismiss',
+    )
+    const left = helpHintVisibility(dismissed, 'pointerLeave')
+    expect(helpHintVisibility(left, 'pointerEnter')).toEqual({
+      open: true,
+      pinned: false,
+      hovered: true,
+    })
   })
 })

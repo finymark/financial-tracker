@@ -121,17 +121,16 @@ export function MonthlyTrendReport({
   return (
     <section className="space-y-4" aria-labelledby="monthly-trend-title">
       <div>
-        <h3
-          id="monthly-trend-title"
-          className="flex items-center gap-1 font-medium"
-        >
-          {t('reports.trend.title')}
+        <div className="flex items-center gap-1">
+          <h3 id="monthly-trend-title" className="font-medium">
+            {t('reports.trend.title')}
+          </h3>
           <HelpHint
             t={t}
             topicKey="reports.trend.title"
             textKey="help.reports.trend"
           />
-        </h3>
+        </div>
         <p className="text-sm text-muted-foreground">
           {t('reports.trend.description')}
         </p>

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { AutostartStatus } from '../../../shared/desktop'
 import type { MessageKey } from '../i18n'
-import { HelpHint } from './ui/help-hint'
 
 export function AutostartSettings({ t }: { t: (key: MessageKey) => string }) {
   const [status, setStatus] = useState<AutostartStatus | null>(null)
@@ -37,23 +36,16 @@ export function AutostartSettings({ t }: { t: (key: MessageKey) => string }) {
 
   return (
     <section className="space-y-2">
-      <div className="flex items-center gap-1">
-        <label className="flex items-center gap-2 text-sm font-medium">
-          <input
-            type="checkbox"
-            checked={status?.openAtLogin ?? false}
-            disabled={!status?.supported || busy}
-            aria-describedby="autostart-description"
-            onChange={(event) => void toggle(event.target.checked)}
-          />
-          {t('settings.autostart')}
-        </label>
-        <HelpHint
-          t={t}
-          topicKey="settings.autostart"
-          textKey="help.settings.autostart"
+      <label className="flex items-center gap-2 text-sm font-medium">
+        <input
+          type="checkbox"
+          checked={status?.openAtLogin ?? false}
+          disabled={!status?.supported || busy}
+          aria-describedby="autostart-description"
+          onChange={(event) => void toggle(event.target.checked)}
         />
-      </div>
+        {t('settings.autostart')}
+      </label>
       <p id="autostart-description" className="text-sm text-muted-foreground">
         {t('settings.autostartDescription')}
         {status && !status.supported && (

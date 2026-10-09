@@ -169,14 +169,16 @@ function RecurringEditor({
 
   return (
     <form className="space-y-4 rounded-lg border p-4" onSubmit={submit}>
-      <h3 className="flex items-center gap-1 font-semibold">
-        {t(item ? 'recurring.edit' : 'recurring.create')}
+      <div className="flex items-center gap-1">
+        <h3 className="font-semibold">
+          {t(item ? 'recurring.edit' : 'recurring.create')}
+        </h3>
         <HelpHint
           t={t}
           topicKey={item ? 'recurring.edit' : 'recurring.create'}
           textKey="help.recurring.editor"
         />
-      </h3>
+      </div>
       <p className="text-sm text-muted-foreground">
         {t('recurring.creationHint')}
       </p>
@@ -467,17 +469,16 @@ function PendingEditor({
           }
         }}
       >
-        <h3
-          id="pending-editor-title"
-          className="flex items-center gap-1 text-lg font-semibold"
-        >
-          {t('pending.editAndConfirm')}
+        <div className="flex items-center gap-1">
+          <h3 id="pending-editor-title" className="text-lg font-semibold">
+            {t('pending.editAndConfirm')}
+          </h3>
           <HelpHint
             t={t}
             topicKey="pending.editAndConfirm"
             textKey="help.recurring.pending"
           />
-        </h3>
+        </div>
         {error && (
           <p role="alert" className="text-sm text-error">
             {t('transactions.error.amount')}

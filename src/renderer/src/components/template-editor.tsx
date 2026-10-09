@@ -84,14 +84,16 @@ export function TemplateEditor({
   }
   return (
     <form onSubmit={submit} className="space-y-4 rounded-md border p-3">
-      <h3 className="flex items-center gap-1 font-semibold">
-        {t(template ? 'templates.edit' : 'templates.create')}
+      <div className="flex items-center gap-1">
+        <h3 className="font-semibold">
+          {t(template ? 'templates.edit' : 'templates.create')}
+        </h3>
         <HelpHint
           t={t}
           topicKey={template ? 'templates.edit' : 'templates.create'}
           textKey="help.transactions.templates"
         />
-      </h3>
+      </div>
       <p className="text-sm text-muted-foreground">
         {t('templates.optionalHint')}
       </p>

@@ -342,7 +342,7 @@ function QuickAddForm({
             <HelpHint
               t={t}
               topicKey="tags.title"
-              textKey="help.transactions.tags"
+              textKey="help.transactions.tagsBasic"
             />
           </div>
           <div className="flex gap-2">
@@ -498,14 +498,14 @@ export default function QuickAddApp() {
         <TitleBar profileName={active?.name} />
         <main className="window-content min-h-0 flex-1 overflow-y-auto bg-background p-5 text-foreground">
           <header className="mb-5 flex items-center justify-between gap-3">
-            <h1 className="flex items-center gap-1 text-xl font-semibold">
-              {t('quickAdd.title')}
+            <div className="flex items-center gap-1">
+              <h1 className="text-xl font-semibold">{t('quickAdd.title')}</h1>
               <HelpHint
                 t={t}
                 topicKey="quickAdd.title"
                 textKey="help.page.quickAdd"
               />
-            </h1>
+            </div>
             <Button
               variant="ghost"
               onClick={() => void window.app.desktop.closeQuickAdd()}

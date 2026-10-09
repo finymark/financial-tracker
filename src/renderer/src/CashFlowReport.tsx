@@ -126,17 +126,16 @@ export function CashFlowReport({ request, language, t }: CashFlowReportProps) {
   return (
     <section className="space-y-4" aria-labelledby="cash-flow-title">
       <div>
-        <h3
-          id="cash-flow-title"
-          className="flex items-center gap-1 font-medium"
-        >
-          {t('reports.cashFlow.title')}
+        <div className="flex items-center gap-1">
+          <h3 id="cash-flow-title" className="font-medium">
+            {t('reports.cashFlow.title')}
+          </h3>
           <HelpHint
             t={t}
             topicKey="reports.cashFlow.title"
             textKey="help.reports.cashFlow"
           />
-        </h3>
+        </div>
         <p className="text-sm text-muted-foreground">
           {t('reports.cashFlow.description')}
         </p>

@@ -37,17 +37,16 @@ export function AttachmentEditor({
   return (
     <section className="space-y-3" aria-labelledby="attachments-title">
       <div className="flex items-center justify-between gap-2">
-        <h3
-          id="attachments-title"
-          className="flex items-center gap-1 text-sm font-medium"
-        >
-          {t('attachments.title')}
+        <div className="flex items-center gap-1">
+          <h3 id="attachments-title" className="text-sm font-medium">
+            {t('attachments.title')}
+          </h3>
           <HelpHint
             t={t}
             topicKey="attachments.title"
             textKey="help.transactions.attachments"
           />
-        </h3>
+        </div>
         <Button
           variant="ghost"
           disabled={busy}

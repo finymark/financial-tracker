@@ -8,7 +8,6 @@ import {
 import type { MessageKey } from '../i18n'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
-import { HelpHint } from './ui/help-hint'
 
 export function shortcutConflictMessage(
   t: (key: MessageKey) => string,
@@ -67,16 +66,8 @@ export function ShortcutSettings({ t }: { t: (key: MessageKey) => string }) {
 
   return (
     <section className="space-y-2" aria-labelledby="shortcut-heading">
-      <h3
-        id="shortcut-heading"
-        className="flex items-center gap-1 text-sm font-medium"
-      >
+      <h3 id="shortcut-heading" className="text-sm font-medium">
         {t('settings.shortcut')}
-        <HelpHint
-          t={t}
-          topicKey="settings.shortcut"
-          textKey="help.settings.shortcut"
-        />
       </h3>
       <p className="text-sm text-muted-foreground">
         {t('settings.shortcutDescription')}

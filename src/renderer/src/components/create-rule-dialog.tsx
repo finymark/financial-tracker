@@ -56,17 +56,16 @@ export function CreateRuleDialog({
           }
         }}
       >
-        <h2
-          id="create-rule-title"
-          className="flex items-center gap-1 text-xl font-semibold"
-        >
-          {t('rules.create')}
+        <div className="flex items-center gap-1">
+          <h2 id="create-rule-title" className="text-xl font-semibold">
+            {t('rules.create')}
+          </h2>
           <HelpHint
             t={t}
             topicKey="rules.create"
             textKey="help.settings.rules"
           />
-        </h2>
+        </div>
         {error && (
           <p role="alert" className="text-sm text-error">
             {t(error)}
