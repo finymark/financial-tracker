@@ -23,9 +23,9 @@ test('omits the interval for schedules that repeat every month or week', () => {
 })
 
 test.each([
-  ['hu', 'Havonta · 15. · 3 havonta', 'Hétfő · 2 hetente'],
-  ['en', 'Monthly · 15. · every 3 months', 'Monday · every 2 weeks'],
-  ['de', 'Monatlich · 15. · alle 3 Monate', 'Montag · alle 2 Wochen'],
+  ['hu', '3 havonta · 15.', 'Hétfő · 2 hetente'],
+  ['en', 'every 3 months · 15.', 'Monday · every 2 weeks'],
+  ['de', 'alle 3 Monate · 15.', 'Montag · alle 2 Wochen'],
 ] as const)('formats longer intervals in %s', (language, monthly, weekly) => {
   expect(
     recurringScheduleText(
