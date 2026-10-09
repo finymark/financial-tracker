@@ -16,6 +16,7 @@ import { Button } from './components/ui/button'
 import { CardContent } from './components/ui/card'
 import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
+import { HelpHint } from './components/ui/help-hint'
 import type { Language, MessageKey } from './i18n'
 import {
   BaseCurrencyTotals,
@@ -266,20 +267,36 @@ export function TransactionsPage({
           {t('transactions.listDescription')}
         </p>
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="ghost"
-            disabled={busy || loading}
-            onClick={() => setForm(emptyForm(accountOptions[0]?.id))}
-          >
-            {t('templates.title')}
-          </Button>
-          <Button
-            variant="ghost"
-            disabled={busy || loading || accountOptions.length === 0}
-            onClick={() => setForm(emptyAdjustmentForm(accountOptions[0]?.id))}
-          >
-            {t('adjustments.setRealBalance')}
-          </Button>
+          <span className="inline-flex items-center gap-1">
+            <Button
+              variant="ghost"
+              disabled={busy || loading}
+              onClick={() => setForm(emptyForm(accountOptions[0]?.id))}
+            >
+              {t('templates.title')}
+            </Button>
+            <HelpHint
+              t={t}
+              topicKey="templates.title"
+              textKey="help.transactions.templates"
+            />
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Button
+              variant="ghost"
+              disabled={busy || loading || accountOptions.length === 0}
+              onClick={() =>
+                setForm(emptyAdjustmentForm(accountOptions[0]?.id))
+              }
+            >
+              {t('adjustments.setRealBalance')}
+            </Button>
+            <HelpHint
+              t={t}
+              topicKey="adjustments.setRealBalance"
+              textKey="help.transactions.balanceAdjustment"
+            />
+          </span>
           <Button
             ref={createRef}
             disabled={busy || loading || accountOptions.length === 0}
@@ -316,6 +333,14 @@ export function TransactionsPage({
         className="grid gap-3 rounded-md border p-3 sm:grid-cols-3 lg:grid-cols-6"
         aria-label={t('transactions.filters')}
       >
+        <div className="flex items-center gap-1 text-xs font-medium sm:col-span-3 lg:col-span-6">
+          {t('transactions.filters')}
+          <HelpHint
+            t={t}
+            topicKey="transactions.filters"
+            textKey="help.transactions.filters"
+          />
+        </div>
         {reportFilterActive && (
           <div className="flex items-center gap-2 self-end text-xs text-muted-foreground sm:col-span-3 lg:col-span-6">
             <span className="rounded-full border bg-muted px-3 py-1">
@@ -453,9 +478,19 @@ export function TransactionsPage({
             }
           />
         </label>
-        <label className="space-y-1 text-xs font-medium">
-          {t('transactions.exclusion')}
+        <div className="space-y-1 text-xs font-medium">
+          <div className="flex items-center gap-1">
+            <label htmlFor="transaction-exclusion-filter">
+              {t('transactions.exclusion')}
+            </label>
+            <HelpHint
+              t={t}
+              topicKey="transactions.exclusion"
+              textKey="help.transactions.excluded"
+            />
+          </div>
           <NativeSelect
+            id="transaction-exclusion-filter"
             value={filters.exclusion}
             onChange={(event) =>
               setFilters({
@@ -472,23 +507,29 @@ export function TransactionsPage({
               ),
             )}
           </NativeSelect>
-        </label>
+        </div>
         <Button type="submit" disabled={busy || loading} className="self-end">
           {t('transactions.applyFilters')}
         </Button>
-        <Button
-          ref={exportRef}
-          type="button"
-          variant="ghost"
-          disabled={busy || loading}
-          className="self-end"
-          onClick={() => {
-            setCsvSaved(false)
-            setExportOpen(true)
-          }}
-        >
-          {t('csv.export')}
-        </Button>
+        <span className="flex items-center gap-1 self-end">
+          <Button
+            ref={exportRef}
+            type="button"
+            variant="ghost"
+            disabled={busy || loading}
+            onClick={() => {
+              setCsvSaved(false)
+              setExportOpen(true)
+            }}
+          >
+            {t('csv.export')}
+          </Button>
+          <HelpHint
+            t={t}
+            topicKey="csv.export"
+            textKey="help.transactions.csvExport"
+          />
+        </span>
       </form>
       {csvSaved && (
         <p role="status" className="text-sm text-muted-foreground">

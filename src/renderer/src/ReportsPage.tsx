@@ -28,6 +28,7 @@ import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
 import { type Language, type MessageKey } from './i18n'
 import { MonthlyTrendReport } from './MonthlyTrendReport'
+import { HelpHint } from './components/ui/help-hint'
 
 interface ReportsPageProps {
   language: Language
@@ -191,6 +192,14 @@ export function ReportsPage({
           onSubmit={apply}
           aria-label={t('reports.dateRange')}
         >
+          <div className="flex items-center gap-1 self-center text-xs font-medium">
+            {t('reports.dateRange')}
+            <HelpHint
+              t={t}
+              topicKey="reports.dateRange"
+              textKey="help.reports.dateRange"
+            />
+          </div>
           <label className="min-w-40 space-y-1 text-xs font-medium">
             {t('transactions.period')}
             <NativeSelect
@@ -271,9 +280,16 @@ export function ReportsPage({
           <section className="space-y-3" aria-labelledby="report-total">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 id="report-total" className="text-sm font-medium">
-                  {t('reports.total')}
-                </h3>
+                <div className="flex items-center gap-1">
+                  <h3 id="report-total" className="text-sm font-medium">
+                    {t('reports.total')}
+                  </h3>
+                  <HelpHint
+                    t={t}
+                    topicKey="reports.total"
+                    textKey="help.reports.category"
+                  />
+                </div>
                 <p className="text-2xl font-semibold tabular-nums">
                   {format.amount(
                     report.total.roundedMinor,
@@ -432,6 +448,13 @@ export function ReportsPage({
                   ? `${categoryName(selected)} — ${t('reports.subcategories')}`
                   : t('reports.categories')}
               </h3>
+              <HelpHint
+                t={t}
+                topicKey={
+                  selected ? 'reports.subcategories' : 'reports.categories'
+                }
+                textKey="help.reports.breakdown"
+              />
             </div>
             <div className="overflow-x-auto rounded-md border">
               <table className="w-full text-sm">

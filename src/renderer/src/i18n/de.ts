@@ -734,4 +734,113 @@ export const de = {
   'phoneUpload.firewallGuidance':
     'Windows fragt möglicherweise nach einer Freigabe für „Financial Tracker“. Erlaube sie nur in privaten Netzwerken. Wenn das Handy keine Verbindung herstellen kann, müssen beide Geräte dasselbe WLAN verwenden und das Windows-Netzwerk muss auf Privat eingestellt sein.',
   'phoneUpload.close': 'Schließen',
+  'help.accessibleName': 'Hilfe',
+  'help.page.profilePicker':
+    'Ein Profil enthält die getrennten Finanzen einer Person. Wähle ein vorhandenes Profil oder erstelle ein neues; jedes Profil wird lokal in einer eigenen Datenbank gespeichert.',
+  'help.profilePicker.profiles':
+    'Öffne ein Profil, um seine getrennten Finanzen und Einstellungen zu verwenden. Du kannst es auch umbenennen oder seine lokalen Daten dauerhaft löschen.',
+  'help.profilePicker.create':
+    'Erstelle auf diesem PC ein Profil für einen weiteren getrennten Finanzbestand. Gib ihm einen erkennbaren Namen; du kannst ihn später ändern.',
+  'help.page.overview':
+    'Vergleiche Ausgaben, Einnahmen und Netto des laufenden Monats mit dem vollständigen Vormonat; ausgeschlossene Transaktionen bleiben außen vor. Beträge werden in deine Basiswährung umgerechnet, wenn ein Wechselkurs verfügbar ist.',
+  'help.page.transactions':
+    'Erfasse und prüfe Ausgaben, Einnahmen, Umbuchungen und Saldoabgleiche. Mit Filtern grenzt du die Liste und ihre Summen ein.',
+  'help.page.receipts':
+    'Belegfotos warten hier, bis du sie als Transaktionen bestätigst oder verwirfst. Die Texterkennung läuft lokal; prüfe vorausgefüllte Angaben immer.',
+  'help.page.recurring':
+    'Lege Ausgaben oder Einnahmen fest, die sich nach einem Zeitplan wiederholen. Fällige Vorkommen werden ausstehend und wirken sich erst nach deiner Bestätigung auf die Finanzen aus.',
+  'help.page.reports':
+    'Untersuche Ausgaben und Einnahmen in deiner Basiswährung; ausgeschlossene Transaktionen bleiben außen vor. Beträge ohne Wechselkurs bleiben separat und fließen nicht in umgerechnete Diagramme oder Summen ein.',
+  'help.page.accounts':
+    'Ein Konto ist ein Ort, an dem Geld in genau einer Währung gehalten wird. Sein Saldo ergibt sich aus Anfangssaldo, datierten Bewegungen und Saldoabgleichen.',
+  'help.page.settings':
+    'Die meisten Einstellungen gelten für das aktuelle Profil. Das Tastenkürzel für Schnellerfassung und die Einstellung Mit Windows starten gelten für alle Profile dieses Windows-Kontos.',
+  'help.page.quickAdd':
+    'Erfasse eine Ausgabe oder Einnahme im aktiven Profil, ohne das Hauptfenster zu öffnen. Wähle das Konto, prüfe die Angaben und speichere.',
+  'help.overview.expenses':
+    'Bisherige Ausgaben dieses Monats ohne ausgeschlossene Transaktionen, verglichen mit dem vollständigen Vormonat. Über Transaktionen anzeigen öffnest du die passenden Transaktionen.',
+  'help.overview.incomes':
+    'Bisherige Einnahmen dieses Monats ohne ausgeschlossene Transaktionen, verglichen mit dem vollständigen Vormonat. Über Transaktionen anzeigen öffnest du die passenden Transaktionen.',
+  'help.overview.net':
+    'Einnahmen minus Ausgaben für den jeweiligen Zeitraum. Umbuchungen, Saldoabgleiche und ausgeschlossene Transaktionen ändern diesen Betrag nicht.',
+  'help.overview.topCategories':
+    'Die fünf Ausgabenkategorien mit den höchsten umgerechneten Summen in diesem Monat, ohne ausgeschlossene Transaktionen. Wähle eine Kategorie, um ihre Transaktionen zu öffnen.',
+  'help.transactions.filters':
+    'Filter ändern die angezeigten Transaktionen und die Summen über der Liste. Wende sie vor dem Export an; der CSV-Export verwendet alle Treffer, nicht nur die aktuelle Seite.',
+  'help.transactions.excluded':
+    'Eine ausgeschlossene Transaktion ändert weiterhin den Kontosaldo, bleibt aber aus Einnahmen-, Ausgabensummen und Berichten heraus. Nutze dies etwa für später erstattete Ausgaben.',
+  'help.transactions.templates':
+    'Eine Transaktionsvorlage speichert wiederverwendbare vorausgefüllte Angaben. Wähle eine zum Ausfüllen oder erstelle eine Vorlage für häufig gemeinsam eingegebene Felder.',
+  'help.transactions.duplicate':
+    'Duplizieren speichert sofort eine neue, auf heute datierte Transaktion mit den ursprünglichen Angaben und Tags. Nutze Rückgängig, wenn du die Kopie nicht behalten möchtest.',
+  'help.transactions.balanceAdjustment':
+    'Erfasse den tatsächlich beobachteten Kontosaldo am Ende eines Tages. Die App berechnet die Differenz aus dem Kontoverlauf neu, ohne sie als Ausgabe oder Einnahme zu zählen.',
+  'help.transactions.csvExport':
+    'Exportiert Ausgaben und Einnahmen, die den angewendeten Filtern entsprechen. Teile einer Aufteilung werden eigene Zeilen; Umbuchungen und Saldoabgleiche werden nicht exportiert.',
+  'help.transactions.csvSeparator':
+    'Wähle, wie Dezimalstellen für dein Tabellenprogramm geschrieben werden. Beim Punkt trennen Kommas die Felder, beim Komma Semikolons, damit es eindeutig bleibt.',
+  'help.transactions.amountCalculator':
+    'Du kannst eine Rechnung mit + - * / und Klammern eingeben. Beim Verlassen des Feldes oder mit Enter wird sie berechnet und das Endergebnis auf Hundertstel gerundet.',
+  'help.transactions.split':
+    'Eine Aufteilung teilt eine Transaktion in Teile mit eigenen Beträgen, Kategorien, Tags und Notizen. Die Teile müssen zusammen den Gesamtbetrag ergeben.',
+  'help.transactions.transfer':
+    'Eine Umbuchung verschiebt Geld zwischen zwei Konten und ist weder Ausgabe noch Einnahme. Bei verschiedenen Währungen gibst du beide tatsächlichen Beträge ein; die App leitet den Kurs daraus ab.',
+  'help.transactions.transferFee':
+    'Eine Umbuchungsgebühr wird als eigene Ausgabe im Quellkonto erfasst. Wähle ihre Kategorie und schließe sie nur aus, wenn sie nicht in Berichte einfließen soll.',
+  'help.transactions.tags':
+    'Tags gruppieren Transaktionen unabhängig von ihren Kategorien. Füge vorhandene oder neue Tags hinzu; unter Tags verwalten kannst du sie umbenennen oder löschen.',
+  'help.transactions.tagsBasic':
+    'Tags gruppieren Transaktionen unabhängig von ihren Kategorien. Wähle ein vorhandenes Tag oder gib ein neues ein.',
+  'help.transactions.attachments':
+    'Anhänge werden in dieses Profil kopiert und bei der Transaktion aufbewahrt. Entfernen trennt die Datei ab; Rückgängig stellt sie wieder her. Eine nicht mehr referenzierte Datei kann später bereinigt werden.',
+  'help.transactions.drawer':
+    'Erfasse oder bearbeite hier eine Ausgabe, Einnahme oder Umbuchung. Enter speichert in einem einzeiligen Feld; Strg+Enter speichert und öffnet ein neues Formular.',
+  'help.receipts.phoneUpload':
+    'Startet vorübergehend eine Upload-Seite für ein Handy im selben privaten WLAN. Während der Sitzung kann jeder mit der Adresse auf Uploads zugreifen; nutze daher nur ein vertrauenswürdiges privates Netzwerk und schließe sie danach.',
+  'help.recurring.pending':
+    'Ausstehende Transaktionen sind fällige Vorkommen, die auf deine Entscheidung warten. Bestätige sie, ändere zuvor Betrag oder Datum oder überspringe dieses Vorkommen.',
+  'help.recurring.definitions':
+    'Definitionen enthalten die wiederverwendeten Angaben und den Zeitplan wiederkehrender Transaktionen. Pausieren verhindert neue ausstehende Vorkommen; beim Fortsetzen werden inzwischen vergangene Termine übersprungen.',
+  'help.recurring.editor':
+    'Lege Transaktionsangaben und Zeitplan für künftige Vorkommen fest. Für Daten vor der Erstellung der Definition wird kein Vorkommen erzeugt.',
+  'help.recurring.schedule':
+    'Wähle Wiederholungsabstand und Kalendertag. Ein optionales Enddatum verhindert weitere Vorkommen nach diesem Datum.',
+  'help.reports.dateRange':
+    'Wähle die Daten für Kategorie-, Monatstrend- und Geldflussberichte. Das Ausgabentempo vergleicht immer diesen Monat mit den drei vorherigen Kalendermonaten.',
+  'help.reports.category':
+    'Ausgaben werden nach Hauptkategorie in deiner Basiswährung gruppiert; ausgeschlossene Transaktionen bleiben außen vor. Wähle erst eine Haupt- und dann eine Unterkategorie, um die passenden Transaktionen zu öffnen.',
+  'help.reports.trend':
+    'Vergleiche monatliche Ausgaben, Einnahmen und Netto; ausgeschlossene Transaktionen bleiben außen vor. Teilmonate enthalten nur Tage innerhalb des gewählten Zeitraums.',
+  'help.reports.pace':
+    'Vergleicht die bisherigen Ausgaben dieses Monats ohne ausgeschlossene Transaktionen mit dem Durchschnitt der drei vorherigen Kalendermonate bis zum gleichen Tag. Kürzere Monate werden bis zu ihrem letzten Tag verglichen.',
+  'help.reports.cashFlow':
+    'Zeigt, wie umgerechnete Einnahmekategorien in Ausgabenkategorien fließen. Die Differenz zwischen Einnahmen und Ausgaben erscheint als Ersparnis oder Defizit; nicht umgerechnete Beträge bleiben separat.',
+  'help.reports.breakdown':
+    'Wähle eine Hauptkategorie, um ihre Unterkategorien zu sehen. Eine Unterkategorie öffnet die Ausgabentransaktionen hinter dieser Summe; ausgeschlossene Transaktionen bleiben außen vor.',
+  'help.accounts.create':
+    'Erstelle für jeden Ort und jede Währung, an dem du Geld hältst, ein Konto. Lege Saldo und Datum fest, ab dem sein Verlauf beginnen soll.',
+  'help.accounts.currency':
+    'Jedes Konto hat genau eine Währung. Du kannst sie nur ändern, solange das Konto keine Transaktionen, Umbuchungen oder Saldoabgleiche hat.',
+  'help.accounts.openingBalance':
+    'Der Anfangssaldo ist der Kontosaldo zu Beginn seines Verlaufs am Eröffnungsdatum. Er darf positiv, null oder negativ sein; du kannst auch eine Rechnung in das Feld eingeben.',
+  'help.accounts.archive':
+    'Archivieren blendet ein Konto aus Eingabelisten aus, ohne Verlauf oder Saldo zu löschen. Hebe die Archivierung auf, wenn du es wieder verwenden möchtest.',
+  'help.settings.categories':
+    'Kategorien ordnen Ausgaben oder Einnahmen auf höchstens zwei Ebenen: Haupt- und Unterkategorie. Sortiere oder archiviere sie, ohne bestehende Transaktionsverläufe zu ändern.',
+  'help.settings.rules':
+    'Regeln füllen bei passenden Transaktionen Zahlungspartner, Kategorie oder Tags automatisch vor. Sie laufen der Reihe nach; die erste passende Regel gewinnt.',
+  'help.settings.ruleAmountCurrency':
+    'Betragsgrenzen werden in dieser Währung verglichen. Hat die Regel eine Kontobedingung, wird automatisch dessen Währung verwendet.',
+  'help.settings.backups':
+    'Wiederherstellen ersetzt die aktuellen Profildaten durch die gewählte Sicherung; Änderungen seit dieser Sicherung gehen verloren.',
+  'help.settings.watchedFolder':
+    'Nachdem ein Foto vollständig kopiert wurde, verschiebt die App es zuerst in den Unterordner feldolgozott und importiert es dann in den Belegeingang. Schlägt der Import fehl, bleibt die Datei dort und ein Hinweis erscheint.',
+  'help.settings.baseCurrency':
+    'Berichte rechnen andere Währungen mit dem Kurs des jeweiligen Tages in diese Währung um. Eine Änderung betrifft die Berichtsanzeige, nicht gespeicherte Kontobeträge.',
+  'help.settings.exchangeRates':
+    'Die App lädt offizielle MNB-Kurse herunter und speichert sie lokal. Daten nach dem gespeicherten Abdeckungszeitraum verwenden den letzten gespeicherten Kurs und werden als vorläufig markiert. Nur Beträge ohne früher veröffentlichten Kurs bleiben unumgerechnet.',
+  'help.settings.privacy':
+    'Der Privatmodus verbirgt angezeigte Beträge und verschleiert Diagrammwerte, ohne gespeicherte Daten zu ändern. Schalte ihn überall mit Strg+Umschalt+H um.',
+  'help.settings.formattingPreview':
+    'Diese Vorschau zeigt, wie die gewählte Sprache Daten und Zahlen formatiert. Gespeicherte Werte ändern sich nicht.',
 } satisfies MessageCatalog

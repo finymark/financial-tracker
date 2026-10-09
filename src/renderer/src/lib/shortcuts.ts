@@ -114,6 +114,7 @@ export interface ShortcutContext {
   editingText?: boolean
   multiline?: boolean
   activatingControl?: boolean
+  helpHint?: boolean
 }
 
 /** Matches keys without depending on the DOM, React, or the active language. */
@@ -124,6 +125,7 @@ export function matchShortcut(
   if (event.repeat || event.isComposing || event.defaultPrevented) return null
   for (const definition of shortcuts as readonly ShortcutDefinition[]) {
     if (!definition.scopes.includes(context.scope)) continue
+    if (definition.action === 'close' && context.helpHint) continue
     if (definition.outsideEditing && context.editingText) continue
     if (
       definition.singleLineOnly &&

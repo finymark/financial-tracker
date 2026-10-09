@@ -5,6 +5,7 @@ import type {
 } from '../../../shared/settings'
 import type { MessageKey } from '../i18n'
 import { Button } from './ui/button'
+import { HelpHint } from './ui/help-hint'
 
 interface WatchedFolderSettingsProps {
   watchedFolder: string | null
@@ -71,7 +72,14 @@ export function WatchedFolderSettings({
   return (
     <section className="space-y-3 rounded-lg border p-4">
       <div>
-        <h3 className="text-sm font-medium">{t('watchedFolder.title')}</h3>
+        <div className="flex items-center gap-1">
+          <h3 className="text-sm font-medium">{t('watchedFolder.title')}</h3>
+          <HelpHint
+            t={t}
+            topicKey="watchedFolder.title"
+            textKey="help.settings.watchedFolder"
+          />
+        </div>
         <p className="mt-1 text-sm text-muted-foreground">
           {t('watchedFolder.hint')}
         </p>

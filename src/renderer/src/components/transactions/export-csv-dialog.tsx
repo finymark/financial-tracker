@@ -6,6 +6,7 @@ import { useAmountFormatters } from '../../lib/privacy'
 import { useDialogFocus } from '../../lib/use-dialog-focus'
 import { Button } from '../ui/button'
 import { NativeSelect } from '../ui/native-select'
+import { HelpHint } from '../ui/help-hint'
 
 interface Props {
   input: TransactionListInput
@@ -74,9 +75,16 @@ export function ExportCsvDialog({
           }
         }}
       >
-        <h2 id="export-csv-title" className="text-xl font-semibold">
-          {t('csv.export')}
-        </h2>
+        <div className="flex items-center gap-1">
+          <h2 id="export-csv-title" className="text-xl font-semibold">
+            {t('csv.export')}
+          </h2>
+          <HelpHint
+            t={t}
+            topicKey="csv.export"
+            textKey="help.transactions.csvExport"
+          />
+        </div>
         <p className="text-sm text-muted-foreground">{t('csv.description')}</p>
         {error && (
           <p role="alert" className="text-sm text-error">
@@ -89,9 +97,22 @@ export function ExportCsvDialog({
           </p>
         )}
         <form onSubmit={(event) => void save(event)} className="space-y-4">
-          <label className="block space-y-1 text-sm font-medium">
-            {t('csv.decimalSeparator')}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1">
+              <label
+                htmlFor="csv-decimal-separator"
+                className="text-sm font-medium"
+              >
+                {t('csv.decimalSeparator')}
+              </label>
+              <HelpHint
+                t={t}
+                topicKey="csv.decimalSeparator"
+                textKey="help.transactions.csvSeparator"
+              />
+            </div>
             <NativeSelect
+              id="csv-decimal-separator"
               ref={selectRef}
               value={separator}
               disabled={busy}
@@ -110,7 +131,7 @@ export function ExportCsvDialog({
                 {t('csv.comma').replace('123,45', format.privateText('123,45'))}
               </option>
             </NativeSelect>
-          </label>
+          </div>
           <div className="flex justify-end gap-2">
             <Button
               type="button"

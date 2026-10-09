@@ -21,6 +21,7 @@ import { shortcutTargetContext } from './lib/shortcut-context'
 import { today } from '../../shared/date'
 import { PhoneUploadDialog } from './components/phone-upload-dialog'
 import { amountInput } from './lib/amount-input-value'
+import { HelpHint } from './components/ui/help-hint'
 
 type OcrField = 'amount' | 'date' | 'account' | 'payee' | 'category' | 'tags'
 
@@ -338,14 +339,24 @@ export function ReceiptInboxPage({
             )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label htmlFor="receipt-amount" className="text-sm font-medium">
-                  {t('transactions.amount')}
-                  {ocrFields.has('amount') && (
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      {t('receipts.ocrPrefilled')}
-                    </span>
-                  )}
-                </label>
+                <div className="flex items-center gap-1">
+                  <label
+                    htmlFor="receipt-amount"
+                    className="text-sm font-medium"
+                  >
+                    {t('transactions.amount')}
+                    {ocrFields.has('amount') && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {t('receipts.ocrPrefilled')}
+                      </span>
+                    )}
+                  </label>
+                  <HelpHint
+                    t={t}
+                    topicKey="transactions.amount"
+                    textKey="help.transactions.amountCalculator"
+                  />
+                </div>
                 <AmountInput
                   id="receipt-amount"
                   ref={amountRef}
@@ -549,18 +560,25 @@ export function ReceiptInboxPage({
                 ))}
               </NativeSelect>
             </label>
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <input
-                type="checkbox"
-                checked={form.excluded}
-                disabled={busy}
-                onChange={(event) =>
-                  setForm({ ...form, excluded: event.target.checked })
-                }
-                className="size-4 accent-primary"
+            <div className="flex items-center gap-1">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={form.excluded}
+                  disabled={busy}
+                  onChange={(event) =>
+                    setForm({ ...form, excluded: event.target.checked })
+                  }
+                  className="size-4 accent-primary"
+                />
+                {t('transactions.excluded')}
+              </label>
+              <HelpHint
+                t={t}
+                topicKey="transactions.excluded"
+                textKey="help.transactions.excluded"
               />
-              {t('transactions.excluded')}
-            </label>
+            </div>
             <label className="block space-y-2 text-sm font-medium">
               {t('transactions.note')}
               <textarea
@@ -610,9 +628,16 @@ export function ReceiptInboxPage({
   return (
     <CardContent className="space-y-4">
       <div className="flex justify-end">
-        <Button ref={phoneUploadRef} onClick={() => setShowPhoneUpload(true)}>
-          {t('phoneUpload.title')}
-        </Button>
+        <span className="inline-flex items-center gap-1">
+          <Button ref={phoneUploadRef} onClick={() => setShowPhoneUpload(true)}>
+            {t('phoneUpload.title')}
+          </Button>
+          <HelpHint
+            t={t}
+            topicKey="phoneUpload.title"
+            textKey="help.receipts.phoneUpload"
+          />
+        </span>
       </div>
       {loading ? (
         <p role="status" className="text-sm text-muted-foreground">

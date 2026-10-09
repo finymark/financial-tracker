@@ -10,6 +10,7 @@ import { AmountInput } from '../amount-input'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { NativeSelect } from '../ui/native-select'
+import { HelpHint } from '../ui/help-hint'
 import { splitLine, type TransactionForm } from './transaction-form'
 import type { RefObject } from 'react'
 import type { ProtectedAutofillFields } from '../../lib/rule-autofill'
@@ -148,6 +149,11 @@ export function SplitEditor({
             </span>
           </>
         )}
+        <HelpHint
+          t={t}
+          topicKey="splits.split"
+          textKey="help.transactions.split"
+        />
       </div>
       {form.splitLines && (
         <div className="space-y-3">

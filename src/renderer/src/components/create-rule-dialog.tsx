@@ -3,6 +3,7 @@ import type { Currency } from '../../../shared/accounts'
 import type { CreateCategorisationRuleInput } from '../../../shared/rules'
 import type { Language, MessageKey } from '../i18n'
 import { useDialogFocus } from '../lib/use-dialog-focus'
+import { HelpHint } from './ui/help-hint'
 import { RuleEditor, emptyRuleForm } from './rule-editor'
 import type { TransactionReferenceData } from './transactions/use-transaction-reference-data'
 
@@ -55,9 +56,16 @@ export function CreateRuleDialog({
           }
         }}
       >
-        <h2 id="create-rule-title" className="text-xl font-semibold">
-          {t('rules.create')}
-        </h2>
+        <div className="flex items-center gap-1">
+          <h2 id="create-rule-title" className="text-xl font-semibold">
+            {t('rules.create')}
+          </h2>
+          <HelpHint
+            t={t}
+            topicKey="rules.create"
+            textKey="help.settings.rules"
+          />
+        </div>
         {error && (
           <p role="alert" className="text-sm text-error">
             {t(error)}

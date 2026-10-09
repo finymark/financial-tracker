@@ -19,6 +19,7 @@ import type {
 } from '../../shared/reports'
 import { Button } from './components/ui/button'
 import { type Language, type MessageKey } from './i18n'
+import { HelpHint } from './components/ui/help-hint'
 
 interface SpendingPaceSectionProps {
   language: Language
@@ -158,9 +159,16 @@ export function SpendingPaceSection({ language, t }: SpendingPaceSectionProps) {
       aria-labelledby="spending-pace-title"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 id="spending-pace-title" className="font-semibold">
-          {t('reports.pace.title')}
-        </h3>
+        <div className="flex items-center gap-1">
+          <h3 id="spending-pace-title" className="font-semibold">
+            {t('reports.pace.title')}
+          </h3>
+          <HelpHint
+            t={t}
+            topicKey="reports.pace.title"
+            textKey="help.reports.pace"
+          />
+        </div>
         <Button
           variant="ghost"
           disabled={loading}
@@ -271,7 +279,16 @@ export function SpendingPaceSection({ language, t }: SpendingPaceSectionProps) {
             </ResponsiveContainer>
           </div>
           <div className="space-y-2">
-            <h4 className="text-sm font-medium">{t('reports.pace.months')}</h4>
+            <div className="flex items-center gap-1">
+              <h4 className="text-sm font-medium">
+                {t('reports.pace.months')}
+              </h4>
+              <HelpHint
+                t={t}
+                topicKey="reports.pace.months"
+                textKey="help.reports.pace"
+              />
+            </div>
             <ul className="grid gap-3 sm:grid-cols-3">
               {report.total.previousMonths.map((month) => (
                 <li

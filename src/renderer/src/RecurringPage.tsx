@@ -17,6 +17,7 @@ import { AmountInput } from './components/amount-input'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
+import { HelpHint } from './components/ui/help-hint'
 import type { RecurringPrefill } from './lib/recurring-prefill'
 import { today } from '../../shared/date'
 
@@ -168,9 +169,16 @@ function RecurringEditor({
 
   return (
     <form className="space-y-4 rounded-lg border p-4" onSubmit={submit}>
-      <h3 className="font-semibold">
-        {t(item ? 'recurring.edit' : 'recurring.create')}
-      </h3>
+      <div className="flex items-center gap-1">
+        <h3 className="font-semibold">
+          {t(item ? 'recurring.edit' : 'recurring.create')}
+        </h3>
+        <HelpHint
+          t={t}
+          topicKey={item ? 'recurring.edit' : 'recurring.create'}
+          textKey="help.recurring.editor"
+        />
+      </div>
       <p className="text-sm text-muted-foreground">
         {t('recurring.creationHint')}
       </p>
@@ -213,9 +221,16 @@ function RecurringEditor({
           </NativeSelect>
         </label>
         <div className="space-y-1">
-          <label htmlFor="recurring-amount" className="text-sm font-medium">
-            {t('transactions.amount')}
-          </label>
+          <div className="flex items-center gap-1">
+            <label htmlFor="recurring-amount" className="text-sm font-medium">
+              {t('transactions.amount')}
+            </label>
+            <HelpHint
+              t={t}
+              topicKey="transactions.amount"
+              textKey="help.transactions.amountCalculator"
+            />
+          </div>
           <AmountInput
             id="recurring-amount"
             value={draft.amount}
@@ -258,9 +273,19 @@ function RecurringEditor({
             ))}
           </NativeSelect>
         </label>
-        <label className="space-y-1 text-sm font-medium">
-          {t('recurring.schedule.label')}
+        <div className="space-y-1">
+          <div className="flex items-center gap-1">
+            <label htmlFor="recurring-schedule" className="text-sm font-medium">
+              {t('recurring.schedule.label')}
+            </label>
+            <HelpHint
+              t={t}
+              topicKey="recurring.schedule.label"
+              textKey="help.recurring.schedule"
+            />
+          </div>
           <NativeSelect
+            id="recurring-schedule"
             value={draft.scheduleType}
             onChange={(event) =>
               setDraft({
@@ -273,7 +298,7 @@ function RecurringEditor({
             <option value="weekly">{t('recurring.schedule.weekly')}</option>
             <option value="yearly">{t('recurring.schedule.yearly')}</option>
           </NativeSelect>
-        </label>
+        </div>
         {draft.scheduleType === 'yearly' && (
           <label className="space-y-1 text-sm font-medium">
             {t('recurring.month')}
@@ -444,9 +469,16 @@ function PendingEditor({
           }
         }}
       >
-        <h3 id="pending-editor-title" className="text-lg font-semibold">
-          {t('pending.editAndConfirm')}
-        </h3>
+        <div className="flex items-center gap-1">
+          <h3 id="pending-editor-title" className="text-lg font-semibold">
+            {t('pending.editAndConfirm')}
+          </h3>
+          <HelpHint
+            t={t}
+            topicKey="pending.editAndConfirm"
+            textKey="help.recurring.pending"
+          />
+        </div>
         {error && (
           <p role="alert" className="text-sm text-error">
             {t('transactions.error.amount')}
@@ -620,6 +652,20 @@ export function RecurringPage({
         >
           {t('recurring.definitions')}
         </Button>
+      </div>
+      <div className="flex items-center gap-1 text-sm font-medium">
+        {t(tab === 'pending' ? 'pending.title' : 'recurring.definitions')}
+        <HelpHint
+          t={t}
+          topicKey={
+            tab === 'pending' ? 'pending.title' : 'recurring.definitions'
+          }
+          textKey={
+            tab === 'pending'
+              ? 'help.recurring.pending'
+              : 'help.recurring.definitions'
+          }
+        />
       </div>
       {tab === 'definitions' && editing === undefined && (
         <Button

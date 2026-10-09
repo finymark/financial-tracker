@@ -4,6 +4,7 @@ import type { MessageKey } from '../i18n'
 import { useDialogFocus } from '../lib/use-dialog-focus'
 import { Button } from './ui/button'
 import { NativeSelect } from './ui/native-select'
+import { HelpHint } from './ui/help-hint'
 
 interface Props {
   t(key: MessageKey): string
@@ -103,9 +104,16 @@ export function PhoneUploadDialog({ t, triggerRef, onClose }: Props) {
           }
         }}
       >
-        <h2 id="phone-upload-title" className="text-xl font-semibold">
-          {t('phoneUpload.title')}
-        </h2>
+        <div className="flex items-center gap-1">
+          <h2 id="phone-upload-title" className="text-xl font-semibold">
+            {t('phoneUpload.title')}
+          </h2>
+          <HelpHint
+            t={t}
+            topicKey="phoneUpload.title"
+            textKey="help.receipts.phoneUpload"
+          />
+        </div>
         {busy && !session && (
           <p role="status" className="text-sm text-muted-foreground">
             {t('phoneUpload.starting')}
