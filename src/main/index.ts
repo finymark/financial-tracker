@@ -663,6 +663,9 @@ function startApplication(): void {
     void shutdown()
   })
   const updateWindow = mainWindow
+  let updateNotification: Notification | null = null
+  if (process.platform === 'win32')
+    Notification.handleActivation(() => showMainWindow())
   const { autoUpdater } = electronUpdater
   registerUpdates({
     ipcMain,
@@ -670,7 +673,7 @@ function startApplication(): void {
     packaged: app.isPackaged,
     justUpdatedVersion,
     beforeInstall: () => {
-      // electron-updater can close windows before Electron's before-quit event.
+      // Shut down first because quit/install event ordering varies by platform.
       quitting = true
       return shutdown()
     },
@@ -699,8 +702,25 @@ function startApplication(): void {
           title: messages['updates.readyTitle'],
           body: messages['updates.readyBody'].replace('{version}', version),
         })
-        notification.once('click', onClick)
-        notification.show()
+        updateNotification = notification
+        const release = () => {
+          if (updateNotification === notification) updateNotification = null
+        }
+        notification.once('click', () => {
+          release()
+          onClick()
+        })
+        notification.once('close', release)
+        notification.once('failed', (_event, error) => {
+          release()
+          console.warn('Could not show the update notification.', error)
+        })
+        try {
+          notification.show()
+        } catch (error) {
+          release()
+          throw error
+        }
       },
     },
     timers: {
@@ -708,10 +728,7 @@ function startApplication(): void {
         setInterval(callback, milliseconds),
     },
     logError: (error) => {
-      console.warn(
-        'Update check or notification failed; try again later.',
-        error,
-      )
+      console.warn('Update operation failed; try again later.', error)
     },
   })
 }

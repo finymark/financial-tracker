@@ -1,4 +1,10 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { join } from 'node:path'
 
 export class LastVersionFile {
@@ -6,12 +12,16 @@ export class LastVersionFile {
   readonly #path: string
   readonly #readFile: (path: string) => string
   readonly #writeFile: (path: string, contents: string) => void
+  readonly #rename: typeof renameSync
+  readonly #wait: (milliseconds: number) => void
 
   constructor(
     userDataDirectory: string,
     options: {
       readFile?: (path: string) => string
       writeFile?: (path: string, contents: string) => void
+      rename?: typeof renameSync
+      wait?: (milliseconds: number) => void
     } = {},
   ) {
     this.#directory = userDataDirectory
@@ -20,6 +30,17 @@ export class LastVersionFile {
     this.#writeFile =
       options.writeFile ??
       ((path, contents) => writeFileSync(path, contents, 'utf8'))
+    this.#rename = options.rename ?? renameSync
+    this.#wait =
+      options.wait ??
+      ((milliseconds) => {
+        Atomics.wait(
+          new Int32Array(new SharedArrayBuffer(4)),
+          0,
+          0,
+          milliseconds,
+        )
+      })
   }
 
   recordCurrentVersion(currentVersion: string): string | null {
@@ -34,15 +55,38 @@ export class LastVersionFile {
       // Missing, unreadable and corrupt files all behave like a fresh install.
     }
 
+    const temporaryPath = `${this.#path}.tmp`
     try {
       mkdirSync(this.#directory, { recursive: true })
       this.#writeFile(
-        this.#path,
+        temporaryPath,
         `${JSON.stringify({ version: currentVersion }, null, 2)}\n`,
       )
+      const delays = [10, 20, 40, 80, 160]
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          this.#rename(temporaryPath, this.#path)
+          break
+        } catch (error) {
+          const code = (error as NodeJS.ErrnoException | null)?.code
+          const delay = delays[attempt]
+          if (
+            delay === undefined ||
+            !['EPERM', 'EACCES', 'EBUSY'].includes(code ?? '')
+          )
+            throw error
+          this.#wait(delay)
+        }
+      }
     } catch {
       // Optional update confirmation state must never block application startup.
       return null
+    } finally {
+      try {
+        rmSync(temporaryPath, { force: true })
+      } catch {
+        // Temporary files are never read; startup still degrades safely.
+      }
     }
 
     return previousVersion !== null && previousVersion !== currentVersion

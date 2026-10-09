@@ -1,6 +1,7 @@
 import {
   existsSync,
   mkdtempSync,
+  renameSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -74,4 +75,46 @@ test('read and write failures degrade to no previous version', () => {
       writeFile: writeFailure,
     }).recordCurrentVersion('0.5.2'),
   ).toBeNull()
+})
+
+test('atomically replaces the version file and retries transient Windows locks', () => {
+  const directory = temporaryUserData()
+  const file = new LastVersionFile(directory)
+  file.recordCurrentVersion('0.5.0')
+  const path = join(directory, 'last-version.json')
+  const original = readFileSync(path, 'utf8')
+  const rename = vi.fn(renameSync)
+  const wait = vi.fn(() => {
+    expect(readFileSync(path, 'utf8')).toBe(original)
+  })
+  rename.mockImplementationOnce(() => {
+    throw Object.assign(new Error('Synthetic lock'), { code: 'EPERM' })
+  })
+
+  expect(
+    new LastVersionFile(directory, { rename, wait }).recordCurrentVersion(
+      '0.5.1',
+    ),
+  ).toBe('0.5.1')
+  expect(rename).toHaveBeenCalledTimes(2)
+  expect(wait).toHaveBeenCalledWith(10)
+  expect(existsSync(`${path}.tmp`)).toBe(false)
+  expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({ version: '0.5.1' })
+})
+
+test('a failed atomic replacement preserves the previous version and cleans up', () => {
+  const directory = temporaryUserData()
+  const file = new LastVersionFile(directory)
+  file.recordCurrentVersion('0.5.0')
+  const path = join(directory, 'last-version.json')
+  const original = readFileSync(path, 'utf8')
+  const rename = vi.fn(() => {
+    throw Object.assign(new Error('Synthetic failure'), { code: 'EIO' })
+  })
+
+  expect(
+    new LastVersionFile(directory, { rename }).recordCurrentVersion('0.5.1'),
+  ).toBeNull()
+  expect(readFileSync(path, 'utf8')).toBe(original)
+  expect(existsSync(`${path}.tmp`)).toBe(false)
 })

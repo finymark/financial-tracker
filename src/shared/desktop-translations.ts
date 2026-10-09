@@ -33,7 +33,7 @@ export const desktopMessages = {
     'tray.noticeOk': 'OK',
     'quickAdd.openError':
       'Quick add could not open the last used profile. Open the main window and try again.',
-    'updates.readyTitle': 'Update ready',
+    'updates.readyTitle': 'The update is ready to install',
     'updates.readyBody':
       'Version {version} is ready. Open Financial Tracker to install it.',
     'settings.autostart': 'Start with Windows',
@@ -64,7 +64,7 @@ export const desktopMessages = {
     'tray.noticeOk': 'Rendben',
     'quickAdd.openError':
       'A Gyors rögzítés nem tudta megnyitni a legutóbb használt profilt. Nyisd meg a főablakot, és próbáld újra.',
-    'updates.readyTitle': 'Frissítés érhető el',
+    'updates.readyTitle': 'A frissítés telepítésre kész',
     'updates.readyBody':
       'Elkészült az új verzió ({version}). Nyisd meg a Financial Trackert a telepítéshez.',
     'settings.autostart': 'Indítás a Windows rendszerrel',
@@ -96,7 +96,7 @@ export const desktopMessages = {
     'tray.noticeOk': 'OK',
     'quickAdd.openError':
       'Die Schnellerfassung konnte das zuletzt verwendete Profil nicht öffnen. Öffne das Hauptfenster und versuche es erneut.',
-    'updates.readyTitle': 'Update bereit',
+    'updates.readyTitle': 'Das Update ist installationsbereit',
     'updates.readyBody':
       'Die neue Version ({version}) ist bereit. Öffne Financial Tracker, um sie zu installieren.',
     'settings.autostart': 'Mit Windows starten',

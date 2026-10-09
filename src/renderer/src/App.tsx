@@ -1427,21 +1427,23 @@ export default function App() {
           </aside>
         )}
       </div>
-      {startupShortcutFailure && (
-        <aside
-          role="alert"
-          className="fixed top-[calc(var(--title-bar-height)+1rem)] right-4 z-50 max-w-md space-y-3 rounded-lg border bg-card p-4 text-sm font-medium text-error shadow-lg"
-        >
-          <p>{shortcutConflictMessage(t, startupShortcutFailure)}</p>
-          <Button
-            variant="ghost"
-            onClick={() => setStartupShortcutFailure(null)}
+      <div className="fixed top-[calc(var(--title-bar-height)+1rem)] right-4 z-50 flex w-[min(calc(100vw-2rem),28rem)] flex-col items-end gap-3">
+        {startupShortcutFailure && (
+          <aside
+            role="alert"
+            className="w-full space-y-3 rounded-lg border bg-card p-4 text-sm font-medium text-error shadow-lg"
           >
-            {t('tray.noticeOk')}
-          </Button>
-        </aside>
-      )}
-      <UpdateNotice t={t} />
+            <p>{shortcutConflictMessage(t, startupShortcutFailure)}</p>
+            <Button
+              variant="ghost"
+              onClick={() => setStartupShortcutFailure(null)}
+            >
+              {t('tray.noticeOk')}
+            </Button>
+          </aside>
+        )}
+        <UpdateNotice t={t} />
+      </div>
     </div>
   )
 }

@@ -33,6 +33,7 @@ function setup(
   const updater = {
     autoDownload: false,
     autoInstallOnAppQuit: true,
+    autoRunAppAfterInstall: false,
     on: vi.fn((event: string, listener: (value: never) => void) => {
       listeners.set(event, listener)
     }),
@@ -119,6 +120,7 @@ test('development builds expose idle state but never initialise the updater', as
   expect(app.setInterval).not.toHaveBeenCalled()
   expect(app.updater.autoDownload).toBe(false)
   expect(app.updater.autoInstallOnAppQuit).toBe(true)
+  expect(app.updater.autoRunAppAfterInstall).toBe(false)
 })
 
 test('packaged startup enables downloads, disables install-on-quit, and schedules six-hour checks', () => {
@@ -126,6 +128,7 @@ test('packaged startup enables downloads, disables install-on-quit, and schedule
 
   expect(app.updater.autoDownload).toBe(true)
   expect(app.updater.autoInstallOnAppQuit).toBe(false)
+  expect(app.updater.autoRunAppAfterInstall).toBe(true)
   expect(app.updater.checkForUpdates).toHaveBeenCalledTimes(1)
   expect(app.setInterval).toHaveBeenCalledWith(
     expect.any(Function),
@@ -178,16 +181,82 @@ test('failed checks are logged, swallowed, and do not stop later checks', async 
   const app = setup()
   await Promise.resolve()
   app.updater.checkForUpdates.mockClear()
-  app.updater.checkForUpdates.mockRejectedValueOnce(new Error('Offline'))
+  const error = new Error('Offline')
+  app.updater.checkForUpdates.mockRejectedValueOnce(error)
   app.updater.checkForUpdates.mockResolvedValue(null)
 
   app.runInterval()
+  app.emit('error', error)
   await Promise.resolve()
   await Promise.resolve()
-  expect(app.logError).toHaveBeenCalledWith(expect.any(Error))
+  expect(app.logError).toHaveBeenCalledTimes(1)
+  expect(app.logError).toHaveBeenCalledWith(error)
   app.runInterval()
   expect(app.updater.checkForUpdates).toHaveBeenCalledTimes(2)
   expect(app.invoke(IPC_CHANNELS.updatesState)).toEqual({ status: 'idle' })
+})
+
+test('a failed download resets progress to idle and allows the next scheduled check', async () => {
+  const download = deferred<unknown>()
+  const app = setup()
+  await Promise.resolve()
+  app.updater.checkForUpdates.mockClear()
+  app.updater.checkForUpdates
+    .mockResolvedValueOnce({ downloadPromise: download.promise })
+    .mockResolvedValue(null)
+
+  app.runInterval()
+  await Promise.resolve()
+  app.emit('download-progress', { percent: 18.4 })
+  expect(app.invoke(IPC_CHANNELS.updatesState)).toEqual({
+    status: 'downloading',
+    percent: 18,
+  })
+
+  const error = new Error('Download failed')
+  app.emit('error', error)
+  download.reject(error)
+  await download.promise.catch(() => {})
+  await Promise.resolve()
+  expect(app.invoke(IPC_CHANNELS.updatesState)).toEqual({ status: 'idle' })
+  expect(app.logError).toHaveBeenCalledTimes(1)
+
+  app.runInterval()
+  expect(app.updater.checkForUpdates).toHaveBeenCalledTimes(2)
+})
+
+test('a cached downloaded update becomes ready without progress events', () => {
+  const app = setup()
+
+  app.emit('update-downloaded', { version: '0.5.1' })
+
+  expect(app.invoke(IPC_CHANNELS.updatesState)).toEqual({
+    status: 'ready',
+    version: '0.5.1',
+  })
+  expect(app.send).toHaveBeenCalledTimes(1)
+})
+
+test('ready state is retained when the updater download promise resolves', async () => {
+  const check = deferred<unknown>()
+  const download = deferred<unknown>()
+  const app = setup()
+  await Promise.resolve()
+  app.updater.checkForUpdates.mockClear()
+  app.updater.checkForUpdates.mockReturnValue(check.promise)
+
+  app.runInterval()
+  check.resolve({ downloadPromise: download.promise })
+  await Promise.resolve()
+  app.emit('update-downloaded', { version: '0.5.1' })
+  download.resolve(undefined)
+  await download.promise
+  await Promise.resolve()
+
+  expect(app.invoke(IPC_CHANNELS.updatesState)).toEqual({
+    status: 'ready',
+    version: '0.5.1',
+  })
 })
 
 test('a hidden window gets one notification and clicking it shows the window', () => {
@@ -227,11 +296,13 @@ test('restart closes application data before visibly installing and ignores dupl
   )
 })
 
-test('a failed shutdown does not start the installer', async () => {
+test('a failed shutdown recovers before rejecting and allows another restart attempt', async () => {
+  const recoverAfterFailure = vi.fn(async () => {})
   const app = setup({
     beforeInstall: vi.fn(async () => {
       throw new Error('Shutdown failed')
     }),
+    recoverAfterFailure,
   })
   app.emit('update-downloaded', { version: '0.5.1' })
 
@@ -239,18 +310,38 @@ test('a failed shutdown does not start the installer', async () => {
     'Shutdown failed',
   )
   expect(app.updater.quitAndInstall).not.toHaveBeenCalled()
-})
-
-test('an installer launch failure recovers and surfaces the existing renderer error key', async () => {
-  const recoverAfterFailure = vi.fn(async () => {})
-  const app = setup({ recoverAfterFailure })
-  app.updater.quitAndInstall.mockImplementation(() => {
-    throw new Error('Installer failed')
-  })
-  app.emit('update-downloaded', { version: '0.5.1' })
+  expect(recoverAfterFailure).toHaveBeenCalledTimes(1)
 
   await expect(app.invoke(IPC_CHANNELS.updatesRestart)).rejects.toThrow(
-    'updates.error',
+    'Shutdown failed',
   )
+  expect(recoverAfterFailure).toHaveBeenCalledTimes(2)
+})
+
+test('an updater error while restarting recovers and pushes a retryable install error', async () => {
+  const recoverAfterFailure = vi.fn(async () => {})
+  const app = setup({ recoverAfterFailure })
+  app.emit('update-downloaded', { version: '0.5.1' })
+
+  await app.invoke(IPC_CHANNELS.updatesRestart)
+  const error = new Error('Installer failed')
+  app.emit('error', error)
+  await Promise.resolve()
+  await Promise.resolve()
+
   expect(recoverAfterFailure).toHaveBeenCalledTimes(1)
+  expect(app.logError).toHaveBeenCalledWith(error)
+  expect(app.send).toHaveBeenLastCalledWith({
+    status: 'ready',
+    version: '0.5.1',
+    installError: true,
+  })
+  expect(app.invoke(IPC_CHANNELS.updatesState)).toEqual({
+    status: 'ready',
+    version: '0.5.1',
+    installError: true,
+  })
+
+  await app.invoke(IPC_CHANNELS.updatesRestart)
+  expect(app.updater.quitAndInstall).toHaveBeenCalledTimes(2)
 })

@@ -9,6 +9,7 @@ type UpdaterEvent = 'download-progress' | 'update-downloaded' | 'error'
 export interface UpdaterLike {
   autoDownload: boolean
   autoInstallOnAppQuit: boolean
+  autoRunAppAfterInstall: boolean
   on(event: UpdaterEvent, listener: (value: unknown) => void): unknown
   checkForUpdates(): unknown
   quitAndInstall(isSilent: boolean, isForceRunAfter: boolean): void
@@ -67,7 +68,40 @@ export function registerUpdates(options: RegisterUpdatesOptions): void {
   let state: UpdateState = { status: 'idle' }
   let inFlight = false
   let restarting = false
+  let restartRecovery: Promise<void> | null = null
   let notificationShown = false
+
+  const publish = (nextState: UpdateState) => {
+    state = nextState
+    try {
+      options.window.send(state)
+    } catch (error) {
+      options.logError(error)
+    }
+  }
+
+  const recoverRestart = (
+    error: unknown,
+    notifyRenderer: boolean,
+    logUpdaterError: boolean,
+  ): Promise<void> => {
+    if (restartRecovery) return restartRecovery
+    if (logUpdaterError) options.logError(error)
+    const version = state.status === 'ready' ? state.version : null
+    restartRecovery = (async () => {
+      try {
+        await options.recoverAfterFailure()
+      } catch (recoveryError) {
+        options.logError(recoveryError)
+      } finally {
+        restarting = false
+        restartRecovery = null
+        if (notifyRenderer && version)
+          publish({ status: 'ready', version, installError: true })
+      }
+    })()
+    return restartRecovery
+  }
 
   registerIpcHandler(options.ipcMain, IPC_CHANNELS.updatesState, () => state)
   registerIpcHandler(
@@ -77,20 +111,21 @@ export function registerUpdates(options: RegisterUpdatesOptions): void {
   )
   registerIpcHandler(options.ipcMain, IPC_CHANNELS.updatesRestart, async () => {
     if (!options.packaged || state.status !== 'ready' || restarting) return
+    const version = state.version
     restarting = true
+    publish({ status: 'ready', version })
     try {
-      // electron-updater closes windows before Electron's before-quit event.
+      // Shut down first because quit/install event ordering varies by platform.
       await options.beforeInstall()
     } catch (error) {
-      restarting = false
+      await recoverRestart(error, false, false)
       throw error
     }
     try {
-      // Keep the installer visible and force the updated app to relaunch.
+      // Keep the installer visible; autoRunAppAfterInstall relaunches afterward.
       options.updater.quitAndInstall(false, true)
     } catch (error) {
-      restarting = false
-      await options.recoverAfterFailure()
+      await recoverRestart(error, true, true)
       throw new Error('updates.error', { cause: error })
     }
   })
@@ -101,15 +136,8 @@ export function registerUpdates(options: RegisterUpdatesOptions): void {
   // Never install on normal quit: a fast manual relaunch can race the running
   // installer. Installation happens only through the explicit restart action.
   options.updater.autoInstallOnAppQuit = false
-
-  const publish = (nextState: UpdateState) => {
-    state = nextState
-    try {
-      options.window.send(state)
-    } catch (error) {
-      options.logError(error)
-    }
-  }
+  // Non-silent NSIS installs ignore quitAndInstall's force-run argument.
+  options.updater.autoRunAppAfterInstall = true
 
   options.updater.on('download-progress', (value) => {
     if (state.status === 'ready') return
@@ -132,7 +160,10 @@ export function registerUpdates(options: RegisterUpdatesOptions): void {
       options.logError(error)
     }
   })
-  options.updater.on('error', (error) => options.logError(error))
+  options.updater.on('error', (error) => {
+    // Check/download errors are logged by the rejected check promise below.
+    if (restarting) void recoverRestart(error, true, true)
+  })
 
   const check = async () => {
     if (inFlight || state.status === 'ready') return

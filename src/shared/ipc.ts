@@ -252,7 +252,7 @@ export const IPC_CHANNELS = {
 export type UpdateState =
   | { status: 'idle' }
   | { status: 'downloading'; percent: number }
-  | { status: 'ready'; version: string }
+  | { status: 'ready'; version: string; installError?: true }
 
 export interface AppBridge {
   windowChrome: {

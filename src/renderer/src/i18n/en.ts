@@ -154,12 +154,13 @@ export const en = {
   'categories.error.replacement':
     'Choose a different, active replacement of the same kind.',
   'updates.downloading': 'Downloading update… {percent}%',
+  'updates.downloadingStarted': 'The update download has started.',
   'updates.ready':
-    'A new version ({version}) is ready. Would you like to install it now?',
+    'The new version ({version}) has been downloaded. Install it now?',
   'updates.later': 'Later',
   'updates.restart': 'Restart and update',
   'updates.restarting': 'Restarting…',
-  'updates.updated': 'Updated to version {version}.',
+  'updates.updated': 'The app was updated: {version}.',
   'updates.error': 'Could not restart for the update. Please try again.',
   'app.name': 'Financial Tracker',
   'app.tagline': 'Your finances, on your PC.',

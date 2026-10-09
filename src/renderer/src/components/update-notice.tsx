@@ -1,30 +1,38 @@
-import { useEffect, useState } from 'react'
-import type { UpdateState } from '../../../shared/ipc'
+import { useEffect, useReducer, useState } from 'react'
 import type { MessageKey } from '../i18n'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
+import {
+  initialUpdateNoticeState,
+  isReadyVisible,
+  updateNoticeReducer,
+} from './update-notice-state'
 
 const UPDATED_CONFIRMATION_MS = 6000
 
 export function UpdateNotice({ t }: { t: (key: MessageKey) => string }) {
-  const [state, setState] = useState<UpdateState>({ status: 'idle' })
-  const [hiddenReadyVersion, setHiddenReadyVersion] = useState<string | null>(
-    null,
+  const [notice, dispatch] = useReducer(
+    updateNoticeReducer,
+    initialUpdateNoticeState,
   )
   const [updatedVersion, setUpdatedVersion] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(false)
 
   useEffect(() => {
     let active = true
     let confirmationTimer: number | undefined
     const unsubscribe = window.app.updates.onStateChanged((nextState) => {
-      if (active) setState(nextState)
+      if (active)
+        dispatch({ type: 'main-state', source: 'push', state: nextState })
     })
     void window.app.updates
       .state()
       .then((currentState) => {
-        if (active) setState(currentState)
+        if (active)
+          dispatch({
+            type: 'main-state',
+            source: 'pull',
+            state: currentState,
+          })
       })
       .catch(() => {})
     void window.app.updates
@@ -47,48 +55,51 @@ export function UpdateNotice({ t }: { t: (key: MessageKey) => string }) {
   }, [])
 
   async function restart() {
-    setBusy(true)
-    setError(false)
+    dispatch({ type: 'restart' })
     try {
       await window.app.updates.restart()
     } catch {
-      setError(true)
-      setBusy(false)
+      dispatch({ type: 'restart-rejected' })
     }
   }
 
-  const ready = state.status === 'ready' && state.version !== hiddenReadyVersion
+  const { update, busy, error } = notice
+  const ready = isReadyVisible(notice)
 
-  if (state.status !== 'downloading' && !ready && !updatedVersion) return null
+  if (update.status !== 'downloading' && !ready && !updatedVersion) return null
   return (
-    <div className="fixed top-[calc(var(--title-bar-height)+1rem)] right-4 z-50 flex w-[min(calc(100vw-2rem),24rem)] flex-col items-end gap-3">
-      {state.status === 'downloading' && (
-        <p
-          role="status"
-          aria-live="polite"
-          className="rounded-full border bg-card px-3 py-1.5 text-xs text-card-foreground shadow-sm"
-        >
-          {t('updates.downloading').replace('{percent}', String(state.percent))}
-        </p>
+    <div className="flex w-full max-w-sm flex-col items-end gap-3">
+      {update.status === 'downloading' && (
+        <>
+          <div
+            role="progressbar"
+            aria-label={t('updates.downloadingStarted')}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={update.percent}
+            className="rounded-full border bg-card px-3 py-1.5 text-xs text-card-foreground shadow-sm"
+          >
+            {t('updates.downloading').replace(
+              '{percent}',
+              String(update.percent),
+            )}
+          </div>
+          <p role="status" aria-live="polite" className="sr-only">
+            {t('updates.downloadingStarted')}
+          </p>
+        </>
       )}
-      {ready && state.status === 'ready' && (
-        <Card
-          role="status"
-          aria-live="polite"
-          className="w-full gap-3 py-4 shadow-lg"
-        >
+      {ready && update.status === 'ready' && (
+        <Card className="w-full gap-3 py-4 shadow-lg">
           <CardContent className="space-y-3 px-4">
-            <p className="text-sm">
-              {t('updates.ready').replace('{version}', state.version)}
+            <p role="status" aria-live="polite" className="text-sm">
+              {t('updates.ready').replace('{version}', update.version)}
             </p>
             <div className="flex flex-wrap justify-end gap-2">
               <Button
                 variant="ghost"
                 disabled={busy}
-                onClick={() => {
-                  setHiddenReadyVersion(state.version)
-                  setError(false)
-                }}
+                onClick={() => dispatch({ type: 'later' })}
               >
                 {t('updates.later')}
               </Button>

@@ -165,12 +165,13 @@ export const de = {
   'categories.error.replacement':
     'Wähle eine andere aktive Ersatzkategorie derselben Art.',
   'updates.downloading': 'Update wird heruntergeladen… {percent} %',
+  'updates.downloadingStarted': 'Der Download des Updates wurde gestartet.',
   'updates.ready':
-    'Die neue Version ({version}) ist bereit. Möchtest du sie jetzt installieren?',
+    'Die neue Version ({version}) wurde heruntergeladen. Möchtest du sie jetzt installieren?',
   'updates.later': 'Später',
   'updates.restart': 'Neustarten und aktualisieren',
   'updates.restarting': 'Neustart…',
-  'updates.updated': 'Auf Version {version} aktualisiert.',
+  'updates.updated': 'Die App wurde aktualisiert: {version}.',
   'updates.error':
     'Neustart für das Update fehlgeschlagen. Bitte versuche es erneut.',
   'app.name': 'Financial Tracker',
