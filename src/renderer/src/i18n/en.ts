@@ -241,6 +241,8 @@ export const en = {
   'recurring.every': 'every',
   'recurring.months': 'month(s)',
   'recurring.weeks': 'week(s)',
+  'recurring.interval.months': 'every {n} months',
+  'recurring.interval.weeks': 'every {n} weeks',
   'recurring.month': 'Month',
   'recurring.day': 'Day',
   'recurring.weekday': 'Weekday',

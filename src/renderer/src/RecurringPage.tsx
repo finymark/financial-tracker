@@ -19,6 +19,7 @@ import { Input } from './components/ui/input'
 import { NativeSelect } from './components/ui/native-select'
 import { HelpHint } from './components/ui/help-hint'
 import type { RecurringPrefill } from './lib/recurring-prefill'
+import { recurringScheduleText } from './lib/recurring-schedule-text'
 import { today } from '../../shared/date'
 
 interface Props {
@@ -54,14 +55,6 @@ function nextDue(item: RecurringTransaction): string | null {
       futureLimit(from),
     )[0] ?? null
   )
-}
-
-function scheduleText(schedule: RecurringSchedule, t: Props['t']): string {
-  if (schedule.type === 'monthly')
-    return `${t('recurring.schedule.monthly')} · ${schedule.day}. · ${t('recurring.every')} ${schedule.intervalMonths} ${t('recurring.months')}`
-  if (schedule.type === 'weekly')
-    return `${t(`recurring.weekday.${schedule.weekday}` as MessageKey)} · ${t('recurring.every')} ${schedule.intervalWeeks} ${t('recurring.weeks')}`
-  return `${t('recurring.schedule.yearly')} · ${schedule.month}/${schedule.day}`
 }
 
 interface EditorProps extends Omit<Props, 'undoRevision' | 'onChanged'> {
@@ -795,7 +788,7 @@ export function RecurringPage({
                           item.amountMinor,
                           account?.currency ?? 'HUF',
                         )}{' '}
-                        · {scheduleText(item.schedule, t)}
+                        · {recurringScheduleText(item.schedule, language, t)}
                       </p>
                       <p className="text-sm">
                         {item.paused

@@ -58,7 +58,7 @@ export const desktopMessages = {
       'Az ablak bezárása után a Financial Tracker tovább fut a háttérben. A tálcaikonról újra megnyithatod, tranzakciót rögzíthetsz vagy kiléphetsz.',
     'tray.noticeOk': 'Rendben',
     'quickAdd.openError':
-      'A gyors rögzítés nem tudta megnyitni a legutóbb használt profilt. Nyisd meg a főablakot, és próbáld újra.',
+      'A Gyors rögzítés nem tudta megnyitni a legutóbb használt profilt. Nyisd meg a főablakot, és próbáld újra.',
     'settings.autostart': 'Indítás a Windows rendszerrel',
     'settings.autostartDescription':
       'Bejelentkezéskor rejtve, a tálcán indul. A beállítás a Windows-fiók minden profiljára érvényes, és alapból ki van kapcsolva.',

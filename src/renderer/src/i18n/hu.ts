@@ -30,28 +30,28 @@ export const hu = {
   'shortcuts.save':
     'Mentés (többsoros megjegyzésben nem; a gombok saját művelete változatlan)',
   'shortcuts.saveAndAddAnother':
-    'Mentés és új tranzakció (a dátum, a számlák és a típus marad)',
+    'Mentés és új tranzakció (a dátum, a számlák és a típus maradnak)',
   'shortcuts.newTransaction': 'Új tranzakció (szövegbevitelen kívül)',
   ...categoryNames.hu,
   ...csvMessages.hu,
   'csv.description':
-    'Az alkalmazott szűrők összes találatát exportálja, nem csak az aktuális oldalt. A felosztás minden része külön sorban jelenik meg. Az átvezetések és az egyenleg-egyeztetések kimaradnak.',
+    'Az alkalmazott szűrők összes találatát exportálja, nemcsak az aktuális oldalt. A felosztás minden része külön sorban jelenik meg. Az átvezetések és az egyenlegegyeztetések kimaradnak.',
   'csv.decimalSeparator': 'Tizedesjel',
   'csv.profileDefault': 'A profil nyelve szerint',
   'csv.dot': 'Pont (123.45) · vesszővel elválasztott mezők',
   'csv.comma': 'Vessző (123,45) · pontosvesszővel elválasztott mezők',
   'csv.saving': 'CSV mentése…',
-  'csv.saved': 'A CSV mentve.',
+  'csv.saved': 'A CSV-fájl elmentve.',
   'csv.error': 'Nem sikerült menteni a CSV-t. Próbáld újra.',
   'csv.error.separator': 'Tizedesjelként pontot vagy vesszőt válassz.',
 
   'rules.title': 'Automatikus kategorizálás',
   'rules.description':
-    'A szabályok fentről lefelé futnak. Az első találat tölti ki a Bolt / partner, a kategória és a címkék mezőjét, még a legutóbb használt értékek előtt.',
+    'A szabályok fentről lefelé futnak. Az első illeszkedő szabály kitölti a Bolt / partner, a kategória és a címkék mezőjét, és elsőbbséget élvez a legutóbb használt értékekkel szemben.',
   'rules.loading': 'Szabályok betöltése…',
   'rules.empty': 'Még nincs automatikus kategorizálási szabály.',
   'rules.offer': 'Készítesz szabályt ehhez a kategorizáláshoz?',
-  'rules.offerDismiss': 'Mégse',
+  'rules.offerDismiss': 'Most nem',
   'rules.create': 'Új szabály',
   'rules.edit': 'Szerkesztés',
   'rules.delete': 'Törlés',
@@ -71,7 +71,8 @@ export const hu = {
   'rules.payeeAction': 'Bolt / partner megadása',
   'rules.noPayeeAction': 'Ne adj meg boltot vagy partnert',
   'rules.noCategory': 'Ne adj meg kategóriát',
-  'rules.noTags': 'Előbb hozz létre címkét egy tranzakciónál.',
+  'rules.noTags':
+    'Mielőtt szabályban használnád, hozz létre címkét egy tranzakció rögzítésekor.',
   'rules.action': 'Művelet',
   'rules.formHint':
     'Válassz legalább egy feltételt és egy kitöltendő mezőt: Bolt / partner, kategória vagy címke.',
@@ -127,7 +128,7 @@ export const hu = {
   'categories.name': 'Név',
   'categories.kind': 'Típus',
   'categories.parent': 'Főkategória',
-  'categories.main': 'Főkategória',
+  'categories.main': 'Nincs (ez lesz a főkategória)',
   'categories.create': 'Új kategória',
   'categories.rename': 'Átnevezés',
   'categories.archive': 'Archiválás',
@@ -138,12 +139,12 @@ export const hu = {
   'categories.confirmDelete': 'Végleges törlés',
   'categories.replacement': 'Helyettesítő kategória',
   'categories.chooseReplacement': 'Válassz másik kategóriát',
-  'categories.noReplacement': 'Nincs másik kategória (nincs használatban)',
+  'categories.noReplacement': 'Nem szükséges (a kategória nincs használatban)',
   'categories.save': 'Mentés',
   'categories.cancel': 'Mégse',
   'categories.refresh': 'Frissítés',
-  'categories.up': 'Mozgatás felfelé',
-  'categories.down': 'Mozgatás lefelé',
+  'categories.up': 'Feljebb',
+  'categories.down': 'Lejjebb',
   'categories.error':
     'Nem sikerült módosítani a kategóriát. Frissíts, és próbáld újra.',
   'categories.error.name': 'Adj meg egy 1–100 karakteres kategórianevet.',
@@ -190,12 +191,12 @@ export const hu = {
   'receipts.discard': 'Törlés',
   'receipts.reading':
     'A blokk beolvasása folyamatban… Közben kézzel is kitöltheted a mezőket.',
-  'receipts.ocrPrefilled': 'A blokkról beolvasva',
+  'receipts.ocrPrefilled': 'a blokkról beolvasva',
   'receipts.ocrLowConfidence':
     'A beolvasás bizonytalan. Ellenőrizd az összes előre kitöltött mezőt.',
   'receipts.currencyMismatch': 'Nincs aktív számla a felismert pénznemben:',
-  'receipts.source.drop': 'Behúzással',
-  'receipts.source.folder': 'Figyelt mappa',
+  'receipts.source.drop': 'Behúzva',
+  'receipts.source.folder': 'Figyelt mappából',
   'receipts.source.phone': 'Telefonról',
   'receipts.dropOverlay': 'Húzd ide a blokkfotókat',
   'receipts.dropProcessing': 'Blokkfotók hozzáadása…',
@@ -208,7 +209,7 @@ export const hu = {
   'receipts.error.notFound': 'A blokk nem található. Frissítsd a listát.',
   'receipts.error.preview': 'Nem sikerült elkészíteni a blokk előnézetét.',
   'recurring.title': 'Rendszeres tranzakciók',
-  'recurring.definitions': 'Beállított tranzakciók',
+  'recurring.definitions': 'Ütemezések',
   'recurring.sections': 'Rendszeres tranzakciók',
   'recurring.fromTransaction': 'Rendszeres tranzakció létrehozása',
   'recurring.fromTemplate': 'Létrehozás sablonból',
@@ -248,6 +249,8 @@ export const hu = {
   'recurring.every': 'minden',
   'recurring.months': 'hónap',
   'recurring.weeks': 'hét',
+  'recurring.interval.months': '{n} havonta',
+  'recurring.interval.weeks': '{n} hetente',
   'recurring.month': 'Hónap',
   'recurring.day': 'Nap',
   'recurring.weekday': 'A hét napja',
@@ -305,7 +308,7 @@ export const hu = {
     'A profiladatbázis nem egyezik a kiválasztott profillal.',
   'overview.title': 'Pénzügyeid egy helyen',
   'overview.description':
-    'Az aktuális hónap eddigi eredményei a teljes előző hónaphoz képest, az alap pénznemben.',
+    'Az aktuális hónap eddigi eredményei a teljes előző hónaphoz képest, az alappénznemben.',
   'overview.error': 'Nem sikerült betölteni az áttekintést.',
   'overview.expenses': 'Kiadások',
   'overview.incomes': 'Bevételek',
@@ -319,11 +322,11 @@ export const hu = {
   'overview.reports': 'Kimutatások',
   'overview.chartLabel': 'A hónap öt legnagyobb kiadási kategóriája',
   'overview.shareHint':
-    'Az arányok az összes kategória átváltott kiadásából számolódnak, nem csak az első ötből. Az át nem váltott összegek külön jelennek meg, és nem számítanak bele az arányokba.',
+    'Az arányok az összes kategória átváltott kiadásából számolódnak, nemcsak az első ötből. Az át nem váltott összegek külön jelennek meg, és nem számítanak bele az arányokba.',
   'reports.trend.title': 'Havi trend',
   'reports.trend.description':
-    'Kiadások, bevételek és nettó összeg az alap pénznemben.',
-  'reports.trend.partial': 'részidőszak',
+    'Kiadások, bevételek és nettó összeg az alappénznemben.',
+  'reports.trend.partial': 'tört hónap',
   'reports.trend.partialHint':
     'A tört hónapokból csak a kiválasztott időszak napjai számítanak.',
   'reports.trend.unconvertedHint':
@@ -350,8 +353,8 @@ export const hu = {
   'reports.pace.chartLabel': 'Eddigi havi kiadások a háromhavi átlaghoz képest',
   'reports.title': 'Kiadások kategóriánként',
   'reports.description':
-    'Hasonlítsd össze a kategóriák összegét az alap pénznemben, és nézd meg a hozzájuk tartozó tranzakciókat.',
-  'reports.heading': 'Kimutatások az alap pénznemben',
+    'Hasonlítsd össze a kategóriák összegét az alappénznemben, és nézd meg a hozzájuk tartozó tranzakciókat.',
+  'reports.heading': 'Kimutatások az alappénznemben',
   'reports.introduction':
     'Nézd meg a választott időszak kategóriáit, havi trendjeit és pénzáramlását, vagy hasonlítsd össze az aktuális hónap költési ütemét.',
   'reports.view': 'Nézet',
@@ -373,7 +376,7 @@ export const hu = {
   'reports.period.lastMonth': 'Előző hónap',
   'reports.period.thisYear': 'Ez az év',
   'reports.period.last12Months': 'Utolsó 12 hónap',
-  'reports.period.custom': 'Egyéni tartomány',
+  'reports.period.custom': 'Egyéni időszak',
   'reports.apply': 'Alkalmaz',
   'reports.loading': 'Kimutatás betöltése…',
   'reports.error': 'Nem sikerült betölteni a kimutatást. Próbáld újra.',
@@ -399,19 +402,19 @@ export const hu = {
   'reports.transactionFilter.expense': 'csak kiadások',
   'reports.transactionFilter.income': 'csak bevételek',
   'reports.transactionFilter.exactCategory': 'alkategóriák nélkül',
-  'reports.transactionFilter.clear': 'Minden típus és alkategória',
+  'reports.transactionFilter.clear': 'Minden típus és alkategória mutatása',
   'transactions.title': 'Tranzakcióid egy helyen',
   'transactions.description':
     'Rögzítsd a kiadásaidat, bevételeidet és átvezetéseidet, hogy mindig naprakészek legyenek a számlaegyenlegeid.',
   'transactions.listDescription':
     'Szűrj időszakra, számlára, kategóriára, boltra vagy partnerre, címkére és megjegyzésre.',
   'adjustments.setRealBalance': 'Valós egyenleg rögzítése',
-  'adjustments.edit': 'Egyenleg-egyeztetés szerkesztése',
+  'adjustments.edit': 'Egyenlegegyeztetés szerkesztése',
   'adjustments.save': 'Mentés',
   'adjustments.deleteConfirmation':
-    'Végleg törlöd ezt az egyenleg-egyeztetést? A számlaegyenleg frissül.',
+    'Végleg törlöd ezt az egyenlegegyeztetést? A számlaegyenleg frissül.',
   'adjustments.confirmDelete': 'Törlés',
-  'adjustments.rowType': 'Egyenleg-egyeztetés',
+  'adjustments.rowType': 'Egyenlegegyeztetés',
   'adjustments.observedBalance': 'Valós egyenleg',
   'adjustments.difference': 'Eltérés',
   'adjustments.zeroDifference': 'Az egyenleg pontos',
@@ -424,11 +427,11 @@ export const hu = {
     'Adj meg érvényes egyenleget ±90 071 992 547 409,91 között.',
   'adjustments.error.note': 'A megjegyzés legfeljebb 1000 karakter lehet.',
   'adjustments.error.notFound':
-    'Az egyenleg-egyeztetés nem található. Frissítsd a listát.',
+    'Az egyenlegegyeztetés nem található. Frissítsd a listát.',
   'transactions.excluded': 'Kihagyva',
   'transactions.excludedHint':
     'A számlaegyenlegbe beleszámít, de a kiadási és bevételi összesítésekből, valamint a kimutatásokból kimarad.',
-  'transactions.exclusion': 'Kihagyás a kimutatásokból',
+  'transactions.exclusion': 'Kihagyott tranzakciók',
   'transactions.exclusion.all': 'Minden tranzakció',
   'transactions.exclusion.onlyExcluded': 'Csak a kihagyottak',
   'transactions.exclusion.hideExcluded': 'Kihagyottak elrejtése',
@@ -436,7 +439,7 @@ export const hu = {
     'Add meg, hogy a tranzakció kimaradjon-e a kimutatásokból.',
   'transactions.filters': 'Szűrők',
   'transactions.period': 'Időszak',
-  'transactions.period.all': 'Bármikor',
+  'transactions.period.all': 'Teljes időszak',
   'transactions.period.thisMonth': 'Ez a hónap',
   'transactions.period.lastMonth': 'Előző hónap',
   'transactions.period.thisYear': 'Ez az év',
@@ -445,11 +448,11 @@ export const hu = {
   'transactions.to': 'Eddig',
   'transactions.allAccounts': 'Összes számla',
   'transactions.allCategories': 'Összes kategória',
-  'transactions.allPayees': 'Minden bolt és partner',
+  'transactions.allPayees': 'Összes bolt és partner',
   'transactions.search': 'Bolt / partner vagy megjegyzés',
   'transactions.applyFilters': 'Szűrés',
   'transactions.filteredTotals': 'Szűrt összesítés',
-  'transactions.baseTotal': 'Összesen az alap pénznemben',
+  'transactions.baseTotal': 'Összesen az alappénznemben',
   'transactions.unconverted': 'Át nem váltott',
   'transactions.provisional': 'ideiglenes',
   'transactions.matches': 'találat',
@@ -458,7 +461,7 @@ export const hu = {
   'transactions.nextPage': 'Következő oldal',
   'transactions.actions': 'Műveletek',
   'transactions.error.filters':
-    'Válassz érvényes szűrőket és helyes dátumtartományt.',
+    'Válassz érvényes szűrőket és helyes időszakot.',
   'transactions.error.totals':
     'A szűrt végösszeg túl nagy a pontos megjelenítéshez.',
   'transactions.duplicate': 'Másolat készítése',
@@ -565,7 +568,7 @@ export const hu = {
   'splits.unsplit': 'Felosztás megszüntetése',
   'splits.remaining': 'Még felosztandó',
   'splits.part': 'Rész',
-  'splits.remove': 'Rész törlése',
+  'splits.remove': 'Eltávolítás',
   'splits.addPart': 'Új rész',
   'splits.indicator': 'Felosztott',
   'tags.title': 'Címkék',
@@ -596,7 +599,7 @@ export const hu = {
   'undo.error': 'Nem sikerült visszavonni a módosítást.',
   'accounts.title': 'Számláid egy helyen',
   'accounts.description':
-    'A számlaegyenleg a nyitóegyenlegből, a dátummal rögzített pénzmozgásokból és az egyenleg-egyeztetésekből áll össze, a számla saját pénznemében.',
+    'A számlaegyenleg a nyitóegyenlegből, a dátummal rögzített pénzmozgásokból és az egyenlegegyeztetésekből áll össze, a számla saját pénznemében.',
   'accounts.create': 'Új számla',
   'accounts.name': 'Számla neve',
   'accounts.currency': 'Pénznem',
@@ -634,13 +637,13 @@ export const hu = {
     'A számlán vannak tranzakciók, ezért nem törölhető. Archiváld helyette.',
   'settings.title': 'Beállítások',
   'settings.description':
-    'A nyelv, a megjelenés, az alap pénznem és a blokkok fogadása ehhez a profilhoz tartozik, és a módosítások azonnal életbe lépnek.',
-  'settings.baseCurrency': 'Alap pénznem',
+    'A nyelv, a megjelenés, az alappénznem és a blokkok fogadása ehhez a profilhoz tartozik, és a módosítások azonnal életbe lépnek.',
+  'settings.baseCurrency': 'Alappénznem',
   'settings.version': 'Alkalmazásverzió',
   'settings.error': 'Nem sikerült menteni a beállításokat. Próbáld újra.',
   'watchedFolder.title': 'Figyelt mappa',
   'watchedFolder.hint':
-    'A Financial Tracker adatmappáján kívül bármely helyi mappát választhatsz, akár Google Drive-val vagy OneDrive-val szinkronizált mappát is. A teljesen átmásolt blokkfotók a feldolgozott almappába kerülnek.',
+    'A Financial Tracker adatmappáján kívül bármely helyi mappát választhatsz, akár Google Drive-val vagy OneDrive-val szinkronizált mappát is. A teljesen bemásolt blokkfotók a „feldolgozott” nevű almappába kerülnek.',
   'watchedFolder.error.userData':
     'Válassz a Financial Tracker adatmappáján kívüli mappát.',
   'watchedFolder.current': 'Kiválasztott mappa',
@@ -649,7 +652,7 @@ export const hu = {
   'watchedFolder.status.watching': 'Aktív',
   'watchedFolder.status.unavailable': 'Nem érhető el',
   'watchedFolder.choose': 'Mappa kiválasztása',
-  'watchedFolder.clear': 'Törlés',
+  'watchedFolder.clear': 'Figyelés kikapcsolása',
   'watchedFolder.intakeFailure':
     'Nem sikerült hozzáadni egy blokkfotót a figyelt mappából',
   'watchedFolder.dismissFailure': 'Bezárás',
@@ -690,17 +693,17 @@ export const hu = {
   'language.de': 'Német',
   'theme.light': 'Világos',
   'theme.dark': 'Sötét',
-  'theme.system': 'Windows követése',
+  'theme.system': 'A Windows beállítása szerint',
   'settings.preview': 'Formázási előnézet',
   'settings.date': 'Dátum',
   'settings.number': 'Szám',
   'phoneUpload.title': 'Blokk feltöltése telefonról',
-  'phoneUpload.starting': 'Telefonos feltöltés indítása a privát hálózaton…',
+  'phoneUpload.starting': 'Telefonos feltöltés indítása a magánhálózaton…',
   'phoneUpload.noPrivateNetwork':
-    'Nincs kapcsolat privát hálózattal. Csatlakoztasd a számítógépet a privát Wi-Fi-hálózathoz, majd próbáld újra.',
+    'Nincs kapcsolat magánhálózattal. Csatlakoztasd a számítógépet egy Wi-Fi-magánhálózathoz, majd próbáld újra.',
   'phoneUpload.error':
     'Nem sikerült elindítani a telefonos feltöltést. Próbáld újra.',
-  'phoneUpload.interface': 'Privát hálózat',
+  'phoneUpload.interface': 'Magánhálózat',
   'phoneUpload.qrAlt': 'A telefonos feltöltés címét tartalmazó QR-kód',
   'phoneUpload.address': 'Ezt a címet is megnyithatod a telefonon',
   'phoneUpload.expiresIn': 'Automatikusan leáll {time} múlva',
@@ -708,7 +711,7 @@ export const hu = {
   'phoneUpload.uploaded': 'Feltöltött blokkok: {count}',
   'phoneUpload.firewallTitle': 'Windows tűzfal',
   'phoneUpload.firewallGuidance':
-    'A Windows engedélyt kérhet a „Financial Tracker” számára. Csak privát hálózatokon engedélyezd. Ha a telefon nem tud csatlakozni, ellenőrizd, hogy mindkét eszköz ugyanazt a Wi-Fi-hálózatot használja, és a Windowsban Privát legyen a hálózat típusa.',
+    'A Windows engedélyt kérhet a „Financial Tracker” számára. Csak magánhálózatokon engedélyezd. Ha a telefon nem tud csatlakozni, ellenőrizd, hogy mindkét eszköz ugyanazt a Wi-Fi-hálózatot használja, és a Windowsban „Magánhálózat” legyen a hálózati profil.',
   'phoneUpload.close': 'Bezárás',
   'help.accessibleName': 'Súgó',
   'help.page.profilePicker':
@@ -718,17 +721,17 @@ export const hu = {
   'help.profilePicker.create':
     'Hozz létre profilt egy másik személy vagy elkülönített pénzügyek számára ezen a számítógépen. Adj neki könnyen felismerhető nevet; később is átnevezheted.',
   'help.page.overview':
-    'Hasonlítsd össze az aktuális hónap eddigi kiadásait, bevételeit és nettó eredményét az előző teljes hónappal. A kimutatásokból kihagyott tranzakciók nem számítanak bele. Az összegeket az alap pénznemre váltva láthatod, ha van hozzájuk árfolyam.',
+    'Hasonlítsd össze az aktuális hónap eddigi kiadásait, bevételeit és nettó eredményét az előző teljes hónappal. A kimutatásokból kihagyott tranzakciók nem számítanak bele. Az összegeket az alappénznemre váltva láthatod, ha van hozzájuk árfolyam.',
   'help.page.transactions':
-    'Itt rögzítheted és nézheted át a kiadásokat, bevételeket, átvezetéseket és egyenleg-egyeztetéseket. A szűrők a listát és az összesítést is szűkítik.',
+    'Itt rögzítheted és nézheted át a kiadásokat, bevételeket, átvezetéseket és egyenlegegyeztetéseket. A szűrők a listát és az összesítést is szűkítik.',
   'help.page.receipts':
     'A blokkfotók itt várnak, amíg tranzakcióként jóváhagyod vagy törlöd őket. A szövegfelismerés csak ezen a számítógépen fut; mindig ellenőrizd az előre kitöltött adatokat.',
   'help.page.recurring':
     'Itt adhatod meg a rendszeres kiadásokat és bevételeket. Az esedékes alkalmak jóváhagyásra várnak, és csak a jóváhagyás után számítanak bele a pénzügyeidbe.',
   'help.page.reports':
-    'Itt az alap pénznemben elemezheted a kiadásaidat és bevételeidet. A kihagyott tranzakciók nem számítanak bele. Az árfolyam nélküli összegek külön jelennek meg, és kimaradnak az átváltott diagramokból és összesítésekből.',
+    'Itt az alappénznemben elemezheted a kiadásaidat és bevételeidet. A kihagyott tranzakciók nem számítanak bele. Az árfolyam nélküli összegek külön jelennek meg, és kimaradnak az átváltott diagramokból és összesítésekből.',
   'help.page.accounts':
-    'A számla egy hely, ahol egyetlen pénznemben tartasz pénzt. Egyenlege a nyitóegyenlegből, a dátummal rögzített pénzmozgásokból és az egyenleg-egyeztetésekből áll össze.',
+    'A számla egy hely, ahol egyetlen pénznemben tartasz pénzt. Egyenlege a nyitóegyenlegből, a dátummal rögzített pénzmozgásokból és az egyenlegegyeztetésekből áll össze.',
   'help.page.settings':
     'A legtöbb beállítás az aktuális profilra vonatkozik. A Gyors rögzítés billentyűparancsa és az Indítás a Windows rendszerrel beállítás a Windows-fiók összes profiljára érvényes.',
   'help.page.quickAdd':
@@ -738,11 +741,11 @@ export const hu = {
   'help.overview.incomes':
     'Az aktuális hónap eddigi bevételei az előző teljes hónaphoz képest, a kimutatásokból kihagyott tranzakciók nélkül. A Tranzakciók gombbal megnyithatod a hozzájuk tartozó tranzakciókat.',
   'help.overview.net':
-    'A bevételek és kiadások különbsége az adott időszakban. Az átvezetések, az egyenleg-egyeztetések és a kihagyott tranzakciók nem módosítják.',
+    'A bevételek és kiadások különbsége az adott időszakban. Az átvezetések, az egyenlegegyeztetések és a kihagyott tranzakciók nem módosítják.',
   'help.overview.topCategories':
     'Az aktuális hónap öt legnagyobb, átváltott összegű kiadási kategóriája, a kimutatásokból kihagyott tranzakciók nélkül. Kattints egy kategóriára a hozzá tartozó tranzakciók megnyitásához.',
   'help.transactions.filters':
-    'A szűrők módosítják a megjelenő tranzakciókat és a lista feletti összesítést. Exportálás előtt alkalmazd őket; a CSV az összes találatot tartalmazza, nem csak az aktuális oldalt.',
+    'A szűrők módosítják a megjelenő tranzakciókat és a lista feletti összesítést. Exportálás előtt alkalmazd őket; a CSV az összes találatot tartalmazza, nemcsak az aktuális oldalt.',
   'help.transactions.excluded':
     'A kimutatásokból kihagyott tranzakció módosítja a számlaegyenleget, de nem számít bele a kiadási és bevételi összesítésekbe. Ilyen lehet például egy később visszatérített kiadás.',
   'help.transactions.templates':
@@ -752,7 +755,7 @@ export const hu = {
   'help.transactions.balanceAdjustment':
     'Rögzítsd a számla valós egyenlegét az adott nap végén. Az alkalmazás az előzményekből újraszámítja az eltérést, amely nem számít kiadásnak vagy bevételnek.',
   'help.transactions.csvExport':
-    'Az alkalmazott szűrőknek megfelelő kiadásokat és bevételeket exportálja. A felosztás részei külön sorban jelennek meg; az átvezetések és az egyenleg-egyeztetések kimaradnak.',
+    'Az alkalmazott szűrőknek megfelelő kiadásokat és bevételeket exportálja. A felosztás részei külön sorban jelennek meg; az átvezetések és az egyenlegegyeztetések kimaradnak.',
   'help.transactions.csvSeparator':
     'Válaszd ki, hogyan jelenjenek meg a tizedes törtek a táblázatkezelőben. Pont esetén vessző, vessző esetén pontosvessző választja el a mezőket.',
   'help.transactions.amountCalculator':
@@ -762,7 +765,7 @@ export const hu = {
   'help.transactions.transfer':
     'Az átvezetés két számla között mozgat pénzt; nem kiadás és nem bevétel. Eltérő pénznemeknél mindkét tényleges összeget add meg, az árfolyamot ezekből számítjuk.',
   'help.transactions.transferFee':
-    'Az átvezetési díjat külön kiadásként rögzítjük a forrásszámlán. Válassz hozzá kategóriát, és csak akkor hagyd ki, ha a kimutatásokban sem szeretnéd látni.',
+    'Az átvezetési díjat külön kiadásként rögzítjük a forrásszámlán. Válassz hozzá kategóriát. A Kihagyva jelölőt csak akkor kapcsold be, ha a díjat a kimutatásokban sem szeretnéd látni.',
   'help.transactions.tags':
     'A címkékkel a kategóriáktól függetlenül csoportosíthatod a tranzakciókat. Adj hozzá meglévő vagy új címkéket; a Címkék kezelésénél átnevezheted vagy törölheted őket.',
   'help.transactions.tagsBasic':
@@ -772,19 +775,19 @@ export const hu = {
   'help.transactions.drawer':
     'Itt kiadást, bevételt vagy átvezetést rögzíthetsz és szerkeszthetsz. Egysoros mezőben az Enter ment, a Ctrl+Enter mentés után új űrlapot nyit.',
   'help.receipts.phoneUpload':
-    'Ideiglenes feltöltőoldalt indít az ugyanahhoz a privát Wi-Fi-hálózathoz csatlakozó telefonon. A munkamenet alatt bárki hozzáférhet a feltöltésekhez, aki ismeri a címet, ezért csak megbízható privát hálózaton használd, és utána zárd be.',
+    'Ideiglenes feltöltőoldalt indít, amelyet az ugyanarra a Wi-Fi-magánhálózatra csatlakozó telefonodon nyithatsz meg. A munkamenet alatt bárki hozzáférhet a feltöltésekhez, aki ismeri a címet, ezért csak megbízható magánhálózaton használd, és utána zárd be.',
   'help.recurring.pending':
     'A jóváhagyásra váró tranzakciók esedékes alkalmak. Jóváhagyhatod őket, előtte módosíthatod az összeget vagy a dátumot, illetve kihagyhatod az adott alkalmat.',
   'help.recurring.definitions':
-    'A beállított rendszeres tranzakciók a közös adatokat és az ütemezést tárolják. Szüneteltetéskor nem jön létre új jóváhagyásra váró alkalom; folytatáskor a közben elmúlt dátumok kimaradnak.',
+    'Az Ütemezések lapon a rendszeres tranzakciók közös adatait és ismétlődését kezelheted. Szüneteltetéskor nem jön létre új jóváhagyásra váró alkalom; folytatáskor a közben elmúlt dátumok kimaradnak.',
   'help.recurring.editor':
-    'Add meg a jövőbeli alkalmak tranzakcióadatait és ütemezését. A beállítás létrehozása előtti dátumokra nem készül tranzakció.',
+    'Add meg a jövőbeli alkalmak tranzakcióadatait és ütemezését. Az ütemezés létrehozása előtti dátumokra nem készül tranzakció.',
   'help.recurring.schedule':
     'Válaszd ki, milyen gyakran és melyik naptári napon ismétlődjön a tranzakció. A nem kötelező befejező dátum után már nem jön létre új alkalom.',
   'help.reports.dateRange':
     'Válaszd ki a kategória-, havi trend- és pénzáramlási kimutatások időszakát. A költési ütem mindig az aktuális hónapot hasonlítja össze az előző három naptári hónappal.',
   'help.reports.category':
-    'A kiadások főkategóriánként, az alap pénznemben jelennek meg; a kihagyott tranzakciók nem számítanak bele. Válassz főkategóriát, majd alkategóriát a hozzájuk tartozó tranzakciók megnyitásához.',
+    'A kiadások főkategóriánként, az alappénznemben jelennek meg; a kihagyott tranzakciók nem számítanak bele. Válassz főkategóriát, majd alkategóriát a hozzájuk tartozó tranzakciók megnyitásához.',
   'help.reports.trend':
     'Hasonlítsd össze a havi kiadásokat, bevételeket és nettó összeget; a kihagyott tranzakciók nem számítanak bele. A tört hónapokból csak a kiválasztott időszak napjai jelennek meg.',
   'help.reports.pace':
@@ -796,7 +799,7 @@ export const hu = {
   'help.accounts.create':
     'Hozz létre külön számlát minden olyan helyhez és pénznemhez, ahol pénzt tartasz. Add meg a nyitóegyenleget és azt a dátumot, amelytől az előzményeket vezetni szeretnéd.',
   'help.accounts.currency':
-    'Minden számlának pontosan egy pénzneme van. Csak akkor módosíthatod, ha a számlán nincs tranzakció, átvezetés vagy egyenleg-egyeztetés.',
+    'Minden számlának pontosan egy pénzneme van. Csak akkor módosíthatod, ha a számlán nincs tranzakció, átvezetés vagy egyenlegegyeztetés.',
   'help.accounts.openingBalance':
     'A nyitóegyenleg a számla egyenlege az előzmények kezdőnapján. Lehet pozitív, nulla vagy negatív, és számítást is beírhatsz a mezőbe.',
   'help.accounts.archive':
@@ -810,7 +813,7 @@ export const hu = {
   'help.settings.backups':
     'A visszaállítás a kiválasztott biztonsági mentésre cseréli a profil jelenlegi adatait, ezért a mentés óta végzett módosítások elvesznek.',
   'help.settings.watchedFolder':
-    'A teljesen bemásolt fotót először a feldolgozott almappába helyezzük, majd onnan importáljuk a blokkok közé. Ha az importálás nem sikerül, a fájl ott marad, és értesítést kapsz.',
+    'A teljesen bemásolt fotót először a „feldolgozott” nevű almappába helyezzük, majd onnan importáljuk a blokkok közé. Ha az importálás nem sikerül, a fájl ott marad, és értesítést kapsz.',
   'help.settings.baseCurrency':
     'A kimutatások a többi pénznemet az adott nap árfolyamával erre a pénznemre váltják. A módosítás a kimutatások megjelenítését változtatja, a számlákon tárolt összegeket nem.',
   'help.settings.exchangeRates':

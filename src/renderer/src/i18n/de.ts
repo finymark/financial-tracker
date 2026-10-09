@@ -256,6 +256,8 @@ export const de = {
   'recurring.every': 'alle',
   'recurring.months': 'Monat(e)',
   'recurring.weeks': 'Woche(n)',
+  'recurring.interval.months': 'alle {n} Monate',
+  'recurring.interval.weeks': 'alle {n} Wochen',
   'recurring.month': 'Monat',
   'recurring.day': 'Tag',
   'recurring.weekday': 'Wochentag',

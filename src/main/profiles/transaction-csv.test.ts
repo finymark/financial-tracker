@@ -89,8 +89,8 @@ test.each([
     'Bevétel',
     'Igen',
     'Nem',
+    'Étkezés',
     'Élelmiszer',
-    'Bevásárlás',
     ',',
   ],
   [

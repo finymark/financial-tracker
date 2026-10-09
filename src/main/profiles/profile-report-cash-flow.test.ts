@@ -472,7 +472,7 @@ test('cash flow localizes seeded category names while preserving custom names', 
   })
   for (const [language, name] of [
     ['en', 'Food'],
-    ['hu', 'Élelmiszer'],
+    ['hu', 'Étkezés'],
     ['de', 'Lebensmittel'],
   ] as const) {
     application.commands.updateSettings({ language })

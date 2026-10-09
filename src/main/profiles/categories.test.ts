@@ -72,7 +72,7 @@ test('new profiles have stable two-level expense and income defaults translated 
     original.find((category) => category.seedKey === 'expense.fees')?.name,
   ).toBe('Fees')
   for (const [language, foodName, shopName, feeName] of [
-    ['hu', 'Élelmiszer', 'Bevásárlás', 'Díjak'],
+    ['hu', 'Étkezés', 'Élelmiszer', 'Díj'],
     ['de', 'Lebensmittel', 'Einkäufe', 'Gebühren'],
     ['en', 'Food', 'Groceries', 'Fees'],
   ] as const) {
@@ -351,7 +351,7 @@ test('the category migration seeds existing profiles in their saved language and
   const food = upgraded.queries
     .listCategories()
     .find((category) => category.seedKey === 'expense.food')!
-  expect(food.name).toBe('Élelmiszer')
+  expect(food.name).toBe('Étkezés')
   upgraded.commands.renameCategory({ id: food.id, name: 'My food' })
   upgraded.commands.archiveCategory(food.id)
   const fees = upgraded.queries
