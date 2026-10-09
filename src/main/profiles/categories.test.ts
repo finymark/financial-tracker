@@ -72,7 +72,7 @@ test('new profiles have stable two-level expense and income defaults translated 
     original.find((category) => category.seedKey === 'expense.fees')?.name,
   ).toBe('Fees')
   for (const [language, foodName, shopName, feeName] of [
-    ['hu', 'Élelmiszer', 'Bolt', 'Díjak'],
+    ['hu', 'Élelmiszer', 'Bevásárlás', 'Díjak'],
     ['de', 'Lebensmittel', 'Einkäufe', 'Gebühren'],
     ['en', 'Food', 'Groceries', 'Fees'],
   ] as const) {

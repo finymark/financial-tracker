@@ -43,8 +43,8 @@ export const categoryNames = {
   } satisfies CategoryCatalog,
   hu: {
     'categories.default.food': 'Élelmiszer',
-    'categories.default.shop': 'Bolt',
-    'categories.default.restaurant': 'Étterem',
+    'categories.default.shop': 'Bevásárlás',
+    'categories.default.restaurant': 'Éttermek',
     'categories.default.housing': 'Lakhatás',
     'categories.default.rent': 'Lakbér',
     'categories.default.utilities': 'Rezsi',
@@ -57,7 +57,7 @@ export const categoryNames = {
     'categories.default.subscriptions': 'Előfizetések',
     'categories.default.otherExpense': 'Egyéb kiadások',
     'categories.default.fees': 'Díjak',
-    'categories.default.salary': 'Fizetés',
+    'categories.default.salary': 'Munkabér',
     'categories.default.otherIncome': 'Egyéb bevétel',
   } satisfies CategoryCatalog,
   de: {

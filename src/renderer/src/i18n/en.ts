@@ -531,6 +531,8 @@ export const en = {
   'transactions.optional': 'Optional',
   'transactions.chooseAccount': 'Choose an active account',
   'transactions.payee': 'Payee',
+  'transactions.payee.expense': 'Payee',
+  'transactions.payee.income': 'Payee',
   'transactions.payeeHint':
     'Choose an existing name or type a new payee to create it.',
   'transactions.category': 'Category',

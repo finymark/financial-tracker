@@ -164,7 +164,13 @@ export function TemplateEditor({
           />
         </div>
         <label className="block space-y-1 text-sm font-medium">
-          {t('transactions.payee')}
+          {t(
+            draft.kind === 'expense'
+              ? 'transactions.payee.expense'
+              : draft.kind === 'income'
+                ? 'transactions.payee.income'
+                : 'transactions.payee',
+          )}
           <Input
             value={draft.payeeName}
             maxLength={100}

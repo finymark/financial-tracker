@@ -555,6 +555,8 @@ export const de = {
   'transactions.optional': 'Optional',
   'transactions.chooseAccount': 'Aktives Konto auswählen',
   'transactions.payee': 'Zahlungspartner',
+  'transactions.payee.expense': 'Zahlungspartner',
+  'transactions.payee.income': 'Zahlungspartner',
   'transactions.payeeHint':
     'Wähle einen vorhandenen Namen oder gib einen neuen Zahlungspartner ein.',
   'transactions.category': 'Kategorie',

@@ -247,7 +247,7 @@ function RecurringEditor({
           />
         </div>
         <label className="space-y-1 text-sm font-medium">
-          {t('transactions.payee')}
+          {t(`transactions.payee.${draft.kind}`)}
           <Input
             maxLength={100}
             value={draft.payeeName}

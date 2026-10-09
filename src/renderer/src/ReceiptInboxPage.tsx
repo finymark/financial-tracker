@@ -440,7 +440,7 @@ export function ReceiptInboxPage({
               </NativeSelect>
             </label>
             <label className="block space-y-2 text-sm font-medium">
-              {t('transactions.payee')}
+              {t(`transactions.payee.${form.kind}`)}
               {ocrFields.has('payee') && (
                 <span className="ml-2 text-xs text-muted-foreground">
                   {t('receipts.ocrPrefilled')}

@@ -50,27 +50,27 @@ export const desktopMessages = {
     'settings.shortcutError': 'Could not change the global shortcut.',
   },
   hu: {
-    'tray.tooltip': 'Financial Tracker — a tálcán fut',
+    'tray.tooltip': 'Financial Tracker — fut a háttérben',
     'tray.open': 'Megnyitás',
     'tray.quickAdd': 'Gyors rögzítés',
     'tray.quit': 'Kilépés',
     'tray.notice':
-      'Az ablak bezárása után a Financial Tracker tovább fut a tálcán. A tálcaikonról újra megnyithatod, tranzakciót rögzíthetsz vagy kiléphetsz.',
+      'Az ablak bezárása után a Financial Tracker tovább fut a háttérben. A tálcaikonról újra megnyithatod, tranzakciót rögzíthetsz vagy kiléphetsz.',
     'tray.noticeOk': 'Rendben',
     'quickAdd.openError':
       'A gyors rögzítés nem tudta megnyitni a legutóbb használt profilt. Nyisd meg a főablakot, és próbáld újra.',
     'settings.autostart': 'Indítás a Windows rendszerrel',
     'settings.autostartDescription':
-      'Bejelentkezéskor rejtve, a tálcán indul. Ez a beállítás a Windows-fiók minden profiljára érvényes; alapértelmezetten kikapcsolt.',
+      'Bejelentkezéskor rejtve, a tálcán indul. A beállítás a Windows-fiók minden profiljára érvényes, és alapból ki van kapcsolva.',
     'settings.autostartUnavailable':
       'Csak a telepített Windows-alkalmazásban érhető el, fejlesztői módban nem.',
     'settings.autostartError':
-      'Nem sikerült lekérni vagy módosítani a Windows indítási beállítását.',
-    'settings.shortcut': 'Globális gyorsrögzítési billentyűparancs',
+      'Nem sikerült betölteni vagy módosítani az automatikus indítás beállítását.',
+    'settings.shortcut': 'A Gyors rögzítés billentyűparancsa',
     'settings.shortcutDescription':
-      'Nyomd le az új billentyűparancsot. Ez az alkalmazásszintű beállítás a Windows-fiók minden profiljára érvényes.',
+      'Nyomd le az új billentyűparancsot. Ez a beállítás a Windows-fiók minden profiljára érvényes.',
     'settings.shortcutCapture': 'Nyomd le az új billentyűparancsot',
-    'settings.shortcutReset': 'Visszaállítás: Ctrl+Alt+N',
+    'settings.shortcutReset': 'Alapérték visszaállítása: Ctrl+Alt+N',
     'settings.shortcutConflict':
       'A(z) {shortcut} billentyűparancsot egy másik program használja. Válassz másik billentyűparancsot.',
     'settings.shortcutConflictKept':
