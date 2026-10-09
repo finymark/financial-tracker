@@ -68,7 +68,7 @@ export function initialWindowState(
       const visibleHeight =
         Math.min(savedBounds.y + savedBounds.height, area.y + area.height) -
         Math.max(savedBounds.y, area.y)
-      // A body sliver or an off-screen title strip is not a recoverable window.
+      // A body sliver or a vertically inaccessible title strip is not recoverable.
       if (
         visibleWidth < Math.min(100, savedBounds.width, area.width) ||
         visibleHeight < Math.min(100, savedBounds.height, area.height) ||
@@ -76,22 +76,20 @@ export function initialWindowState(
         savedBounds.y + TITLE_BAR_HEIGHT > area.y + area.height
       )
         continue
-      let bounds = savedBounds
-      if (bounds.width > area.width || bounds.height > area.height) {
-        const width = Math.min(bounds.width, area.width)
-        const height = Math.min(bounds.height, area.height)
-        bounds = {
-          x: Math.max(area.x, Math.min(bounds.x, area.x + area.width - width)),
-          y: Math.max(
-            area.y,
-            Math.min(bounds.y, area.y + area.height - height),
-          ),
-          width,
-          height,
-        }
+      const width = Math.min(savedBounds.width, area.width)
+      const height = Math.min(savedBounds.height, area.height)
+      const bounds = {
+        x: Math.max(
+          area.x,
+          Math.min(savedBounds.x, area.x + area.width - width),
+        ),
+        y: Math.max(
+          area.y,
+          Math.min(savedBounds.y, area.y + area.height - height),
+        ),
+        width,
+        height,
       }
-      if (bounds.x < area.x || bounds.x + bounds.width > area.x + area.width)
-        continue
       const intersection = visibleWidth * visibleHeight
       // Prefer the display containing most of a rectangle spanning multiple displays.
       if (!match || intersection > match.intersection)

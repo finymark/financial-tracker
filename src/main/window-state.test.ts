@@ -79,9 +79,9 @@ test.each([false, true])(
   },
 )
 
-test('a visible corner is not enough when the title strip and native buttons are outside the work area', () => {
+test('a usable visible corner is moved inside the work area, while a sliver falls back', () => {
   const sliver = {
-    bounds: { x: 1959, y: 0, width: 900, height: 600 },
+    bounds: { x: 1959, y: 20, width: 900, height: 600 },
     maximized: false,
   }
   expect(initialWindowState(sliver, [primary], primary)).toEqual({
@@ -90,7 +90,7 @@ test('a visible corner is not enough when the title strip and native buttons are
   })
   const corner = { ...sliver, bounds: { ...sliver.bounds, x: 1860, y: 960 } }
   expect(initialWindowState(corner, [primary], primary)).toEqual({
-    bounds: { x: 550, y: 240, width: 900, height: 600 },
+    bounds: { x: 1060, y: 460, width: 900, height: 600 },
     maximized: false,
   })
 })
@@ -440,7 +440,10 @@ test('a window with its title strip on a top monitor restores there until that m
     bounds: { x: 200, y: -300, width: 1000, height: 800 },
     maximized: false,
   }
-  expect(initialWindowState(state, [primary, top], primary)).toEqual(state)
+  expect(initialWindowState(state, [primary, top], primary)).toEqual({
+    bounds: { x: 200, y: -800, width: 1000, height: 800 },
+    maximized: false,
+  })
   expect(initialWindowState(state, [primary], primary)).toEqual({
     bounds: { x: 550, y: 240, width: 900, height: 600 },
     maximized: false,
@@ -461,4 +464,59 @@ test('clamping only oversized width preserves a smaller height and its vertical 
     bounds: { x: 40, y: 100, width: 1920, height: 700 },
     maximized: false,
   })
+})
+
+test.each([false, true])(
+  'a side-by-side span moves into the display holding most of it, reversed order=%s',
+  (reversed) => {
+    const left = { x: 0, y: 0, width: 1920, height: 1040 }
+    const right = { x: 1920, y: 0, width: 1920, height: 1040 }
+    const state = {
+      bounds: { x: 1500, y: 100, width: 1000, height: 700 },
+      maximized: false,
+    }
+    expect(
+      initialWindowState(state, reversed ? [right, left] : [left, right], left),
+    ).toEqual({
+      bounds: { x: 1920, y: 100, width: 1000, height: 700 },
+      maximized: false,
+    })
+  },
+)
+
+test.each([
+  { x: -50, expectedX: 0 },
+  { x: 1700, expectedX: 920 },
+])(
+  'a window past a horizontal edge keeps its size and moves inside: x=$x',
+  ({ x, expectedX }) => {
+    const area = { x: 0, y: 0, width: 1920, height: 1040 }
+    expect(
+      initialWindowState(
+        { bounds: { x, y: 100, width: 1000, height: 700 }, maximized: false },
+        [area],
+        area,
+      ),
+    ).toEqual({
+      bounds: { x: expectedX, y: 100, width: 1000, height: 700 },
+      maximized: false,
+    })
+  },
+)
+
+test('flush saves supplied normal bounds even when they equal the maximized bounds', () => {
+  const { tracker, apply, save, snapshot, setSnapshot } = trackerFixture()
+  tracker.showFirstTime(apply)
+  setSnapshot({
+    ...snapshot(),
+    bounds: primary,
+    normalBounds: { ...primary },
+    maximized: true,
+  })
+  tracker.flush()
+  expect(save).toHaveBeenCalledExactlyOnceWith({
+    bounds: primary,
+    maximized: true,
+  })
+  expect(vi.getTimerCount()).toBe(0)
 })
