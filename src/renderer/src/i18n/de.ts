@@ -827,8 +827,6 @@ export const de = {
     'Archivieren blendet ein Konto aus Eingabelisten aus, ohne Verlauf oder Saldo zu löschen. Hebe die Archivierung auf, wenn du es wieder verwenden möchtest.',
   'help.settings.categories':
     'Kategorien ordnen Ausgaben oder Einnahmen auf höchstens zwei Ebenen: Haupt- und Unterkategorie. Sortiere oder archiviere sie, ohne bestehende Transaktionsverläufe zu ändern.',
-  'help.settings.payees':
-    'Ein Zahlungspartner ist der vereinheitlichte Name einer Transaktion. Füge Aliasse für rohe oder alternative Namen hinzu; beim Zusammenführen wechseln Transaktionen und Aliasse zum verbleibenden Zahlungspartner.',
   'help.settings.rules':
     'Regeln füllen bei passenden Transaktionen Zahlungspartner, Kategorie oder Tags automatisch vor. Sie laufen der Reihe nach; die erste passende Regel gewinnt.',
   'help.settings.ruleAmountCurrency':
@@ -837,10 +835,6 @@ export const de = {
     'Wiederherstellen ersetzt die aktuellen Profildaten durch die gewählte Sicherung; Änderungen seit dieser Sicherung gehen verloren.',
   'help.settings.watchedFolder':
     'Nachdem ein Foto vollständig kopiert wurde, verschiebt die App es zuerst in den Unterordner feldolgozott und importiert es dann in den Belegeingang. Schlägt der Import fehl, bleibt die Datei dort und ein Hinweis erscheint.',
-  'help.settings.shortcut':
-    'Dieses systemweite Tastenkürzel öffnet Schnellerfassung auch bei ausgeblendetem Hauptfenster und gilt für alle Profile dieses Windows-Kontos. Fokussiere das Kürzelfeld und drücke die gewünschte Tastenkombination.',
-  'help.settings.autostart':
-    'Diese Einstellung ist standardmäßig aus. Wenn sie aktiv ist, startet Financial Tracker bei der Windows-Anmeldung ausgeblendet im Infobereich. Sie gilt für alle Profile dieses Windows-Kontos.',
   'help.settings.baseCurrency':
     'Berichte rechnen andere Währungen mit dem Kurs des jeweiligen Tages in diese Währung um. Eine Änderung betrifft die Berichtsanzeige, nicht gespeicherte Kontobeträge.',
   'help.settings.exchangeRates':

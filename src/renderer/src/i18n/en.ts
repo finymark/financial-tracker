@@ -794,8 +794,6 @@ export const en = {
     'Archiving hides an account from entry pickers without deleting its history or balance. Unarchive it when you need to use it again.',
   'help.settings.categories':
     'Categories classify expense or income in up to two levels: main category and subcategory. Reorder or archive them without changing existing transaction history.',
-  'help.settings.payees':
-    'A payee is the normalized name used on transactions. Add aliases for raw or alternate names; merging moves transactions and aliases to the surviving payee.',
   'help.settings.rules':
     'Rules automatically prefill payee, category or tags when a transaction matches. They run in order and the first matching rule wins.',
   'help.settings.ruleAmountCurrency':
@@ -804,10 +802,6 @@ export const en = {
     'Restoring replaces current profile data with the selected backup, so changes made since that backup are lost.',
   'help.settings.watchedFolder':
     'After a photo finishes copying, the app first moves it to the feldolgozott subfolder, then imports it into the receipt inbox. If import fails, the file stays there and a notice appears.',
-  'help.settings.shortcut':
-    'This system-wide shortcut opens Quick add even when the main window is hidden, and applies to every profile on this Windows account. Focus the shortcut field and press the desired key combination.',
-  'help.settings.autostart':
-    'This is off by default. When enabled, Financial Tracker starts hidden in the notification area when you sign in to Windows. This setting applies to every profile on this Windows account.',
   'help.settings.baseCurrency':
     'Reports convert other currencies into this currency using the exchange rate for each date. Changing it changes report display, not stored account amounts.',
   'help.settings.exchangeRates':

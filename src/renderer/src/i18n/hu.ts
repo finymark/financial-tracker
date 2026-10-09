@@ -798,8 +798,6 @@ export const hu = {
     'Az archiválás elrejti a számlát az adatbeviteli listákból, de nem törli az előzményeit vagy az egyenlegét. Ha újra használnád, szüntesd meg az archiválást.',
   'help.settings.categories':
     'A kategóriák legfeljebb két szinten sorolják be a kiadásokat vagy bevételeket: főkategória és alkategória. Átrendezheted vagy archiválhatod őket a meglévő tranzakciók módosítása nélkül.',
-  'help.settings.payees':
-    'A kedvezményezett a tranzakciókon használt egységes név. A nyers vagy eltérő nevekhez álnevet adhatsz; egyesítéskor a tranzakciók és álnevek a megmaradó kedvezményezetthez kerülnek.',
   'help.settings.rules':
     'A szabályok egyezés esetén automatikusan előre kitöltik a kedvezményezettet, kategóriát vagy címkéket. Sorrendben futnak, és az első egyező szabály érvényesül.',
   'help.settings.ruleAmountCurrency':
@@ -808,10 +806,6 @@ export const hu = {
     'A visszaállítás az aktuális profiladatokat a kiválasztott mentésre cseréli, ezért a mentés óta végzett módosítások elvesznek.',
   'help.settings.watchedFolder':
     'A teljesen bemásolt fotót az alkalmazás először a feldolgozott almappába helyezi, majd onnan importálja a Nyugta beérkezők közé. Ha az importálás nem sikerül, a fájl ott marad, és értesítés jelenik meg.',
-  'help.settings.shortcut':
-    'Ez a rendszerszintű gyorsbillentyű akkor is megnyitja a Gyors rögzítést, ha a főablak rejtve van, és ezen a Windows-fiókon minden profilra érvényes. Fókuszáld a gyorsbillentyű mezőjét, majd nyomd le a kívánt billentyűkombinációt.',
-  'help.settings.autostart':
-    'Alapértelmezés szerint ki van kapcsolva. Bekapcsolva a Financial Tracker a Windowsba való bejelentkezéskor rejtve, az értesítési területen indul el. Ez a beállítás ezen a Windows-fiókon minden profilra érvényes.',
   'help.settings.baseCurrency':
     'A kimutatások a többi pénznemet az adott nap árfolyamával erre a pénznemre váltják. A módosítás a kimutatások megjelenítését változtatja, a számlákon tárolt összegeket nem.',
   'help.settings.exchangeRates':
