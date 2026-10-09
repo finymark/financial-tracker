@@ -46,6 +46,11 @@ import { registerReportIpc } from './profiles/report-ipc'
 import { RecurringScheduler } from './recurring-scheduler'
 import { registerRecurringIpc } from './profiles/recurring-ipc'
 import { AppSettingsFile } from './app-settings'
+import {
+  initialWindowState,
+  windowStateToSave,
+  type WindowState,
+} from './window-state'
 import { registerDesktopIpc } from './desktop-ipc'
 import { buildTrayMenu, trayLanguage } from './tray-menu'
 import { desktopMessages } from '../shared/desktop-translations'
@@ -70,11 +75,18 @@ let mainWindow: BrowserWindow | null = null
 let quickAddWindow: BrowserWindow | null = null
 let quitting = false
 let pendingSecondLaunch = false
+let mainWindowShown = false
+let maximizeOnFirstShow = false
 let openQuickAddImplementation: () => Promise<void> = async () => {}
 
 function showMainWindow(): void {
   if (quitting || !mainWindow || mainWindow.isDestroyed()) return
   if (mainWindow.isMinimized()) mainWindow.restore()
+  if (!mainWindowShown) {
+    mainWindowShown = true
+    // On Windows maximize() also shows a hidden window. Do it only on request.
+    if (maximizeOnFirstShow) mainWindow.maximize()
+  }
   mainWindow.show()
   mainWindow.focus()
 }
@@ -148,11 +160,11 @@ function createAppWindow(
   return window
 }
 
-function createWindow(hidden: boolean): BrowserWindow {
+function createWindow(hidden: boolean, state: WindowState): BrowserWindow {
+  maximizeOnFirstShow = state.maximized
   const window = createAppWindow({
     show: false,
-    width: 900,
-    height: 600,
+    ...state.bounds,
     title: 'Financial Tracker',
   })
 
@@ -330,6 +342,44 @@ function startApplication(): void {
   }
   let trayNoticeShown = settings.isTrayNoticeShown()
   let tray: Tray | null = null
+  const initialState = initialWindowState(
+    settings.getWindowState(),
+    screen.getAllDisplays().map((display) => display.workArea),
+    screen.getPrimaryDisplay().workArea,
+  )
+  let pendingWindowState = initialState
+  let windowStateTimer: ReturnType<typeof setTimeout> | undefined
+  const captureWindowState = () => {
+    if (!mainWindowShown || !mainWindow || mainWindow.isDestroyed()) return
+    return windowStateToSave({
+      bounds: mainWindow.getBounds(),
+      normalBounds: mainWindow.getNormalBounds(),
+      maximized: mainWindow.isMaximized(),
+      minimized: mainWindow.isMinimized(),
+      fullscreen: mainWindow.isFullScreen(),
+    })
+  }
+  const saveWindowState = () => {
+    clearTimeout(windowStateTimer)
+    windowStateTimer = undefined
+    // Keep the last usable snapshot if closing/quitting while minimized or fullscreen.
+    // Before the first show, retain the intended maximize flag, not the hidden window's.
+    pendingWindowState = captureWindowState() ?? pendingWindowState
+    try {
+      settings.setWindowState(pendingWindowState)
+    } catch {
+      console.warn('Could not persist the main window state.')
+    }
+  }
+  const scheduleWindowStateSave = () => {
+    if (quitting) return
+    const state = captureWindowState()
+    if (!state) return
+    // Capture now, so a later minimize/fullscreen cannot discard a pending change.
+    pendingWindowState = state
+    clearTimeout(windowStateTimer)
+    windowStateTimer = setTimeout(saveWindowState, 250)
+  }
   const rateSource = new MnbExchangeRateSource(createElectronNetTransport())
   const receiptOcr = new TesseractOcrEngine()
   const onRateStatusChanged = () => {
@@ -541,6 +591,7 @@ function startApplication(): void {
   let shutdownPromise: Promise<void> | null = null
   let shutdownComplete = false
   function shutdown(): Promise<void> {
+    saveWindowState()
     exchangeRates.stop()
     recurring.stop()
     shutdownPromise ??= phoneUpload
@@ -580,9 +631,14 @@ function startApplication(): void {
     disposeDesktopIntegrations()
   })
 
-  mainWindow = createWindow(startsHidden(process.argv))
+  mainWindow = createWindow(startsHidden(process.argv), initialState)
+  mainWindow.on('resize', scheduleWindowStateSave)
+  mainWindow.on('move', scheduleWindowStateSave)
+  mainWindow.on('maximize', scheduleWindowStateSave)
+  mainWindow.on('unmaximize', scheduleWindowStateSave)
   mainWindow.on('close', (event) => {
     if (quitting) return
+    saveWindowState()
     event.preventDefault()
     mainWindow?.hide()
     if (!trayNoticeShown) {
