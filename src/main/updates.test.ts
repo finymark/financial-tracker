@@ -298,9 +298,10 @@ test('restart closes application data before visibly installing and ignores dupl
 
 test('a failed shutdown recovers before rejecting and allows another restart attempt', async () => {
   const recoverAfterFailure = vi.fn(async () => {})
+  const error = new Error('Shutdown failed')
   const app = setup({
     beforeInstall: vi.fn(async () => {
-      throw new Error('Shutdown failed')
+      throw error
     }),
     recoverAfterFailure,
   })
@@ -311,25 +312,29 @@ test('a failed shutdown recovers before rejecting and allows another restart att
   )
   expect(app.updater.quitAndInstall).not.toHaveBeenCalled()
   expect(recoverAfterFailure).toHaveBeenCalledTimes(1)
+  expect(app.logError).toHaveBeenCalledTimes(1)
+  expect(app.logError).toHaveBeenCalledWith(error)
 
   await expect(app.invoke(IPC_CHANNELS.updatesRestart)).rejects.toThrow(
     'Shutdown failed',
   )
   expect(recoverAfterFailure).toHaveBeenCalledTimes(2)
+  expect(app.logError).toHaveBeenCalledTimes(2)
 })
 
-test('an updater error while restarting recovers and pushes a retryable install error', async () => {
+test('a synchronous updater error during quitAndInstall recovers and allows a retry', async () => {
   const recoverAfterFailure = vi.fn(async () => {})
   const app = setup({ recoverAfterFailure })
   app.emit('update-downloaded', { version: '0.5.1' })
+  const error = new Error('Installer failed')
+  app.updater.quitAndInstall.mockImplementationOnce(() => {
+    app.emit('error', error)
+  })
 
   await app.invoke(IPC_CHANNELS.updatesRestart)
-  const error = new Error('Installer failed')
-  app.emit('error', error)
-  await Promise.resolve()
-  await Promise.resolve()
 
   expect(recoverAfterFailure).toHaveBeenCalledTimes(1)
+  expect(app.logError).toHaveBeenCalledTimes(1)
   expect(app.logError).toHaveBeenCalledWith(error)
   expect(app.send).toHaveBeenLastCalledWith({
     status: 'ready',
@@ -344,4 +349,45 @@ test('an updater error while restarting recovers and pushes a retryable install 
 
   await app.invoke(IPC_CHANNELS.updatesRestart)
   expect(app.updater.quitAndInstall).toHaveBeenCalledTimes(2)
+})
+
+test('an updater error after quitAndInstall returns is only logged because quit is already scheduled', async () => {
+  const recoverAfterFailure = vi.fn(async () => {})
+  const app = setup({ recoverAfterFailure })
+  app.emit('update-downloaded', { version: '0.5.1' })
+
+  await app.invoke(IPC_CHANNELS.updatesRestart)
+  const error = new Error('Asynchronous NSIS spawn failure')
+  app.emit('error', error)
+  await Promise.resolve()
+
+  expect(app.logError).toHaveBeenCalledTimes(1)
+  expect(app.logError).toHaveBeenCalledWith(error)
+  expect(recoverAfterFailure).not.toHaveBeenCalled()
+  expect(app.invoke(IPC_CHANNELS.updatesState)).toEqual({
+    status: 'ready',
+    version: '0.5.1',
+  })
+})
+
+test('a thrown quitAndInstall failure recovers and rejects with the renderer error key', async () => {
+  const recoverAfterFailure = vi.fn(async () => {})
+  const app = setup({ recoverAfterFailure })
+  const error = new Error('quitAndInstall threw')
+  app.updater.quitAndInstall.mockImplementation(() => {
+    throw error
+  })
+  app.emit('update-downloaded', { version: '0.5.1' })
+
+  await expect(app.invoke(IPC_CHANNELS.updatesRestart)).rejects.toThrow(
+    'updates.error',
+  )
+  expect(app.logError).toHaveBeenCalledTimes(1)
+  expect(app.logError).toHaveBeenCalledWith(error)
+  expect(recoverAfterFailure).toHaveBeenCalledTimes(1)
+  expect(app.invoke(IPC_CHANNELS.updatesState)).toEqual({
+    status: 'ready',
+    version: '0.5.1',
+    installError: true,
+  })
 })

@@ -69,6 +69,9 @@ export function registerUpdates(options: RegisterUpdatesOptions): void {
   let inFlight = false
   let restarting = false
   let restartRecovery: Promise<void> | null = null
+  let callingQuitAndInstall = false
+  let sawSynchronousInstallError = false
+  let synchronousInstallError: unknown
   let notificationShown = false
 
   const publish = (nextState: UpdateState) => {
@@ -118,16 +121,29 @@ export function registerUpdates(options: RegisterUpdatesOptions): void {
       // Shut down first because quit/install event ordering varies by platform.
       await options.beforeInstall()
     } catch (error) {
-      await recoverRestart(error, false, false)
+      await recoverRestart(error, false, true)
       throw error
     }
+    let thrownInstallError: unknown
+    let quitAndInstallThrew = false
+    sawSynchronousInstallError = false
+    synchronousInstallError = undefined
+    callingQuitAndInstall = true
     try {
       // Keep the installer visible; autoRunAppAfterInstall relaunches afterward.
       options.updater.quitAndInstall(false, true)
     } catch (error) {
-      await recoverRestart(error, true, true)
-      throw new Error('updates.error', { cause: error })
+      quitAndInstallThrew = true
+      thrownInstallError = error
+    } finally {
+      callingQuitAndInstall = false
     }
+    if (quitAndInstallThrew) {
+      await recoverRestart(thrownInstallError, true, true)
+      throw new Error('updates.error', { cause: thrownInstallError })
+    }
+    if (sawSynchronousInstallError)
+      await recoverRestart(synchronousInstallError, true, true)
   })
 
   if (!options.packaged) return
@@ -162,7 +178,15 @@ export function registerUpdates(options: RegisterUpdatesOptions): void {
   })
   options.updater.on('error', (error) => {
     // Check/download errors are logged by the rejected check promise below.
-    if (restarting) void recoverRestart(error, true, true)
+    if (!restarting) return
+    if (callingQuitAndInstall) {
+      sawSynchronousInstallError = true
+      synchronousInstallError = error
+      return
+    }
+    // quitAndInstall already scheduled app.quit(); recovery would reopen data
+    // and restart schedulers while the process is exiting.
+    options.logError(error)
   })
 
   const check = async () => {
