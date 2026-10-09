@@ -1,3 +1,5 @@
+import { TITLE_BAR_HEIGHT } from '../shared/window-chrome'
+
 export interface WindowBounds {
   x: number
   y: number
@@ -56,22 +58,48 @@ export function initialWindowState(
   primaryWorkArea: WindowBounds,
 ): WindowState {
   const state = parseWindowState(saved)
-  if (
-    state &&
-    workAreas.some((area) => {
-      // Require a usable visible patch, not just a thin sliver at a screen edge.
-      const bounds = state.bounds
-      return (
-        Math.min(bounds.x + bounds.width, area.x + area.width) -
-          Math.max(bounds.x, area.x) >=
-          Math.min(100, bounds.width) &&
-        Math.min(bounds.y + bounds.height, area.y + area.height) -
-          Math.max(bounds.y, area.y) >=
-          Math.min(100, bounds.height)
+  let match: { bounds: WindowBounds; intersection: number } | undefined
+  if (state) {
+    for (const area of workAreas) {
+      const savedBounds = state.bounds
+      const visibleWidth =
+        Math.min(savedBounds.x + savedBounds.width, area.x + area.width) -
+        Math.max(savedBounds.x, area.x)
+      const visibleHeight =
+        Math.min(savedBounds.y + savedBounds.height, area.y + area.height) -
+        Math.max(savedBounds.y, area.y)
+      // A body sliver or an off-screen title strip is not a recoverable window.
+      if (
+        visibleWidth < Math.min(100, savedBounds.width, area.width) ||
+        visibleHeight < Math.min(100, savedBounds.height, area.height) ||
+        savedBounds.y < area.y ||
+        savedBounds.y + TITLE_BAR_HEIGHT > area.y + area.height
       )
-    })
-  )
-    return state
+        continue
+      let bounds = savedBounds
+      if (bounds.width > area.width || bounds.height > area.height) {
+        const width = Math.min(bounds.width, area.width)
+        const height = Math.min(bounds.height, area.height)
+        bounds = {
+          x: Math.max(area.x, Math.min(bounds.x, area.x + area.width - width)),
+          y: Math.max(
+            area.y,
+            Math.min(bounds.y, area.y + area.height - height),
+          ),
+          width,
+          height,
+        }
+      }
+      if (bounds.x < area.x || bounds.x + bounds.width > area.x + area.width)
+        continue
+      const intersection = visibleWidth * visibleHeight
+      // Prefer the display containing most of a rectangle spanning multiple displays.
+      if (!match || intersection > match.intersection)
+        match = { bounds, intersection }
+    }
+  }
+  if (match && state)
+    return { bounds: match.bounds, maximized: state.maximized }
   const width = Math.min(900, primaryWorkArea.width)
   const height = Math.min(600, primaryWorkArea.height)
   return {
@@ -85,16 +113,110 @@ export function initialWindowState(
   }
 }
 
-export function windowStateToSave(snapshot: {
+export interface WindowSnapshot {
   bounds: WindowBounds
   normalBounds: WindowBounds
   maximized: boolean
   minimized: boolean
   fullscreen: boolean
-}): WindowState | undefined {
+}
+
+export function windowStateToSave(
+  snapshot: WindowSnapshot,
+): WindowState | undefined {
   if (snapshot.minimized || snapshot.fullscreen) return
   return parseWindowState({
     bounds: snapshot.maximized ? snapshot.normalBounds : snapshot.bounds,
     maximized: snapshot.maximized,
   })
+}
+
+export interface WindowDisplays {
+  workAreas: readonly WindowBounds[]
+  primaryWorkArea: WindowBounds
+}
+
+interface WindowStateTimers {
+  setTimeout: (
+    callback: () => void,
+    milliseconds: number,
+  ) => ReturnType<typeof setTimeout>
+  clearTimeout: (timer: ReturnType<typeof setTimeout>) => void
+}
+
+export class WindowStateTracker {
+  readonly #savedState: WindowState | undefined
+  readonly #getSnapshot: () => WindowSnapshot | undefined
+  readonly #getDisplays: () => WindowDisplays
+  readonly #save: (state: WindowState) => void
+  readonly #timers: WindowStateTimers
+  #shown = false
+  #lastState: WindowState | undefined
+  #timer: ReturnType<typeof setTimeout> | undefined
+
+  constructor(options: {
+    savedState: unknown
+    getSnapshot: () => WindowSnapshot | undefined
+    getDisplays: () => WindowDisplays
+    save: (state: WindowState) => void
+    timers?: WindowStateTimers
+  }) {
+    this.#savedState = parseWindowState(options.savedState)
+    this.#getSnapshot = options.getSnapshot
+    this.#getDisplays = options.getDisplays
+    this.#save = options.save
+    this.#timers = options.timers ?? { setTimeout, clearTimeout }
+  }
+
+  initialState(): WindowState {
+    const displays = this.#getDisplays()
+    return initialWindowState(
+      this.#savedState,
+      displays.workAreas,
+      displays.primaryWorkArea,
+    )
+  }
+
+  showFirstTime(apply: (state: WindowState) => void): void {
+    if (this.#shown) return
+    // Re-evaluate the original saved rectangle: docking may have changed displays.
+    const state = this.initialState()
+    apply(state)
+    // Ignore synchronous resize/maximize events emitted while applying restoration.
+    this.#lastState = state
+    this.#shown = true
+    this.#schedule()
+  }
+
+  changed(): void {
+    if (!this.#shown) return
+    const state = this.#capture()
+    if (!state) return
+    // Capture now, before minimize/fullscreen can hide a pending usable change.
+    this.#lastState = state
+    this.#schedule()
+  }
+
+  flush(): void {
+    this.#cancelTimer()
+    if (!this.#shown) return
+    this.#lastState = this.#capture() ?? this.#lastState
+    if (this.#lastState) this.#save(this.#lastState)
+  }
+
+  #capture(): WindowState | undefined {
+    const snapshot = this.#getSnapshot()
+    return snapshot ? windowStateToSave(snapshot) : undefined
+  }
+
+  #schedule(): void {
+    this.#cancelTimer()
+    this.#timer = this.#timers.setTimeout(() => this.flush(), 1000)
+  }
+
+  #cancelTimer(): void {
+    if (this.#timer === undefined) return
+    this.#timers.clearTimeout(this.#timer)
+    this.#timer = undefined
+  }
 }
