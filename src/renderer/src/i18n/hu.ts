@@ -160,9 +160,13 @@ export const hu = {
     'Ehhez a kategóriához tranzakciók tartoznak. A megőrzésükhöz válassz másik kategóriát.',
   'categories.error.replacement':
     'Másik, azonos típusú, aktív kategóriát válassz.',
-  'updates.ready':
-    'A frissítés letöltődött. A telepítéshez indítsd újra az alkalmazást.',
+  'updates.downloading': 'Frissítés letöltése… {percent}%',
+  'updates.downloadingStarted': 'A frissítés letöltése elkezdődött.',
+  'updates.ready': 'Az új verzió ({version}) letöltődött. Telepíted most?',
+  'updates.later': 'Később',
   'updates.restart': 'Újraindítás és frissítés',
+  'updates.restarting': 'Újraindítás…',
+  'updates.updated': 'Az alkalmazás frissült: {version}.',
   'updates.error':
     'Nem sikerült újraindítani az alkalmazást a frissítéshez. Próbáld újra.',
   'app.name': 'Financial Tracker',

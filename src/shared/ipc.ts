@@ -143,8 +143,9 @@ export const IPC_CHANNELS = {
   desktopDataChanged: 'desktop:data-changed',
   desktopProfileChanged: 'desktop:profile-changed',
   windowChromeSetTheme: 'window-chrome:set-theme',
-  updatesIsReady: 'updates:is-ready',
-  updatesReady: 'updates:ready',
+  updatesState: 'updates:state',
+  updatesStateChanged: 'updates:state-changed',
+  updatesJustUpdated: 'updates:just-updated',
   updatesRestart: 'updates:restart',
   profilesList: 'profiles:list',
   profilesCreate: 'profiles:create',
@@ -248,6 +249,11 @@ export const IPC_CHANNELS = {
   receiptsChanged: 'receipts:changed',
 } as const
 
+export type UpdateState =
+  | { status: 'idle' }
+  | { status: 'downloading'; percent: number }
+  | { status: 'ready'; version: string; installError?: true }
+
 export interface AppBridge {
   windowChrome: {
     setTheme(theme: ResolvedTheme): Promise<void>
@@ -332,8 +338,9 @@ export interface AppBridge {
     delete(input: CategorisationRuleIdInput): Promise<void>
   }
   updates: {
-    isReady(): Promise<boolean>
-    onReady(listener: () => void): () => void
+    state(): Promise<UpdateState>
+    onStateChanged(listener: (state: UpdateState) => void): () => void
+    justUpdated(): Promise<string | null>
     restart(): Promise<void>
   }
   getVersion(): Promise<string>

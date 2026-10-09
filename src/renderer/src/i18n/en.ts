@@ -153,8 +153,14 @@ export const en = {
     'This category has transactions. Choose a replacement to preserve them.',
   'categories.error.replacement':
     'Choose a different, active replacement of the same kind.',
-  'updates.ready': 'An update is downloaded. Restart to install it.',
+  'updates.downloading': 'Downloading update… {percent}%',
+  'updates.downloadingStarted': 'The update download has started.',
+  'updates.ready':
+    'The new version ({version}) has been downloaded. Install it now?',
+  'updates.later': 'Later',
   'updates.restart': 'Restart and update',
+  'updates.restarting': 'Restarting…',
+  'updates.updated': 'The app was updated: {version}.',
   'updates.error': 'Could not restart for the update. Please try again.',
   'app.name': 'Financial Tracker',
   'app.tagline': 'Your finances, on your PC.',

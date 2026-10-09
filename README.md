@@ -259,16 +259,43 @@ dispatched on a tag. It creates neither a tag nor a GitHub Release.
    `latest.yml`; electron-updater needs these assets. Check a previously
    installed version detects and installs the new version on restart.
 
-Packaged builds check the public GitHub Releases feed once on startup and
-automatically download available updates. Development builds do neither.
-Offline/failed checks do not block startup and retry on the next startup.
-After download, a small Hungarian/English/German notice offers **Restart and
-update**, using the active profile's language (English before profile selection).
-Installation is explicit, not automatic on ordinary quit. Restart waits for
-ongoing profile operations and closes SQLite before starting the installer.
-Database migrations retain the existing verified-backup protections. End-to-end
-update/restart behavior must be checked manually with two authorized releases;
-the build-only artifact is not an update feed.
+Packaged builds check the public GitHub Releases feed at startup and every six
+hours while running (the app often stays in the tray for days), and download
+available updates in the background. Development builds do neither. Offline or
+failed checks are only logged and never interrupt work. While a download runs,
+the main window shows its progress. When it finishes, a card names the new
+version and offers **Later**, which hides it until the next app start, and
+**Restart and update**. If the main window is hidden at that moment, one native
+notification appears, and clicking it opens the main window. Texts follow the
+active profile's language (English before profile selection). Nothing installs
+on an ordinary quit. That avoids a manual relaunch racing a running installer.
+**Restart and update** waits for ongoing profile operations, closes SQLite, quits,
+and runs the installer visibly with its progress window. The updated app then
+starts again by itself. On its first start after an update it briefly confirms
+the new version. The last-run version is kept in a separate `last-version.json`
+beside `app-settings.json`, so older builds keep reading their settings. A fresh
+install shows no confirmation. Database migrations retain the existing
+verified-backup protections. End-to-end update/restart behavior must be checked
+manually with two authorized releases; the build-only artifact is not an update
+feed.
+
+### Manual update check (two published releases)
+
+Install the older release (0.5.1 or later; 0.5.0 still has the earlier silent
+flow), keep a synthetic profile open, and publish the newer one.
+
+1. Start the older app. The main window shows the download progress, then a card
+   naming the new version with **Later** and **Restart and update**.
+2. Choose **Later**: the card stays hidden for this run. Quit from the tray and
+   start again: the card returns.
+3. Choose **Restart and update**: the app closes, the installer shows its
+   progress window, and the updated app starts by itself and briefly confirms
+   the new version.
+4. Repeat with the main window hidden in the tray until the download finishes:
+   one native notification appears, and clicking it opens the main window with
+   the card.
+5. Start the app without network access: it starts normally without any update
+   message.
 
 ## Backup and restore
 
